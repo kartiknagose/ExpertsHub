@@ -1,0 +1,146 @@
+// Prisma schema for UrbanPro v2
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  CUSTOMER
+  WORKER
+  ADMIN
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model User {
+  id            Int       @id @default(autoincrement())
+  name          String
+  email         String    @unique
+  passwordHash  String
+  role          Role      @default(CUSTOMER)
+  emailVerified Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  addresses     Address[]
+  workerProfile WorkerProfile?
+
+  bookingsCustomer Booking[] @relation("customerBookings")
+  bookingsWorker   Booking[] @relation("workerBookings")
+
+  reviewsCustomer Review[] @relation("customerReviews")
+  reviewsWorker   Review[] @relation("workerReviews")
+}
+
+model Address {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  user       User     @relation(fields: [userId], references: [id])
+  line1      String
+  line2      String?
+  city       String
+  state      String
+  postalCode String
+  country    String
+  latitude   Float?
+  longitude  Float?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Service {
+  id           Int      @id @default(autoincrement())
+  name         String
+  description  String?
+  category     String?
+  basePrice    Decimal?
+  translations Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  workers  WorkerService[]
+  bookings Booking[]
+}
+
+model WorkerProfile {
+  id           Int      @id @default(autoincrement())
+  userId       Int      @unique
+  user         User     @relation(fields: [userId], references: [id])
+  bio          String?
+  skills       Json?
+  hourlyRate   Decimal?
+  rating       Float    @default(0)
+  totalReviews Int      @default(0)
+  serviceAreas Json?
+
+  availability Availability[]
+  services     WorkerService[]
+}
+
+model WorkerService {
+  workerId Int
+  serviceId Int
+  worker   WorkerProfile @relation(fields: [workerId], references: [id])
+  service  Service       @relation(fields: [serviceId], references: [id])
+
+  @@id([workerId, serviceId])
+}
+
+model Availability {
+  id         Int      @id @default(autoincrement())
+  workerId   Int
+  worker     WorkerProfile @relation(fields: [workerId], references: [id])
+  dayOfWeek  Int      // 0-6 (Sun-Sat)
+  startTime  String   // HH:mm
+  endTime    String   // HH:mm
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Booking {
+  id          Int           @id @default(autoincrement())
+  customerId  Int
+  customer    User          @relation("customerBookings", fields: [customerId], references: [id])
+  workerId    Int?
+  worker      User?         @relation("workerBookings", fields: [workerId], references: [id])
+  serviceId   Int
+  service     Service       @relation(fields: [serviceId], references: [id])
+  scheduledAt DateTime
+  status      BookingStatus @default(PENDING)
+  totalPrice  Decimal?
+  address     String?
+  notes       String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  review      Review?
+
+  @@index([status])
+  @@index([customerId])
+  @@index([workerId])
+}
+
+model Review {
+  id         Int      @id @default(autoincrement())
+  bookingId  Int      @unique
+  booking    Booking  @relation(fields: [bookingId], references: [id])
+  workerId   Int
+  worker     User     @relation("workerReviews", fields: [workerId], references: [id])
+  customerId Int
+  customer   User     @relation("customerReviews", fields: [customerId], references: [id])
+  rating     Int
+  comment    String?
+  createdAt  DateTime @default(now())
+
+  @@index([workerId])
+}
