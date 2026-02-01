@@ -26,6 +26,7 @@ model User {
   id            Int       @id @default(autoincrement())
   name          String
   email         String    @unique
+  mobile        String    @unique
   passwordHash  String
   role          Role      @default(CUSTOMER)
   emailVerified Boolean   @default(false)
@@ -40,6 +41,22 @@ model User {
 
   reviewsCustomer Review[] @relation("customerReviews")
   reviewsWorker   Review[] @relation("workerReviews")
+  emailVerifications EmailVerification[]
+}
+
+model EmailVerification {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email     String
+  token     String    @unique
+  verified  Boolean   @default(false)
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([email])
+  @@index([token])
 }
 
 model Address {
