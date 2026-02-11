@@ -16,4 +16,19 @@ const verifyEmailSchema = [
   query('token').notEmpty().withMessage('Verification token required'),
 ];
 
-module.exports = { registerSchema, loginSchema, verifyEmailSchema };
+const forgotPasswordSchema = [
+  body('email').isEmail().withMessage('Valid email required'),
+];
+
+const resetPasswordSchema = [
+  body('token').notEmpty().withMessage('Reset token required'),
+  body('password').isLength({ min: 8 }).withMessage('Password min 8 chars'),
+];
+
+module.exports = {
+  registerSchema,
+  loginSchema,
+  verifyEmailSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
+};

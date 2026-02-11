@@ -13,7 +13,7 @@
  */
 
 const asyncHandler = require('../../common/utils/asyncHandler');
-const { createService, listServices, getServiceById } = require('./service.service');
+const { createService, listServices, getServiceById, getServiceWorkers } = require('./service.service');
 
 /**
  * CREATE A NEW SERVICE
@@ -69,11 +69,11 @@ exports.create = asyncHandler(async (req, res) => {
  * }
  */
 exports.list = asyncHandler(async (req, res) => {
-  // Extract category filter from query string (e.g., ?category=Plumbing)
-  const { category } = req.query;
+  // Extract filters from query string (e.g., ?category=Plumbing&search=cleaning)
+  const { category, search } = req.query;
   
   // Call service function to fetch services (with optional filter)
-  const services = await listServices({ category });
+  const services = await listServices({ category, search });
   
   // Send services back to client
   res.json({ services });
@@ -124,4 +124,26 @@ exports.getOne = asyncHandler(async (req, res) => {
   
   // Service found, send it back to client
   res.json({ service });
+});
+
+/**
+ * GET WORKERS FOR A SERVICE
+ *
+ * HTTP Endpoint: GET /api/services/:id/workers
+ * Who can access: Anyone (public endpoint)
+ *
+ * Response (200 OK):
+ * {
+ *   "workers": [ ...worker profiles... ]
+ * }
+ */
+exports.getWorkers = asyncHandler(async (req, res) => {
+  const id = Number(req.params.id);
+
+  if (Number.isNaN(id)) {
+    return res.status(400).json({ error: 'Invalid service id' });
+  }
+
+  const workers = await getServiceWorkers(id);
+  res.json({ workers });
 });

@@ -1,4 +1,5 @@
 const express = require('express');
+const path = require('path');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const cookieParser = require('cookie-parser');
@@ -11,6 +12,13 @@ const notFoundHandler = require('./middleware/notFoundHandler');
 const errorHandler = require('./middleware/errorHandler');
 const workerRoutes = require('./modules/workers/worker.routes');
 const serviceRoutes = require('./modules/services/service.routes');
+const customerRoutes = require('./modules/customers/customer.routes');
+const uploadRoutes = require('./modules/uploads/upload.routes');
+const availabilityRoutes = require('./modules/availability/availability.routes');
+const reviewRoutes = require('./modules/reviews/review.routes');
+const verificationRoutes = require('./modules/verification/verification.routes');
+const adminRoutes = require('./modules/admin/admin.routes');
+const paymentRoutes = require('./modules/payments/payment.routes');
 
 // Routes
 const authRoutes = require('./modules/auth/auth.routes');
@@ -19,12 +27,19 @@ const bookingRoutes = require('./modules/bookings/booking.routes');
 const app = express();
 
 // Security & parsing
-app.use(helmet());
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  })
+);
 app.use(cors(corsOptions));
 app.use(morgan('dev'));
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
 app.use(i18n);
+
+// Static uploads
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Health check
 app.get('/health', (req, res) => {
@@ -36,6 +51,13 @@ app.use('/api/auth', authRoutes);
 app.use('/api/workers', workerRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/bookings', bookingRoutes); // Mount booking routes at /api/bookings
+app.use('/api/customers', customerRoutes);
+app.use('/api/uploads', uploadRoutes);
+app.use('/api/availability', availabilityRoutes);
+app.use('/api/reviews', reviewRoutes);
+app.use('/api/verification', verificationRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/payments', paymentRoutes);
 
 // 404 and error handlers
 app.use(notFoundHandler);

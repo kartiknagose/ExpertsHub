@@ -1,7 +1,7 @@
 const prisma = require('../../config/prisma');
 
 // Create or update a worker profile for the current user (idempotent)
-async function upsertWorkerProfile(userId, { bio, hourlyRate, skills, serviceAreas }) {
+async function upsertWorkerProfile(userId, { bio, hourlyRate, skills, serviceAreas, profilePhotoUrl }) {
   // Store skills and serviceAreas as JSON arrays for flexibility
   const data = {
     bio: bio ?? null,
@@ -11,17 +11,46 @@ async function upsertWorkerProfile(userId, { bio, hourlyRate, skills, serviceAre
     user: { connect: { id: userId } },
   };
 
-  // If profile exists -> update, else -> create
-  const existing = await prisma.workerProfile.findUnique({ where: { userId } });
-  if (existing) {
-    return prisma.workerProfile.update({ where: { userId }, data });
-  }
-  return prisma.workerProfile.create({ data });
+  return prisma.$transaction(async (tx) => {
+    // If profile exists -> update, else -> create
+    const existing = await tx.workerProfile.findUnique({ where: { userId } });
+    let profile;
+
+    if (existing) {
+      profile = await tx.workerProfile.update({ where: { userId }, data });
+    } else {
+      profile = await tx.workerProfile.create({ data });
+    }
+
+    await tx.user.update({
+      where: { id: userId },
+      data: {
+        profilePhotoUrl: profilePhotoUrl || undefined,
+        isProfileComplete: true,
+      },
+    });
+
+    return profile;
+  });
 }
 
 // Get the current user's worker profile (if any)
 async function getMyWorkerProfile(userId) {
-  return prisma.workerProfile.findUnique({ where: { userId } });
+  return prisma.workerProfile.findUnique({
+    where: { userId },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          profilePhotoUrl: true,
+          emailVerified: true,
+        },
+      },
+    },
+  });
 }
 
 // Add a service to the worker's offered services

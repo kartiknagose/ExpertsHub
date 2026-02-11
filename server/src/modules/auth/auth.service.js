@@ -1,36 +1,40 @@
 const prisma = require('../../config/prisma');
 const { hashPassword, comparePassword } = require('../../common/utils/bcrypt');
 const { signJwt } = require('../../common/utils/jwt');
-const { generateEmailVerificationToken } = require('../../common/utils/tokenGenerator');
+const { generateEmailVerificationToken, generatePasswordResetToken } = require('../../common/utils/tokenGenerator');
 
 async function registerUser({ name, email, mobile, password }) {
-  // Check email and mobile uniqueness
-  const existingEmail = await prisma.user.findUnique({ where: { email } });
-  if (existingEmail) throw new Error('Email already registered');
-  
-  const existingMobile = await prisma.user.findUnique({ where: { mobile } });
-  if (existingMobile) throw new Error('Mobile number already registered');
-  
   const passwordHash = await hashPassword(password);
   const { token: verificationToken, expiresAt } = generateEmailVerificationToken();
   
-  // Create user and email verification in transaction
-  const user = await prisma.user.create({
-    data: {
-      name,
-      email,
-      mobile,
-      passwordHash,
-      role: 'CUSTOMER',
-      emailVerifications: {
-        create: {
-          email,
-          token: verificationToken,
-          expiresAt,
+  // Atomic transaction: check uniqueness and create user together (prevents race condition)
+  const user = await prisma.$transaction(async (tx) => {
+    // Check email uniqueness within transaction
+    const existingEmail = await tx.user.findUnique({ where: { email } });
+    if (existingEmail) throw new Error('Email already registered');
+    
+    // Check mobile uniqueness within transaction
+    const existingMobile = await tx.user.findUnique({ where: { mobile } });
+    if (existingMobile) throw new Error('Mobile number already registered');
+    
+    // Create user and email verification atomically (all or nothing)
+    return await tx.user.create({
+      data: {
+        name,
+        email,
+        mobile,
+        passwordHash,
+        role: 'CUSTOMER',
+        emailVerifications: {
+          create: {
+            email,
+            token: verificationToken,
+            expiresAt,
+          }
         }
-      }
-    },
-    include: { emailVerifications: true }
+      },
+      include: { emailVerifications: true }
+    });
   });
   
   const jwtToken = signJwt({ id: user.id, role: user.role });
@@ -41,42 +45,38 @@ async function registerUser({ name, email, mobile, password }) {
   };
 }
 
-async function registerWorker({ name, email, mobile, password, bio, skills, hourlyRate, serviceAreas }) {
-  // Check email and mobile uniqueness
-  const existingEmail = await prisma.user.findUnique({ where: { email } });
-  if (existingEmail) throw new Error('Email already registered');
-  
-  const existingMobile = await prisma.user.findUnique({ where: { mobile } });
-  if (existingMobile) throw new Error('Mobile number already registered');
-  
+async function registerWorker({ name, email, mobile, password }) {
   const passwordHash = await hashPassword(password);
   const { token: verificationToken, expiresAt } = generateEmailVerificationToken();
   
-  // Create user with WORKER role, WorkerProfile, and EmailVerification in transaction
-  const user = await prisma.user.create({
-    data: {
-      name,
-      email,
-      mobile,
-      passwordHash,
-      role: 'WORKER',
-      workerProfile: {
-        create: {
-          bio: bio || '',
-          skills: skills || [],
-          hourlyRate: hourlyRate || 0,
-          serviceAreas: serviceAreas || [],
+  // Atomic transaction: check uniqueness and create user together (prevents race condition)
+  const user = await prisma.$transaction(async (tx) => {
+    // Check email uniqueness within transaction
+    const existingEmail = await tx.user.findUnique({ where: { email } });
+    if (existingEmail) throw new Error('Email already registered');
+    
+    // Check mobile uniqueness within transaction
+    const existingMobile = await tx.user.findUnique({ where: { mobile } });
+    if (existingMobile) throw new Error('Mobile number already registered');
+    
+    // Create user with WORKER role and EmailVerification atomically
+    return await tx.user.create({
+      data: {
+        name,
+        email,
+        mobile,
+        passwordHash,
+        role: 'WORKER',
+        emailVerifications: {
+          create: {
+            email,
+            token: verificationToken,
+            expiresAt,
+          }
         }
       },
-      emailVerifications: {
-        create: {
-          email,
-          token: verificationToken,
-          expiresAt,
-        }
-      }
-    },
-    include: { workerProfile: true, emailVerifications: true }
+      include: { emailVerifications: true }
+    });
   });
   
   const jwtToken = signJwt({ id: user.id, role: user.role });
@@ -92,6 +92,7 @@ async function loginUser({ email, password }) {
   if (!user) throw new Error('Invalid credentials');
   const ok = await comparePassword(password, user.passwordHash);
   if (!ok) throw new Error('Invalid credentials');
+  if (!user.emailVerified) throw new Error('Email not verified');
   const token = signJwt({ id: user.id, role: user.role });
   return { user, token };
 }
@@ -102,19 +103,95 @@ async function verifyEmailToken({ token }) {
   if (verification.verified) throw new Error('Email already verified');
   if (new Date() > verification.expiresAt) throw new Error('Verification link expired');
 
-  // Update EmailVerification record
-  await prisma.emailVerification.update({
-    where: { id: verification.id },
-    data: { verified: true }
+  // Atomic transaction: update both records together
+  await prisma.$transaction(async (tx) => {
+    // Update EmailVerification record
+    await tx.emailVerification.update({
+      where: { id: verification.id },
+      data: { verified: true }
+    });
+
+    // Update User record
+    await tx.user.update({
+      where: { id: verification.userId },
+      data: { emailVerified: true, emailVerifiedAt: new Date() }
+    });
   });
 
-  // Update User record
-  await prisma.user.update({
+  // Fetch user role and profile completion info for redirect decisions
+  const user = await prisma.user.findUnique({
     where: { id: verification.userId },
-    data: { emailVerified: true }
+    include: {
+      workerProfile: true,
+      addresses: { take: 1 },
+    },
   });
 
-  return { userId: verification.userId, email: verification.email };
+  return {
+    userId: verification.userId,
+    email: verification.email,
+    role: user?.role,
+    hasWorkerProfile: Boolean(user?.workerProfile),
+    hasAddress: Boolean(user?.addresses?.length),
+    isProfileComplete: Boolean(user?.isProfileComplete),
+  };
 }
 
-module.exports = { registerUser, registerWorker, loginUser, verifyEmailToken };
+async function requestPasswordReset({ email, baseUrl }) {
+  // Always respond with success to avoid account enumeration
+  const user = await prisma.user.findUnique({ where: { email } });
+
+  if (!user) {
+    return { message: 'If an account exists, a reset link has been created.' };
+  }
+
+  const { token, expiresAt } = generatePasswordResetToken();
+
+  await prisma.passwordResetToken.create({
+    data: {
+      userId: user.id,
+      token,
+      expiresAt,
+    },
+  });
+
+  const resetLink = `${baseUrl}/reset-password?token=${token}`;
+
+  return {
+    message: 'If an account exists, a reset link has been created.',
+    resetLink,
+  };
+}
+
+async function resetPasswordWithToken({ token, password }) {
+  const resetToken = await prisma.passwordResetToken.findUnique({
+    where: { token },
+  });
+
+  if (!resetToken) throw new Error('Invalid or expired reset token');
+  if (resetToken.used) throw new Error('Reset token already used');
+  if (new Date() > resetToken.expiresAt) throw new Error('Reset token expired');
+
+  const passwordHash = await hashPassword(password);
+
+  await prisma.$transaction(async (tx) => {
+    await tx.user.update({
+      where: { id: resetToken.userId },
+      data: { passwordHash },
+    });
+
+    await tx.passwordResetToken.update({
+      where: { id: resetToken.id },
+      data: { used: true },
+    });
+  });
+}
+
+module.exports = {
+  registerUser,
+  registerWorker,
+  loginUser,
+  verifyEmailToken,
+  requestPasswordReset,
+  resetPasswordWithToken,
+};

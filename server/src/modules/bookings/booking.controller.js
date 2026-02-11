@@ -221,6 +221,42 @@ const cancelBooking = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * PAY FOR A BOOKING
+ *
+ * HTTP Endpoint: POST /api/bookings/:id/pay
+ * Who can access: The CUSTOMER who created it
+ *
+ * Request Body (optional):
+ * {
+ *   "paymentReference": "txn_123"
+ * }
+ *
+ * Response (200 OK):
+ * {
+ *   "message": "Payment recorded successfully",
+ *   "booking": { ...updated booking... }
+ * }
+ */
+const payBooking = asyncHandler(async (req, res) => {
+  const bookingId = parseInt(req.params.id);
+  const { paymentReference } = req.body;
+  const userId = req.user.id;
+  const userRole = req.user.role;
+
+  const paidBooking = await bookingService.payBooking(
+    bookingId,
+    userId,
+    userRole,
+    paymentReference
+  );
+
+  res.status(200).json({
+    message: 'Payment recorded successfully.',
+    booking: paidBooking,
+  });
+});
+
 // Export all controller functions so routes can use them
 module.exports = {
   createBooking,
@@ -228,4 +264,5 @@ module.exports = {
   getBookingById,
   updateBookingStatus,
   cancelBooking,
+  payBooking,
 };

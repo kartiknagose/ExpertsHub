@@ -1,0 +1,13 @@
+# UrbanPro — Robots.txt
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /worker/
+Disallow: /dashboard
+Disallow: /bookings
+Disallow: /profile
+Disallow: /login
+Disallow: /register
+
+# Sitemap
+# Sitemap: https://urbanpro.com/sitemap.xml

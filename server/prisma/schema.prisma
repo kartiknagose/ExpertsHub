@@ -22,6 +22,33 @@ enum BookingStatus {
   CANCELLED
 }
 
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum VerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  MORE_INFO
+}
+
+enum VerificationDocumentType {
+  ID_PROOF
+  EXPERIENCE_LETTER
+  CERTIFICATION
+  PORTFOLIO
+  ADDRESS_PROOF
+}
+
+enum VerificationMediaType {
+  VIDEO_INTRO
+  PORTFOLIO_IMAGE
+}
+
 model User {
   id            Int       @id @default(autoincrement())
   name          String
@@ -30,6 +57,9 @@ model User {
   passwordHash  String
   role          Role      @default(CUSTOMER)
   emailVerified Boolean   @default(false)
+  emailVerifiedAt DateTime?
+  profilePhotoUrl String?
+  isProfileComplete Boolean @default(false)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -37,11 +67,13 @@ model User {
   workerProfile WorkerProfile?
 
   bookingsCustomer Booking[] @relation("customerBookings")
-  bookingsWorker   Booking[] @relation("workerBookings")
 
-  reviewsCustomer Review[] @relation("customerReviews")
-  reviewsWorker   Review[] @relation("workerReviews")
+  reviewsWritten  Review[] @relation("reviewsWritten")
+  reviewsReceived Review[] @relation("reviewsReceived")
   emailVerifications EmailVerification[]
+  passwordResetTokens PasswordResetToken[]
+  workerVerificationApplications WorkerVerificationApplication[]
+  payments Payment[]
 }
 
 model EmailVerification {
@@ -56,6 +88,19 @@ model EmailVerification {
 
   @@index([userId])
   @@index([email])
+  @@index([token])
+}
+
+model PasswordResetToken {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
   @@index([token])
 }
 
@@ -99,9 +144,69 @@ model WorkerProfile {
   rating       Float    @default(0)
   totalReviews Int      @default(0)
   serviceAreas Json?
+  isVerified   Boolean  @default(false)
+  isProbation  Boolean  @default(true)
+  verificationScore Int? 
 
   availability Availability[]
   services     WorkerService[]
+  bookingsWorker Booking[] @relation("bookingsWorker")
+}
+
+model WorkerVerificationApplication {
+  id          Int       @id @default(autoincrement())
+  userId      Int
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status      VerificationStatus @default(PENDING)
+  score       Int?      
+  notes       String?
+  submittedAt DateTime  @default(now())
+  reviewedAt  DateTime?
+
+  documents   WorkerVerificationDocument[]
+  references  WorkerVerificationReference[]
+  media       WorkerVerificationMedia[]
+
+  @@index([userId])
+  @@index([status])
+}
+
+model WorkerVerificationDocument {
+  id            Int       @id @default(autoincrement())
+  applicationId Int
+  application   WorkerVerificationApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  type          VerificationDocumentType
+  url           String
+  createdAt     DateTime  @default(now())
+
+  @@index([applicationId])
+  @@index([type])
+}
+
+model WorkerVerificationReference {
+  id            Int       @id @default(autoincrement())
+  applicationId Int
+  application   WorkerVerificationApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  name          String
+  phone         String
+  relation      String?
+  verified      Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+
+  @@index([applicationId])
+  @@index([phone])
+}
+
+model WorkerVerificationMedia {
+  id            Int       @id @default(autoincrement())
+  applicationId Int
+  application   WorkerVerificationApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  type          VerificationMediaType
+  url           String
+  createdAt     DateTime  @default(now())
+
+  @@index([applicationId])
+  @@index([type])
 }
 
 model WorkerService {
@@ -128,12 +233,15 @@ model Booking {
   id                 Int           @id @default(autoincrement())
   customerId         Int
   customer           User          @relation("customerBookings", fields: [customerId], references: [id])
-  workerId           Int?
-  worker             User?         @relation("workerBookings", fields: [workerId], references: [id])
+  workerProfileId    Int?
+  workerProfile      WorkerProfile? @relation("bookingsWorker", fields: [workerProfileId], references: [id])
   serviceId          Int
   service            Service       @relation(fields: [serviceId], references: [id])
   scheduledAt        DateTime
   status             BookingStatus @default(PENDING)
+  paymentStatus      PaymentStatus @default(PENDING)
+  paymentReference   String?
+  paidAt             DateTime?
   totalPrice         Decimal?
   address            String?
   notes              String?
@@ -141,24 +249,43 @@ model Booking {
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 
-  review             Review?
+  reviews            Review[]
+  payments           Payment[]
 
   @@index([status])
   @@index([customerId])
-  @@index([workerId])
+  @@index([workerProfileId])
+}
+
+model Payment {
+  id          Int           @id @default(autoincrement())
+  bookingId   Int
+  booking     Booking       @relation(fields: [bookingId], references: [id])
+  customerId  Int
+  customer    User          @relation(fields: [customerId], references: [id])
+  amount      Decimal?
+  status      PaymentStatus @default(PENDING)
+  reference   String?
+  createdAt   DateTime      @default(now())
+
+  @@index([bookingId])
+  @@index([customerId])
 }
 
 model Review {
-  id         Int      @id @default(autoincrement())
-  bookingId  Int      @unique
-  booking    Booking  @relation(fields: [bookingId], references: [id])
-  workerId   Int
-  worker     User     @relation("workerReviews", fields: [workerId], references: [id])
-  customerId Int
-  customer   User     @relation("customerReviews", fields: [customerId], references: [id])
-  rating     Int
-  comment    String?
-  createdAt  DateTime @default(now())
+  id            Int      @id @default(autoincrement())
+  bookingId     Int
+  booking       Booking  @relation(fields: [bookingId], references: [id])
+  
+  reviewerId    Int
+  reviewer      User     @relation("reviewsWritten", fields: [reviewerId], references: [id])
+  
+  revieweeId    Int
+  reviewee      User     @relation("reviewsReceived", fields: [revieweeId], references: [id])
+  
+  rating        Int
+  comment       String?
+  createdAt     DateTime @default(now())
 
-  @@index([workerId])
+  @@unique([bookingId, reviewerId])
 }

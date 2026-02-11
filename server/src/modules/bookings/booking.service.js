@@ -34,36 +34,50 @@ const prisma = require('../../config/prisma'); // Our database connection
  * @throws {Error} - If validation fails (worker not found, service not offered, etc.)
  */
 async function createBooking(customerId, bookingData) {
-  const { workerId, serviceId, scheduledDate, addressDetails, estimatedPrice, notes } = bookingData;
+  const { workerProfileId, serviceId, scheduledDate, addressDetails, estimatedPrice, notes } = bookingData;
 
-  // STEP 1: Verify the worker exists and has a worker profile
-  // Why? Can't book someone who isn't registered as a worker
+  // VALIDATE: Scheduled date must be in the future (at least 1 hour from now)
+  const scheduledDateObj = new Date(scheduledDate);
+  const now = new Date();
+  const oneHourLater = new Date(now.getTime() + 60 * 60 * 1000);
+
+  if (scheduledDateObj <= now) {
+    throw new Error('Booking date must be in the future.');
+  }
+
+  if (scheduledDateObj < oneHourLater) {
+    throw new Error('Bookings must be scheduled at least 1 hour in advance.');
+  }
+
+  // VALIDATE: Customer cannot book themselves as a worker (implicit check - they shouldn't be a worker)
+  const customer = await prisma.user.findUnique({ where: { id: customerId } });
+  if (customer.role === 'WORKER') {
+    throw new Error('Workers cannot book services (use customer account instead).');
+  }
+
+  // VALIDATE: Verify the worker exists and has a worker profile
   const workerProfile = await prisma.workerProfile.findUnique({
-    where: { id: workerId }, // Look for worker by their ID
+    where: { id: workerProfileId },
   });
 
   if (!workerProfile) {
-    // If worker doesn't exist, throw an error that controller will catch
     throw new Error('Worker not found. Please select a valid worker.');
   }
 
-  // STEP 2: Verify the service exists
-  // Why? Can't book a service that doesn't exist in our system
+  // VALIDATE: Verify the service exists
   const service = await prisma.service.findUnique({
-    where: { id: serviceId }, // Look for service by its ID
+    where: { id: serviceId },
   });
 
   if (!service) {
     throw new Error('Service not found. Please select a valid service.');
   }
 
-  // STEP 3: Verify the worker actually offers this service
-  // Why? A plumber shouldn't accept electrical work bookings
-  // We check the "WorkerService" junction table that connects workers to their services
+  // VALIDATE: Verify the worker actually offers this service
   const workerOffersService = await prisma.workerService.findUnique({
     where: {
-      workerId_serviceId: { // Compound key: both workerId AND serviceId must match
-        workerId: workerId,
+      workerId_serviceId: {
+        workerId: workerProfileId,
         serviceId: serviceId,
       },
     },
@@ -73,33 +87,51 @@ async function createBooking(customerId, bookingData) {
     throw new Error('This worker does not offer the selected service. Please choose another worker or service.');
   }
 
-  // STEP 4: All validations passed! Create the booking in the database
+  // VALIDATE: Address must be at least 10 characters
+  if (!addressDetails || addressDetails.length < 10) {
+    throw new Error('Address must be at least 10 characters long.');
+  }
+
+  // VALIDATE: Price must be positive (if provided)
+  if (estimatedPrice !== undefined && (isNaN(estimatedPrice) || estimatedPrice < 0)) {
+    throw new Error('Estimated price must be a positive number.');
+  }
+
+  // VALIDATE: Price cannot exceed reasonable limit (e.g., $100,000)
+  if (estimatedPrice !== undefined && estimatedPrice > 100000) {
+    throw new Error('Estimated price seems too high. Please check and try again.');
+  }
+
+  // Create booking with transaction to ensure atomicity
   const newBooking = await prisma.booking.create({
     data: {
-      customerId: customerId,        // Who is booking (from JWT token)
-      workerId: workerId,             // The worker's profile ID (consistent with WorkerService)
-      serviceId: serviceId,           // What service they want
-      scheduledAt: new Date(scheduledDate), // Convert string to Date object
-      address: addressDetails, // Where the service happens
-      totalPrice: estimatedPrice, // How much they expect to pay (optional)
-      notes: notes,                   // Any special instructions (optional)
-      status: 'PENDING',              // Initial status (waiting for worker to accept)
+      customerId: customerId,
+      workerProfileId: workerProfileId,
+      serviceId: serviceId,
+      scheduledAt: scheduledDateObj,
+      address: addressDetails,
+      totalPrice: estimatedPrice,
+      notes: notes,
+      status: 'PENDING',
     },
-    // Include related data in the response (so we can show service name, worker name, etc.)
     include: {
       service: {
-        select: { id: true, name: true, category: true }, // Get service details
+        select: { id: true, name: true, category: true },
       },
-      worker: {
-        select: { id: true, name: true, email: true }, // Get worker details
+      reviews: true,
+      workerProfile: {
+        select: {
+          id: true,
+          userId: true,
+          user: { select: { id: true, name: true, email: true } },
+        },
       },
       customer: {
-        select: { id: true, name: true, email: true }, // Get customer details
+        select: { id: true, name: true, email: true },
       },
     },
   });
 
-  // Return the complete booking object
   return newBooking;
 }
 
@@ -121,41 +153,43 @@ async function createBooking(customerId, bookingData) {
  * @returns {Promise<array>} - List of bookings for this user
  */
 async function getBookingsByUser(userId, role) {
-  let whereClause = {}; // Empty filter by default
+  let whereClause = {};
 
-  // Determine the filter based on user role
   if (role === 'CUSTOMER') {
-    // Customers see only bookings they created
     whereClause = { customerId: userId };
   } else if (role === 'WORKER') {
-    // Workers see bookings where their profile is assigned
     const workerProfile = await prisma.workerProfile.findUnique({
       where: { userId },
     });
     if (workerProfile) {
-      whereClause = { workerId: workerProfile.id };
+      whereClause = { workerProfileId: workerProfile.id };
     } else {
-      whereClause = { workerId: -1 }; // No profile = no bookings
+      whereClause = { workerProfileId: -1 };
     }
   }
-  // If role is ADMIN, whereClause stays empty, so they see ALL bookings
 
-  // Fetch bookings from database with the appropriate filter
   const bookings = await prisma.booking.findMany({
-    where: whereClause, // Apply the role-based filter
+    where: whereClause,
     include: {
       service: {
-        select: { id: true, name: true, category: true }, // Show what service was booked
+        select: { id: true, name: true, category: true },
       },
-      worker: {
-        select: { id: true, name: true, email: true }, // Show who's doing the work
+      reviews: {
+        select: { id: true, reviewerId: true, rating: true },
+      },
+      workerProfile: {
+        select: {
+          id: true,
+          userId: true,
+          user: { select: { id: true, name: true, email: true } },
+        },
       },
       customer: {
-        select: { id: true, name: true, email: true }, // Show who booked it
+        select: { id: true, name: true, email: true },
       },
     },
     orderBy: {
-      createdAt: 'desc', // Show newest bookings first
+      createdAt: 'desc',
     },
   });
 
@@ -178,15 +212,16 @@ async function getBookingsByUser(userId, role) {
  * @throws {Error} - If booking not found or user doesn't have permission
  */
 async function getBookingById(bookingId, userId, role) {
-  // Fetch the booking from database
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
     include: {
       service: {
         select: { id: true, name: true, category: true, basePrice: true },
       },
-      worker: {
-        select: { id: true, name: true, email: true },
+      reviews: true,
+      workerProfile: {
+        select: { id: true, userId: true },
+        include: { user: { select: { id: true, name: true, email: true } } },
       },
       customer: {
         select: { id: true, name: true, email: true },
@@ -194,27 +229,21 @@ async function getBookingById(bookingId, userId, role) {
     },
   });
 
-  // If booking doesn't exist, throw error
   if (!booking) {
     throw new Error('Booking not found.');
   }
 
-  // Check if user has permission to view this booking
-  // Admins can view everything
-  // Customers can view their own bookings
-  // Workers can view bookings assigned to them
   const isCustomer = booking.customerId === userId;
   let isWorker = false;
   if (role === 'WORKER') {
     const workerProfile = await prisma.workerProfile.findUnique({
       where: { userId },
     });
-    isWorker = workerProfile && booking.workerId === workerProfile.id;
+    isWorker = workerProfile && booking.workerProfileId === workerProfile.id;
   }
   const isAdmin = role === 'ADMIN';
 
   if (!isCustomer && !isWorker && !isAdmin) {
-    // User is not involved in this booking and is not an admin
     throw new Error('You do not have permission to view this booking.');
   }
 
@@ -242,7 +271,7 @@ async function getBookingById(bookingId, userId, role) {
  * @throws {Error} - If booking not found or user doesn't have permission
  */
 async function updateBookingStatus(bookingId, newStatus, userId, role) {
-  // First, fetch the booking to check permissions
+  // Fetch booking with transaction for atomicity
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
   });
@@ -251,33 +280,59 @@ async function updateBookingStatus(bookingId, newStatus, userId, role) {
     throw new Error('Booking not found.');
   }
 
-  // Check if user has permission to update this booking
   let isWorker = false;
   if (role === 'WORKER') {
     const workerProfile = await prisma.workerProfile.findUnique({
       where: { userId },
     });
-    isWorker = workerProfile && booking.workerId === workerProfile.id;
+    isWorker = workerProfile && booking.workerProfileId === workerProfile.id;
   }
   const isAdmin = role === 'ADMIN';
 
   if (!isWorker && !isAdmin) {
-    // Only the assigned worker or an admin can update status
     throw new Error('Only the assigned worker or admin can update booking status.');
   }
 
-  // Update the booking status in the database
-  const updatedBooking = await prisma.booking.update({
-    where: { id: bookingId },
-    data: {
-      status: newStatus, // Change to new status
-      updatedAt: new Date(), // Update the timestamp
-    },
-    include: {
-      service: { select: { id: true, name: true, category: true } },
-      worker: { select: { id: true, name: true, email: true } },
-      customer: { select: { id: true, name: true, email: true } },
-    },
+  // Use transaction to prevent race conditions where two workers update simultaneously
+  const updatedBooking = await prisma.$transaction(async (tx) => {
+    // Re-fetch within transaction to get fresh data
+    const currentBooking = await tx.booking.findUnique({
+      where: { id: bookingId },
+    });
+
+    // Validate status transition
+    const validTransitions = {
+      'PENDING': ['CONFIRMED', 'CANCELLED'],
+      'CONFIRMED': ['IN_PROGRESS', 'CANCELLED'],
+      'IN_PROGRESS': ['COMPLETED', 'CANCELLED'],
+      'COMPLETED': [],
+      'CANCELLED': [],
+    };
+
+    if (!validTransitions[currentBooking.status].includes(newStatus)) {
+      throw new Error(`Cannot transition from ${currentBooking.status} to ${newStatus}`);
+    }
+
+    // Update the booking
+    return await tx.booking.update({
+      where: { id: bookingId },
+      data: {
+        status: newStatus,
+        updatedAt: new Date(),
+      },
+      include: {
+        service: { select: { id: true, name: true, category: true } },
+        reviews: true,
+        workerProfile: {
+          select: {
+            id: true,
+            userId: true,
+            user: { select: { id: true, name: true, email: true } },
+          },
+        },
+        customer: { select: { id: true, name: true, email: true } },
+      },
+    });
   });
 
   return updatedBooking;
@@ -300,7 +355,6 @@ async function updateBookingStatus(bookingId, newStatus, userId, role) {
  * @throws {Error} - If booking not found or user doesn't have permission
  */
 async function cancelBooking(bookingId, userId, role, cancellationReason) {
-  // Fetch the booking
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
   });
@@ -309,24 +363,21 @@ async function cancelBooking(bookingId, userId, role, cancellationReason) {
     throw new Error('Booking not found.');
   }
 
-  // Check if booking is already cancelled
   if (booking.status === 'CANCELLED') {
     throw new Error('This booking is already cancelled.');
   }
 
-  // Check if booking is already completed
   if (booking.status === 'COMPLETED') {
     throw new Error('Cannot cancel a completed booking.');
   }
 
-  // Check if user has permission to cancel
   const isCustomer = booking.customerId === userId;
   let isWorker = false;
   if (role === 'WORKER') {
     const workerProfile = await prisma.workerProfile.findUnique({
       where: { userId },
     });
-    isWorker = workerProfile && booking.workerId === workerProfile.id;
+    isWorker = workerProfile && booking.workerProfileId === workerProfile.id;
   }
   const isAdmin = role === 'ADMIN';
 
@@ -334,7 +385,6 @@ async function cancelBooking(bookingId, userId, role, cancellationReason) {
     throw new Error('You do not have permission to cancel this booking.');
   }
 
-  // Cancel the booking
   const cancelledBooking = await prisma.booking.update({
     where: { id: bookingId },
     data: {
@@ -344,12 +394,80 @@ async function cancelBooking(bookingId, userId, role, cancellationReason) {
     },
     include: {
       service: { select: { id: true, name: true, category: true } },
-      worker: { select: { id: true, name: true, email: true } },
+      reviews: true,
+      workerProfile: {
+        select: {
+          id: true,
+          userId: true,
+          user: { select: { id: true, name: true, email: true } },
+        },
+      },
       customer: { select: { id: true, name: true, email: true } },
     },
   });
 
   return cancelledBooking;
+}
+
+/**
+ * PAY FOR A BOOKING
+ *
+ * Business Logic:
+ * - Only the booking customer can pay
+ * - Cannot pay cancelled booking
+ * - Marks paymentStatus as PAID and sets paidAt
+ */
+async function payBooking(bookingId, userId, userRole, paymentReference) {
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    include: { customer: { select: { id: true } } },
+  });
+
+  if (!booking) {
+    throw new Error('Booking not found.');
+  }
+
+  if (userRole !== 'CUSTOMER' || booking.customerId !== userId) {
+    throw new Error('Only the booking customer can pay for this booking.');
+  }
+
+  if (booking.status === 'CANCELLED') {
+    throw new Error('Cannot pay for a cancelled booking.');
+  }
+
+  if (booking.paymentStatus === 'PAID') {
+    throw new Error('Booking is already paid.');
+  }
+
+  const reference = paymentReference || `manual-${Date.now()}`;
+
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.booking.update({
+      where: { id: bookingId },
+      data: {
+        paymentStatus: 'PAID',
+        paymentReference: reference,
+        paidAt: new Date(),
+      },
+      include: {
+        service: { select: { id: true, name: true, category: true } },
+        workerProfile: { select: { id: true, userId: true, user: { select: { id: true, name: true } } } },
+        customer: { select: { id: true, name: true, email: true } },
+      },
+    });
+
+    await tx.payment.create({
+      data: {
+        bookingId: bookingId,
+        customerId: userId,
+        amount: updated.totalPrice || null,
+        status: 'PAID',
+        reference,
+      },
+    });
+
+    return updated;
+  });
 }
 
 // Export all service functions so controllers can use them
@@ -359,4 +477,5 @@ module.exports = {
   getBookingById,
   updateBookingStatus,
   cancelBooking,
+  payBooking,
 };

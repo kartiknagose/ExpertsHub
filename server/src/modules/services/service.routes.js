@@ -17,7 +17,7 @@
  */
 
 const { Router } = require('express');
-const { create, list, getOne } = require('./service.controller');
+const { create, list, getOne, getWorkers } = require('./service.controller');
 const authenticate = require('../../middleware/auth'); // Check if user is logged in
 const { requireAdmin } = require('../../middleware/requireRole'); // Check if user is admin
 const validate = require('../../middleware/validation'); // Check if request data is valid
@@ -98,6 +98,14 @@ router.get('/', list);
  * - Helps with sharing direct links to services
  */
 router.get('/:id', getOne);
+
+/**
+ * ROUTE 4: GET WORKERS FOR A SERVICE
+ *
+ * Endpoint: GET /api/services/:id/workers
+ * Access: Public
+ */
+router.get('/:id/workers', getWorkers);
 
 // Export the router so index.js can mount it at /api/services
 module.exports = router;

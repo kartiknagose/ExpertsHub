@@ -72,9 +72,20 @@ async function createService(serviceData) {
  * @param {object} filters - Optional filters { category: "Plumbing" }
  * @returns {Promise<array>} - List of services
  */
-async function listServices({ category } = {}) {
-  // Build filter: if category exists, filter by it; otherwise, empty filter (get all)
-  const where = category ? { category } : {};
+async function listServices({ category, search } = {}) {
+  const where = {};
+
+  if (category) {
+    where.category = category;
+  }
+
+  if (search) {
+    where.OR = [
+      { name: { contains: search, mode: 'insensitive' } },
+      { description: { contains: search, mode: 'insensitive' } },
+      { category: { contains: search, mode: 'insensitive' } },
+    ];
+  }
   
   // Fetch services from database, sorted alphabetically
   return prisma.service.findMany({ 
@@ -97,9 +108,43 @@ async function getServiceById(id) {
   return prisma.service.findUnique({ where: { id } });
 }
 
+/**
+ * GET WORKERS WHO OFFER A SERVICE
+ *
+ * Business Logic:
+ * - Find worker profiles that have the requested service
+ * - Include basic user info for display
+ *
+ * @param {number} serviceId - The service ID
+ * @returns {Promise<array>} - List of worker profiles offering the service
+ */
+async function getServiceWorkers(serviceId) {
+  const workers = await prisma.workerService.findMany({
+    where: { serviceId },
+    include: {
+      worker: {
+        select: {
+          id: true,
+          hourlyRate: true,
+          rating: true,
+          totalReviews: true,
+          isVerified: true,
+          user: {
+            select: { id: true, name: true, email: true },
+          },
+        },
+      },
+    },
+  });
+
+  // Flatten to worker profiles for easier consumption by frontend
+  return workers.map((entry) => entry.worker);
+}
+
 // Export all service functions so controllers can use them
 module.exports = { 
   createService,    // NEW: For creating services
   listServices,     // Existing: For browsing services
-  getServiceById    // Existing: For viewing service details
+  getServiceById,   // Existing: For viewing service details
+  getServiceWorkers // NEW: For listing workers offering a service
 };

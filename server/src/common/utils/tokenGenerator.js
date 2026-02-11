@@ -20,7 +20,20 @@ function generateEmailVerificationToken(expiryHours = 24) {
   return { token, expiresAt };
 }
 
+/**
+ * Generate password reset token with expiry
+ * @param {number} expiryHours - How many hours until token expires (default: 2)
+ * @returns {object} { token, expiresAt }
+ */
+function generatePasswordResetToken(expiryHours = 2) {
+  const token = generateVerificationToken();
+  const expiresAt = new Date();
+  expiresAt.setHours(expiresAt.getHours() + expiryHours);
+  return { token, expiresAt };
+}
+
 module.exports = {
   generateVerificationToken,
   generateEmailVerificationToken,
+  generatePasswordResetToken,
 };

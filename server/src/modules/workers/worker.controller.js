@@ -12,13 +12,14 @@ const {
 // Create or update the authenticated user's worker profile (lets any user become a worker)
 exports.saveProfile = asyncHandler(async (req, res) => {
   const userId = req.user.id; // from auth middleware
-  const { bio, hourlyRate, skills, serviceAreas } = req.body;
+  const { bio, hourlyRate, skills, serviceAreas, profilePhotoUrl } = req.body;
 
   const profile = await upsertWorkerProfile(userId, {
     bio,
     hourlyRate: typeof hourlyRate === 'number' ? hourlyRate : undefined, // avoid storing non-numeric values
     skills, // array like ["plumbing", "cleaning"]
     serviceAreas, // array like ["Mumbai", "Pune"]
+    profilePhotoUrl,
   });
 
   res.status(201).json({ profile });

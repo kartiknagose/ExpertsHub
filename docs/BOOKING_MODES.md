@@ -54,6 +54,7 @@ Customer picks a service → system auto-assigns the best available worker.
 4. Booking auto-created with selected worker
 5. Worker gets notification instantly
 
+
 **Advantages:**
 - Fast booking (no waiting for acceptance)
 - No customer worry about "will worker accept?"

@@ -20,17 +20,20 @@
  */
 
 const express = require('express');
-const router = express.Router(); // Create a router to define routes
+const router = express.Router();
 
 // Import middleware
-const authenticate = require('../../middleware/auth'); // Checks if user is logged in (has valid JWT)
-const validate = require('../../middleware/validation'); // Checks if request data is valid
+const authenticate = require('../../middleware/auth');
+const validate = require('../../middleware/validation');
+const { bookingLimiter } = require('../../config/rateLimit');
+const { requireCustomer } = require('../../middleware/requireRole');
 
 // Import validation schemas
 const {
   createBookingSchema,
   updateBookingStatusSchema,
   cancelBookingSchema,
+  payBookingSchema,
 } = require('./booking.schemas');
 
 // Import controller functions
@@ -56,9 +59,11 @@ const bookingController = require('./booking.controller');
 router.post(
   '/',
   authenticate,           // Step 1: Check if user is logged in
-  createBookingSchema,    // Step 2: Validate request body
-  validate,               // Step 3: Check for validation errors
-  bookingController.createBooking // Step 4: Execute controller function
+  requireCustomer,        // Step 1.5: Only customers can create bookings
+  bookingLimiter,         // Step 2: Rate limiting (max 20 per hour)
+  createBookingSchema,    // Step 3: Validate request body
+  validate,               // Step 4: Check for validation errors
+  bookingController.createBooking // Step 5: Execute controller function
 );
 
 /**
@@ -152,6 +157,21 @@ router.patch(
   cancelBookingSchema,               // Step 2: Validate cancellation reason (if provided)
   validate,                          // Step 3: Check for validation errors
   bookingController.cancelBooking    // Step 4: Execute controller function
+);
+
+/**
+ * ROUTE 6: PAY FOR A BOOKING
+ * 
+ * Endpoint: POST /api/bookings/:id/pay
+ * Access: Private (CUSTOMER only)
+ */
+router.post(
+  '/:id/pay',
+  authenticate,
+  requireCustomer,
+  payBookingSchema,
+  validate,
+  bookingController.payBooking
 );
 
 // Export the router so index.js can mount it at /api/bookings
