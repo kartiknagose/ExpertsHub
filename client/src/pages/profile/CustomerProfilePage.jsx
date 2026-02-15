@@ -72,6 +72,8 @@ export function CustomerProfilePage() {
           setValue('postalCode', address.postalCode || '');
           setValue('country', address.country || '');
         } else {
+          // New user or empty profile - Auto-enable edit mode for setup
+          setIsEditing(true);
           setValue('country', 'India');
         }
 
@@ -144,18 +146,29 @@ export function CustomerProfilePage() {
       setAddressSummary(refreshedAddress);
 
       setSuccessMessage('Profile updated successfully.');
-      if (profilePhotoUrl) {
-        const resolvedPhoto = resolveProfilePhotoUrl(profilePhotoUrl);
-        setInitialPhotoUrl(resolvedPhoto);
-        const updatedUser = { ...authUser, profilePhotoUrl };
+
+      if (refreshed.user) {
+        const updatedUser = { ...authUser, ...refreshed.user };
+        // Ensure manual update of profilePhotoUrl if for some reason backend didn't return it instantly (though it should)
+        if (profilePhotoUrl) {
+          updatedUser.profilePhotoUrl = profilePhotoUrl;
+        }
+
         localStorage.setItem('user', JSON.stringify(updatedUser));
         setUser(updatedUser);
       }
+
       if (refreshed.user?.profilePhotoUrl) {
         const resolvedPhoto = resolveProfilePhotoUrl(refreshed.user.profilePhotoUrl);
         setPhotoPreview(resolvedPhoto);
         setInitialPhotoUrl(resolvedPhoto);
+      } else if (profilePhotoUrl) {
+        // Fallback if refreshed user didn't have it yet for some reason
+        const resolvedPhoto = resolveProfilePhotoUrl(profilePhotoUrl);
+        setPhotoPreview(resolvedPhoto);
+        setInitialPhotoUrl(resolvedPhoto);
       }
+
       setIsEditing(false);
     } catch (error) {
       const errorMessage = error.response?.data?.message || 'Failed to update profile';
@@ -178,8 +191,7 @@ export function CustomerProfilePage() {
             const addressLine = addressSummary
               ? `${addressSummary.line1}, ${addressSummary.city}, ${addressSummary.state}`
               : 'Add your address to speed up bookings.';
-            // Only show Save Changes when the user is editing and changed something.
-            const canSave = isEditing && (isDirty || Boolean(photoFile) || (photoPreview && photoPreview !== initialPhotoUrl));
+            const canEditPhoto = isEditing;
 
             return (
               <>
@@ -233,10 +245,10 @@ export function CustomerProfilePage() {
                           Profile Photo
                         </label>
                         <label
-                          className={`flex items-center gap-3 rounded-xl border border-dashed px-3 py-3 text-sm font-medium cursor-pointer transition-colors ${isDark
-                              ? 'border-dark-600 text-gray-200 hover:border-brand-500 bg-dark-800/40'
-                              : 'border-gray-200 text-gray-700 hover:border-brand-500 bg-gray-50'
-                            }`}
+                          className={`flex items-center gap-3 rounded-xl border border-dashed px-3 py-3 text-sm font-medium transition-colors ${isDark
+                            ? 'border-dark-600 text-gray-200 bg-dark-800/40'
+                            : 'border-gray-200 text-gray-700 bg-gray-50'
+                            } ${canEditPhoto ? 'cursor-pointer hover:border-brand-500' : 'cursor-not-allowed opacity-70'}`}
                         >
                           <Camera size={16} />
                           <div>
@@ -244,11 +256,17 @@ export function CustomerProfilePage() {
                             <p className={isDark ? 'text-xs text-gray-400' : 'text-xs text-gray-500'}>
                               {photoFile?.name || 'JPG, PNG up to 5MB'}
                             </p>
+                            {!canEditPhoto && (
+                              <p className={isDark ? 'text-xs text-gray-500' : 'text-xs text-gray-400'}>
+                                Click Edit to update
+                              </p>
+                            )}
                           </div>
                           <input
                             type="file"
                             accept="image/*"
                             onChange={handlePhotoChange}
+                            disabled={!canEditPhoto}
                             className="hidden"
                           />
                         </label>
@@ -304,7 +322,9 @@ export function CustomerProfilePage() {
                     <CardHeader>
                       <div className="flex items-center justify-between">
                         <div>
-                          <CardTitle>{isEditing ? 'Edit Profile' : 'Contact & Address'}</CardTitle>
+                          <CardTitle>
+                            {!addressSummary ? 'Complete Your Profile' : (isEditing ? 'Edit Profile' : 'Contact & Address')}
+                          </CardTitle>
                           <CardDescription>
                             {isEditing
                               ? 'Update your details and save changes.'
@@ -321,6 +341,14 @@ export function CustomerProfilePage() {
 
                     {!isEditing && (
                       <div className="space-y-4 px-6 pb-6">
+                        <div>
+                          <p className={isDark ? 'text-xs text-gray-400' : 'text-xs text-gray-500'}>Name</p>
+                          <p className={isDark ? 'text-gray-200' : 'text-gray-800'}>{user?.name || '--'}</p>
+                        </div>
+                        <div>
+                          <p className={isDark ? 'text-xs text-gray-400' : 'text-xs text-gray-500'}>Email</p>
+                          <p className={isDark ? 'text-gray-200' : 'text-gray-800'}>{user?.email || '--'}</p>
+                        </div>
                         <div>
                           <p className={isDark ? 'text-xs text-gray-400' : 'text-xs text-gray-500'}>Address</p>
                           <p className={isDark ? 'text-gray-200' : 'text-gray-800'}>{addressLine}</p>
@@ -393,7 +421,6 @@ export function CustomerProfilePage() {
                                 icon={MapPin}
                                 error={errors.country?.message}
                                 readOnly
-                                value="India"
                                 {...register('country')}
                               />
                             </div>
@@ -443,17 +470,15 @@ export function CustomerProfilePage() {
                         )}
 
                         <div className="flex flex-col gap-3">
-                          {canSave && (
-                            <Button
-                              type="submit"
-                              fullWidth
-                              loading={isSubmitting}
-                              icon={Save}
-                              iconPosition="right"
-                            >
-                              Save Changes
-                            </Button>
-                          )}
+                          <Button
+                            type="submit"
+                            fullWidth
+                            loading={isSubmitting}
+                            icon={Save}
+                            iconPosition="right"
+                          >
+                            Save Changes
+                          </Button>
                           <Button
                             type="button"
                             fullWidth

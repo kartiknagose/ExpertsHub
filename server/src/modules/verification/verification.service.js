@@ -27,6 +27,15 @@ async function applyForVerification(userId, data) {
       userId,
       notes: data.notes || null,
       status: 'PENDING',
+      documents: {
+        create: (data.documents || []).map((doc) => ({
+          type: doc.type,
+          url: doc.url,
+        })),
+      },
+    },
+    include: {
+      documents: true,
     },
   });
 }
@@ -52,7 +61,7 @@ async function reviewApplication(applicationId, data) {
     throw new Error('Verification application not found.');
   }
 
-  return prisma.workerVerificationApplication.update({
+  const updatedApp = await prisma.workerVerificationApplication.update({
     where: { id: applicationId },
     data: {
       status: data.status,
@@ -61,6 +70,24 @@ async function reviewApplication(applicationId, data) {
       reviewedAt: new Date(),
     },
   });
+
+  // Sync verification status with WorkerProfile
+  if (data.status === 'APPROVED' || data.status === 'REJECTED') {
+    try {
+      await prisma.workerProfile.update({
+        where: { userId: application.userId },
+        data: {
+          isVerified: data.status === 'APPROVED',
+          isProbation: data.status !== 'APPROVED', // Remove probation if approved
+        }
+      });
+    } catch (error) {
+      console.error('Failed to update worker profile verification status:', error);
+      // Don't fail the request, just log it. The application status is updated.
+    }
+  }
+
+  return updatedApp;
 }
 
 module.exports = {

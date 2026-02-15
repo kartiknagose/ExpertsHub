@@ -23,3 +23,7 @@ prisma/dev.db-journal
 # OS/editor
 .DS_Store
 .vscode/
+
+# uploads
+server/src/uploads/*
+!server/src/uploads/.gitkeep

@@ -1,28 +1,28 @@
 /** @type {import('tailwindcss').Config} */
+const brandPalette = {
+  50: '#eff6ff',
+  100: '#dbeafe',
+  200: '#bfdbfe',
+  300: '#93c5fd',
+  400: '#60a5fa',
+  500: '#3e8fff',
+  600: '#2563eb',
+  700: '#1d4ed8',
+  800: '#1e40af',
+  900: '#1e3a8a',
+  950: '#172554',
+};
+
 export default {
   content: [
-    "./index.html",
-    "./src/**/*.{js,jsx,ts,tsx}",
+    './index.html',
+    './src/**/*.{js,jsx,ts,tsx}',
   ],
   darkMode: 'class',
   theme: {
     extend: {
       colors: {
-        // Brand - Indigo/Cyan (Primary brand color)
-        brand: {
-          50: '#eff6ff',
-          100: '#dbeafe',
-          200: '#bfdbfe',
-          300: '#93c5fd',
-          400: '#60a5fa',
-          500: '#3e8fff',
-          600: '#2563eb',
-          700: '#1d4ed8',
-          800: '#1e40af',
-          900: '#1e3a8a',
-          950: '#172554',
-        },
-        // Accent - Magenta/Pink (Secondary accent)
+        brand: brandPalette,
         accent: {
           50: '#fdf4ff',
           100: '#fae8ff',
@@ -36,21 +36,7 @@ export default {
           900: '#701a75',
           950: '#4a044e',
         },
-        // Primary - Violet/Purple (Stripe-inspired)
-        primary: {
-          50: '#faf5ff',
-          100: '#f3e8ff',
-          200: '#e9d5ff',
-          300: '#d8b4fe',
-          400: '#c084fc',
-          500: '#a855f7',
-          600: '#9333ea',
-          700: '#7e22ce',
-          800: '#6b21a8',
-          900: '#581c87',
-          950: '#3b0764',
-        },
-        // Success - Emerald (Modern, trustworthy)
+        primary: brandPalette,
         success: {
           50: '#ecfdf5',
           100: '#d1fae5',
@@ -64,7 +50,6 @@ export default {
           900: '#064e3b',
           950: '#022c22',
         },
-        // Warning - Amber (Attention without aggression)
         warning: {
           50: '#fffbeb',
           100: '#fef3c7',
@@ -78,7 +63,6 @@ export default {
           900: '#78350f',
           950: '#451a03',
         },
-        // Error - Rose (Soft but noticeable)
         error: {
           50: '#fff1f2',
           100: '#ffe4e6',
@@ -92,7 +76,6 @@ export default {
           900: '#881337',
           950: '#4c0519',
         },
-        // Dark - For dark mode theme
         dark: {
           50: '#e0e0e0',
           100: '#c0c0c0',
@@ -106,7 +89,6 @@ export default {
           900: '#1a1a1a',
           950: '#0a0a0a',
         },
-        // Neutral - True grays (flexible, clean)
         neutral: {
           50: '#fafafa',
           100: '#f5f5f5',
@@ -122,14 +104,14 @@ export default {
         },
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+        sans: ['Space Grotesk', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
       },
       fontSize: {
-        'xs': ['0.75rem', { lineHeight: '1rem' }],
-        'sm': ['0.875rem', { lineHeight: '1.25rem' }],
-        'base': ['1rem', { lineHeight: '1.5rem' }],
-        'lg': ['1.125rem', { lineHeight: '1.75rem' }],
-        'xl': ['1.25rem', { lineHeight: '1.75rem' }],
+        xs: ['0.75rem', { lineHeight: '1rem' }],
+        sm: ['0.875rem', { lineHeight: '1.25rem' }],
+        base: ['1rem', { lineHeight: '1.5rem' }],
+        lg: ['1.125rem', { lineHeight: '1.75rem' }],
+        xl: ['1.25rem', { lineHeight: '1.75rem' }],
         '2xl': ['1.5rem', { lineHeight: '2rem' }],
         '3xl': ['1.875rem', { lineHeight: '2.25rem' }],
         '4xl': ['2.25rem', { lineHeight: '2.5rem' }],
@@ -138,30 +120,30 @@ export default {
         '7xl': ['4.5rem', { lineHeight: '1' }],
       },
       spacing: {
-        '18': '4.5rem',
-        '112': '28rem',
-        '128': '32rem',
+        18: '4.5rem',
+        112: '28rem',
+        128: '32rem',
       },
       borderRadius: {
-        'none': '0',
-        'sm': '0.25rem',
+        none: '0',
+        sm: '0.25rem',
         DEFAULT: '0.5rem',
-        'md': '0.5rem',
-        'lg': '0.75rem',
-        'xl': '1rem',
+        md: '0.5rem',
+        lg: '0.75rem',
+        xl: '1rem',
         '2xl': '1.5rem',
         '3xl': '2rem',
-        'full': '9999px',
+        full: '9999px',
       },
       boxShadow: {
-        'sm': '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+        sm: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
         DEFAULT: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1)',
-        'md': '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)',
-        'lg': '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1)',
-        'xl': '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+        md: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)',
+        lg: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1)',
+        xl: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
         '2xl': '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-        'inner': 'inset 0 2px 4px 0 rgba(0, 0, 0, 0.05)',
-        'none': 'none',
+        inner: 'inset 0 2px 4px 0 rgba(0, 0, 0, 0.05)',
+        none: 'none',
       },
       animation: {
         'fade-in': 'fadeIn 0.3s ease-out',
@@ -190,4 +172,4 @@ export default {
     },
   },
   plugins: [],
-}
+};

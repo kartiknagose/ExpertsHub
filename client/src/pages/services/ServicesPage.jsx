@@ -4,9 +4,10 @@ import { useQuery } from '@tanstack/react-query';
 import { Search, Filter, Sparkles, Droplets, Zap, Paintbrush, Wind, Wrench, Briefcase, Star, ArrowRight } from 'lucide-react';
 import { MainLayout } from '../../components/layout/MainLayout';
 import { Card, CardHeader, CardTitle, CardDescription } from '../../components/common';
-import { Input, Button, Badge, Spinner, PageHeader, EmptyState, Skeleton } from '../../components/common';
+import { Input, Button, Badge, PageHeader, Skeleton, AsyncState } from '../../components/common';
 import { useTheme } from '../../context/ThemeContext';
 import { getAllServices } from '../../api/services';
+import { getServiceImage } from '../../constants/images';
 
 // Fetch services with optional filters
 const fetchServices = async (filters) => {
@@ -29,59 +30,69 @@ const getCategoryIcon = (category) => {
 // Memoized Service Card Component (ISSUE-035)
 const ServiceCard = memo(({ service, isDark }) => {
   const Icon = getCategoryIcon(service.category);
+  const bgImage = getServiceImage(service.name || service.category);
 
   // Simulated rating (normally from DB)
   const rating = (4.0 + (service.id % 10) / 10).toFixed(1);
 
   return (
-    <Card hoverable className="h-full flex flex-col relative overflow-hidden group">
-      {/* Decorative Background Icon */}
-      <Icon
-        className={`absolute -right-6 -bottom-6 opacity-5 transform rotate-12 transition-transform duration-500 group-hover:scale-110 ${isDark ? 'text-gray-100' : 'text-gray-900'}`}
-        size={140}
-      />
+    <Card hoverable className="h-full flex flex-col relative overflow-hidden group border-0 shadow-lg ring-1 ring-gray-200 dark:ring-gray-800">
 
-      <div className="flex justify-between items-start mb-4 relative z-10">
-        <div className={`p-3 rounded-xl ${isDark ? 'bg-dark-700 text-brand-400' : 'bg-brand-50 text-brand-600'}`}>
-          <Icon size={24} />
+      {/* Image Header */}
+      <div className="relative h-48 overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent z-10 transition-opacity duration-300 group-hover:opacity-80"></div>
+        <img
+          src={bgImage}
+          alt={service.name}
+          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+          loading="lazy"
+        />
+
+        <div className="absolute top-4 right-4 z-20">
+          <div className="flex items-center gap-1 bg-white/90 backdrop-blur-sm text-gray-900 px-2 py-1 rounded-lg text-xs font-bold shadow-sm">
+            <Star size={12} className="fill-yellow-400 text-yellow-400" />
+            {rating}
+          </div>
         </div>
-        <div className="flex items-center gap-1 bg-yellow-400/10 text-yellow-600 px-2 py-1 rounded-full text-xs font-medium">
-          <Star size={12} className="fill-yellow-400 text-yellow-400" />
-          {rating}
+
+        <div className="absolute top-4 left-4 z-20">
+          <div className={`p-2 rounded-lg backdrop-blur-md ${isDark ? 'bg-black/40 text-white' : 'bg-white/90 text-brand-600'} shadow-sm`}>
+            <Icon size={20} />
+          </div>
         </div>
       </div>
 
-      <div className="mb-4 flex-grow relative z-10">
-        <div className="mb-2">
+      <div className="p-5 flex-grow flex flex-col">
+        <div className="mb-3">
           {service.category && (
-            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${isDark ? 'bg-dark-700 text-gray-400' : 'bg-gray-100 text-gray-500'}`}>
+            <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md ${isDark ? 'bg-dark-700 text-gray-300' : 'bg-gray-100 text-gray-600'}`}>
               {service.category}
             </span>
           )}
         </div>
-        <h3 className={`text-xl font-bold mb-2 line-clamp-1 ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
+
+        <h3 className={`text-xl font-bold mb-2 line-clamp-1 group-hover:text-brand-600 transition-colors ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
           {service.name}
         </h3>
-        <p className={`text-sm line-clamp-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+
+        <p className={`text-sm line-clamp-2 mb-4 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
           {service.description || 'Professional service at your doorstep.'}
         </p>
-      </div>
 
-      <div className="mt-auto pt-4 border-t border-dashed border-gray-200 dark:border-gray-700 relative z-10">
-        <div className="flex items-center justify-between mb-4">
+        <div className="mt-auto flex items-center justify-between pt-4 border-t border-gray-100 dark:border-gray-800">
           <div className="flex flex-col">
             <span className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>Starting from</span>
-            <span className={`text-lg font-bold ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
+            <span className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
               ₹{service.basePrice ? service.basePrice : 'On Request'}
             </span>
           </div>
-        </div>
 
-        <Link to={`/services/${service.id}`} className="block">
-          <Button fullWidth variant="primary" className="group-hover:shadow-lg group-hover:shadow-brand-500/20 transition-all">
-            View Details <ArrowRight size={16} className="ml-2 group-hover:translate-x-1 transition-transform" />
-          </Button>
-        </Link>
+          <Link to={`/services/${service.id}`}>
+            <Button size="sm" className="rounded-full w-10 h-10 p-0 flex items-center justify-center bg-brand-50 text-brand-600 hover:bg-brand-600 hover:text-white transition-all shadow-none hover:shadow-lg dark:bg-dark-700 dark:text-gray-300 dark:hover:bg-brand-600 dark:hover:text-white">
+              <ArrowRight size={18} />
+            </Button>
+          </Link>
+        </div>
       </div>
     </Card>
   );
@@ -98,14 +109,36 @@ export function ServicesPage() {
     staleTime: 5 * 60 * 1000,
   });
 
-  // Derive categories from services list
+  // Deduplicate services by name
+  const uniqueServices = useMemo(() => {
+    const uniqueMap = new Map();
+    services.forEach((service) => {
+      // Normalize the name to ensure case-insensitive deduplication
+      const key = service.name?.trim().toLowerCase();
+      if (!key) return;
+
+      // If we haven't seen this service name yet, add it.
+      if (!uniqueMap.has(key)) {
+        uniqueMap.set(key, service);
+      } else {
+        // Keep the one with the lower price if duplicates exist
+        const existing = uniqueMap.get(key);
+        if ((service.basePrice || 0) < (existing.basePrice || 0)) {
+          uniqueMap.set(key, service);
+        }
+      }
+    });
+    return Array.from(uniqueMap.values());
+  }, [services]);
+
+  // Derive categories from unique services
   const categories = useMemo(() => {
     const set = new Set();
-    services.forEach((service) => {
+    uniqueServices.forEach((service) => {
       if (service.category) set.add(service.category);
     });
     return Array.from(set);
-  }, [services]);
+  }, [uniqueServices]);
 
   const clearFilters = () => {
     setSearch('');
@@ -123,7 +156,7 @@ export function ServicesPage() {
         {/* Filters */}
         <Card className="mb-8">
           <CardHeader>
-            <CardTitle>Find a Service</CardTitle>
+            <CardTitle>Book a Service</CardTitle>
             <CardDescription>Search by name or filter by category</CardDescription>
           </CardHeader>
 
@@ -168,56 +201,52 @@ export function ServicesPage() {
           </div>
         </Card>
 
-        {/* Loading State (ISSUE-013) */}
-        {isLoading && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[...Array(6)].map((_, i) => (
-              <Card key={i} className="h-80">
-                <div className="flex justify-between mb-6">
-                  <Skeleton variant="circular" className="w-12 h-12" />
-                  <Skeleton className="w-12 h-6 rounded-full" />
-                </div>
-                <Skeleton className="w-20 h-4 mb-2" />
-                <Skeleton className="w-3/4 h-6 mb-2" />
-                <Skeleton className="w-full h-16 mb-6" />
-                <div className="mt-auto pt-4 border-t border-dashed border-gray-200 dark:border-gray-700">
-                  <div className="flex justify-between mb-4">
-                    <Skeleton className="w-24 h-4" />
-                    <Skeleton className="w-16 h-6" />
+        <AsyncState
+          isLoading={isLoading}
+          isError={isError}
+          error={error}
+          isEmpty={!isLoading && !isError && uniqueServices.length === 0}
+          emptyTitle="No services found"
+          emptyMessage="Try different search terms or clear your filters."
+          emptyAction={
+            <Button size="sm" variant="outline" onClick={clearFilters}>
+              Clear Filters
+            </Button>
+          }
+          loadingFallback={
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[...Array(6)].map((_, i) => (
+                <Card key={i} className="h-80">
+                  <div className="flex justify-between mb-6">
+                    <Skeleton variant="circular" className="w-12 h-12" />
+                    <Skeleton className="w-12 h-6 rounded-full" />
                   </div>
-                  <Skeleton className="w-full h-10" />
-                </div>
-              </Card>
-            ))}
-          </div>
-        )}
-
-        {isError && (
-          <Card className="p-6 border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-900/10">
-            <p className="text-red-600 dark:text-red-400">{error?.message || 'Failed to load services'}</p>
-          </Card>
-        )}
-
-        {!isLoading && !isError && services.length === 0 && (
-          <EmptyState
-            icon={Search}
-            title="No services found"
-            message="Try different search terms or clear your filters."
-            action={
-              <Button size="sm" variant="outline" onClick={clearFilters}>
-                Clear Filters
-              </Button>
-            }
-          />
-        )}
-
-        {!isLoading && !isError && services.length > 0 && (
+                  <Skeleton className="w-20 h-4 mb-2" />
+                  <Skeleton className="w-3/4 h-6 mb-2" />
+                  <Skeleton className="w-full h-16 mb-6" />
+                  <div className="mt-auto pt-4 border-t border-dashed border-gray-200 dark:border-gray-700">
+                    <div className="flex justify-between mb-4">
+                      <Skeleton className="w-24 h-4" />
+                      <Skeleton className="w-16 h-6" />
+                    </div>
+                    <Skeleton className="w-full h-10" />
+                  </div>
+                </Card>
+              ))}
+            </div>
+          }
+          errorFallback={
+            <Card className="p-6 border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-900/10">
+              <p className="text-red-600 dark:text-red-400">{error?.message || 'Failed to load services'}</p>
+            </Card>
+          }
+        >
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {services.map((service) => (
+            {uniqueServices.map((service) => (
               <ServiceCard key={service.id} service={service} isDark={isDark} />
             ))}
           </div>
-        )}
+        </AsyncState>
       </div>
     </MainLayout>
   );

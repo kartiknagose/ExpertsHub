@@ -9,15 +9,25 @@ const prisma = require('../../config/prisma');
 const router = Router();
 
 // Ensure upload directory exists
-const uploadDir = path.join(__dirname, '../../uploads/profile-photos');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
+const profilePhotoDir = path.join(__dirname, '../../uploads/profile-photos');
+if (!fs.existsSync(profilePhotoDir)) {
+  fs.mkdirSync(profilePhotoDir, { recursive: true });
 }
 
-// Multer storage config
-const storage = multer.diskStorage({
+const verificationDocDir = path.join(__dirname, '../../uploads/verification-docs');
+if (!fs.existsSync(verificationDocDir)) {
+  fs.mkdirSync(verificationDocDir, { recursive: true });
+}
+
+const bookingPhotoDir = path.join(__dirname, '../../uploads/booking-photos');
+if (!fs.existsSync(bookingPhotoDir)) {
+  fs.mkdirSync(bookingPhotoDir, { recursive: true });
+}
+
+// Multer storage config for profile photos
+const profilePhotoStorage = multer.diskStorage({
   destination: (_req, _file, cb) => {
-    cb(null, uploadDir);
+    cb(null, profilePhotoDir);
   },
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
@@ -26,28 +36,75 @@ const storage = multer.diskStorage({
   },
 });
 
+// Multer storage config for verification documents
+const verificationDocStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    cb(null, verificationDocDir);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const safeExt = ext || '.jpg';
+    cb(null, `verif-${req.user.id}-${Date.now()}${safeExt}`);
+  },
+});
+
+// Multer storage config for booking photos
+const bookingPhotoStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    cb(null, bookingPhotoDir);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const safeExt = ext || '.jpg';
+    cb(null, `booking-${req.user.id}-${Date.now()}${safeExt}`);
+  },
+});
+
 // Only allow image uploads (accept any image/* mime type)
-const fileFilter = (_req, file, cb) => {
+const imageFileFilter = (_req, file, cb) => {
   if (file.mimetype && file.mimetype.startsWith('image/')) {
     cb(null, true);
     return;
   }
-
   cb(new Error('Only image files are allowed'), false);
 };
 
-const upload = multer({
-  storage,
-  fileFilter,
+// Allow image and PDF uploads
+const docFileFilter = (_req, file, cb) => {
+  if (
+    file.mimetype &&
+    (file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf')
+  ) {
+    cb(null, true);
+    return;
+  }
+  cb(new Error('Only image and PDF files are allowed'), false);
+};
+
+const uploadProfile = multer({
+  storage: profilePhotoStorage,
+  fileFilter: imageFileFilter,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+});
+
+const uploadVerification = multer({
+  storage: verificationDocStorage,
+  fileFilter: docFileFilter,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+});
+
+const uploadBooking = multer({
+  storage: bookingPhotoStorage,
+  fileFilter: imageFileFilter,
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
 });
 
 // POST /api/uploads/profile-photo
-// Upload profile photo and update user record
+// ... (existing route code)
 router.post(
   '/profile-photo',
   auth,
-  upload.single('photo'),
+  uploadProfile.single('photo'),
   asyncHandler(async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ message: 'No file uploaded' });
@@ -62,6 +119,61 @@ router.post(
     });
 
     res.status(201).json({ url: relativeUrl, publicUrl });
+  })
+);
+
+// POST /api/uploads/verification-doc
+// Upload verification document (standalone)
+router.post(
+  '/verification-doc',
+  auth,
+  uploadVerification.single('document'),
+  asyncHandler(async (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded' });
+    }
+
+    const relativeUrl = `/uploads/verification-docs/${req.file.filename}`;
+    const publicUrl = `${req.protocol}://${req.get('host')}${relativeUrl}`;
+
+    // Just return the URL, don't update DB yet (will be done in verification application submit)
+    res.status(201).json({ url: relativeUrl, publicUrl });
+  })
+);
+
+/**
+ * POST /api/uploads/booking-photo
+ * Upload a photo for a booking (BEFORE or AFTER)
+ */
+router.post(
+  '/booking-photo',
+  auth,
+  uploadBooking.single('photo'),
+  asyncHandler(async (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded' });
+    }
+
+    const relativeUrl = `/uploads/booking-photos/${req.file.filename}`;
+    const publicUrl = `${req.protocol}://${req.get('host')}${relativeUrl}`;
+
+    // Optionally link to booking if details provided
+    const { bookingId, type } = req.body;
+    if (bookingId && type) {
+      await prisma.bookingPhoto.create({
+        data: {
+          bookingId: parseInt(bookingId),
+          url: relativeUrl,
+          type: type // 'BEFORE' or 'AFTER'
+        }
+      });
+    }
+
+    res.status(201).json({
+      url: relativeUrl,
+      publicUrl,
+      message: 'Photo uploaded successfully'
+    });
   })
 );
 

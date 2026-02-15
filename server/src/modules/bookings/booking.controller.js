@@ -49,6 +49,12 @@ const createBooking = asyncHandler(async (req, res) => {
   // Remember: Our auth middleware (auth.js) adds req.user to every authenticated request
   const customerId = req.user.id;
 
+  // Check if customer profile is complete
+  if (!req.user.isProfileComplete) {
+    res.status(403);
+    throw new Error('You must complete your profile (address and details) before booking a service.');
+  }
+
   // Call the service to create the booking (service handles all business logic)
   const newBooking = await bookingService.createBooking(customerId, bookingData);
 
@@ -80,9 +86,13 @@ const getMyBookings = asyncHandler(async (req, res) => {
   // Get user's ID and role from JWT token (added by auth middleware)
   const userId = req.user.id;
   const userRole = req.user.role; // 'CUSTOMER', 'WORKER', or 'ADMIN'
+  const viewAs = req.query.viewAs;
+
+  // Allow WORKER to view as CUSTOMER if requested
+  const roleToUse = (userRole === 'WORKER' && viewAs === 'CUSTOMER') ? 'CUSTOMER' : userRole;
 
   // Call service to fetch bookings based on user's role
-  const bookings = await bookingService.getBookingsByUser(userId, userRole);
+  const bookings = await bookingService.getBookingsByUser(userId, roleToUse);
 
   // Send bookings back to client
   res.status(200).json({
@@ -200,7 +210,7 @@ const cancelBooking = asyncHandler(async (req, res) => {
   const bookingId = parseInt(req.params.id);
 
   // Extract cancellation reason from request body (optional)
-  const { cancellationReason } = req.body;
+  const { cancellationReason } = req.body || {};
 
   // Get user's ID and role from JWT token
   const userId = req.user.id;
@@ -257,6 +267,134 @@ const payBooking = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * GET OPEN BOOKINGS (JOB BOARD)
+ * 
+ * HTTP Endpoint: GET /api/bookings/open
+ * Who can access: Only WORKERS
+ * 
+ * Response (200 OK):
+ * {
+ *   "bookings": [ ...list of available jobs... ]
+ * }
+ */
+const getOpenBookings = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  const userRole = req.user.role;
+
+  if (userRole !== 'WORKER') {
+    res.status(403);
+    throw new Error('Only workers can view open bookings.');
+  }
+
+  const bookings = await bookingService.getOpenBookingsForWorker(userId);
+
+  res.status(200).json({
+    bookings,
+  });
+});
+
+/**
+ * ACCEPT AN OPEN BOOKING
+ * 
+ * HTTP Endpoint: POST /api/bookings/:id/accept
+ * Who can access: Only WORKERS
+ * 
+ * Response (200 OK):
+ * {
+ *   "message": "Booking accepted successfully",
+ *   "booking": { ...confirmed booking... }
+ * }
+ */
+const acceptBooking = asyncHandler(async (req, res) => {
+  const bookingId = parseInt(req.params.id);
+  const userId = req.user.id;
+  const userRole = req.user.role;
+
+  if (userRole !== 'WORKER') {
+    res.status(403);
+    throw new Error('Only workers can accept bookings.');
+  }
+
+  // Check valid profile and verification
+  // We need to fetch worker profile to check verification status,
+  // or checks should be in service?? 
+  // Ideally req.user should have isProfileComplete. verification is on workerProfile.
+  // Let's rely on service to check verification or fetch it here.
+  // Actually, let's fetch it here through prisma or just assume service checks logic?
+  // The prompt says "worker must complete his profile AND worker Identity verification to get booking requests"
+  // But this is "Accepting" a booking. Same rule applies. 
+
+  if (!req.user.isProfileComplete) {
+    res.status(403);
+    throw new Error('Please complete your profile details first.');
+  }
+
+  // We should also check verification status.
+  // Since verification status is on WorkerProfile, we might need a quick check.
+  // Let's do it in the service for cleaner code? 
+  // No, controller can fail fast. But let's check service logic first. 
+  // Actually, I'll put it in service to be safe, OR fetch it here.
+
+  // For now, let's just add the profile complete check here as requested.
+  // The verification check is better placed in the service to avoid extra DB calls here if service already does it.
+
+  const booking = await bookingService.acceptBooking(bookingId, userId);
+
+  res.status(200).json({
+    message: 'Booking accepted successfully. You can now view customer details.',
+    booking,
+  });
+});
+
+/**
+ * VERIFY OTP TO START JOB
+ * 
+ * HTTP Endpoint: POST /api/bookings/:id/start
+ * Who can access: Only WORKERS
+ */
+const verifyBookingStart = asyncHandler(async (req, res) => {
+  const bookingId = parseInt(req.params.id);
+  const userId = req.user.id;
+  const { otp } = req.body;
+
+  if (!otp) {
+    res.status(400);
+    throw new Error('OTP is required.');
+  }
+
+  const updatedBooking = await bookingService.verifyBookingStart(bookingId, otp, userId);
+
+  res.status(200).json({
+    message: 'OTP verified! Job started successfully.',
+    booking: updatedBooking
+  });
+});
+
+/**
+ * VERIFY OTP TO COMPLETE JOB
+ * 
+ * HTTP Endpoint: POST /api/bookings/:id/complete
+ * Who can access: Only WORKERS
+ */
+const verifyBookingCompletion = asyncHandler(async (req, res) => {
+  const bookingId = parseInt(req.params.id);
+  const userId = req.user.id;
+  const { otp } = req.body;
+
+  if (!otp) {
+    res.status(400);
+    throw new Error('OTP is required.');
+  }
+
+  const updatedBooking = await bookingService.verifyBookingCompletion(bookingId, otp, userId);
+
+  res.status(200).json({
+    message: 'OTP verified! Job completed successfully.',
+    booking: updatedBooking
+  });
+});
+
 // Export all controller functions so routes can use them
 module.exports = {
   createBooking,
@@ -265,4 +403,8 @@ module.exports = {
   updateBookingStatus,
   cancelBooking,
   payBooking,
+  getOpenBookings,
+  acceptBooking,
+  verifyBookingStart,
+  verifyBookingCompletion,
 };

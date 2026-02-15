@@ -1,7 +1,7 @@
 // Email verification page
 // Verifies email token and redirects based on role/profile completion
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { CheckCircle, XCircle } from 'lucide-react';
 import { verifyEmail } from '../../api/auth';
@@ -14,83 +14,112 @@ export function VerifyEmailPage() {
   const { isDark } = useTheme();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [status, setStatus] = useState('loading'); // loading | success | error
-  const [message, setMessage] = useState('');
+  const token = searchParams.get('token');
+  const [status, setStatus] = useState(token ? 'loading' : 'error'); // loading | success | error
+  const [message, setMessage] = useState(token ? 'Verifying your email...' : 'Verification token is missing.');
+  const [verifiedEmail, setVerifiedEmail] = useState('');
+  const [redirectCount, setRedirectCount] = useState(5);
+  const hasVerifiedRef = useRef(false);
 
+  // Countdown effect
   useEffect(() => {
-    const token = searchParams.get('token');
-
-    if (!token) {
-      setStatus('error');
-      setMessage('Verification token is missing.');
-      return;
+    let timer;
+    if (status === 'success' && redirectCount > 0) {
+      timer = setInterval(() => setRedirectCount((c) => c - 1), 1000);
+    } else if (status === 'success' && redirectCount === 0) {
+      // Navigate when countdown hits 0
+      navigate('/login', {
+        state: {
+          email: verifiedEmail,
+          message: message,
+          type: 'success',
+        },
+        replace: true,
+      });
     }
+    return () => clearInterval(timer);
+  }, [status, redirectCount, navigate, verifiedEmail, message]);
+
+  // Verification effect
+  useEffect(() => {
+    if (!token || hasVerifiedRef.current) return;
+    hasVerifiedRef.current = true;
 
     const verify = async () => {
       try {
-        const result = await verifyEmail(token);
+        const data = await verifyEmail(token);
+
+        let successMsg = 'Email verified successfully! You can now log in.';
+        if (data.role === 'WORKER' && !data.hasWorkerProfile) {
+          successMsg = 'Email verified! Please login to complete your professional profile.';
+        } else if (!data.hasAddress) {
+          successMsg = 'Email verified! Please login to add your address.';
+        }
+
         setStatus('success');
-        setMessage('Email verified successfully.');
-
-        // Redirect based on role and profile completion
-        if (result.role === 'WORKER') {
-          if (!result.hasWorkerProfile || !result.isProfileComplete) {
-            navigate('/worker/setup-profile');
-            return;
-          }
-          navigate('/login');
-          return;
-        }
-
-        if (result.role === 'CUSTOMER') {
-          if (!result.hasAddress || !result.isProfileComplete) {
-            navigate('/profile/setup');
-            return;
-          }
-          navigate('/login');
-          return;
-        }
-
-        navigate('/login');
+        setMessage(successMsg);
+        setVerifiedEmail(data.email || '');
       } catch (error) {
-        setStatus('error');
-        setMessage(error.response?.data?.message || 'Verification failed.');
+        // If already verified, treat as success
+        if (error.response?.data?.message?.includes('already verified') ||
+          error.response?.status === 409) {
+          setStatus('success');
+          setMessage('Email is already verified.');
+          setVerifiedEmail(''); // We might not have email here if error
+        } else {
+          setStatus('error');
+          setMessage(error.response?.data?.message || 'Verification failed. The link may have expired.');
+        }
       }
     };
 
     verify();
-  }, [navigate, searchParams]);
+  }, [token]);
 
-  const iconColor = status === 'success' ? 'text-success-500' : 'text-error-500';
+  const getIcon = () => {
+    switch (status) {
+      case 'success':
+        return <CheckCircle size={64} className="text-success-500 mx-auto" />;
+      case 'error':
+        return <XCircle size={64} className="text-error-500 mx-auto" />;
+      default:
+        return <div className="w-12 h-12 rounded-full border-4 border-brand-500 border-t-transparent animate-spin mx-auto"></div>;
+    }
+  };
 
   return (
-    <MainLayout>
-      <div className="min-h-screen flex items-center justify-center px-4 py-12">
-        <Card className="w-full max-w-md text-center">
-          <CardHeader>
-            <CardTitle>Email Verification</CardTitle>
-            <CardDescription>
-              {status === 'loading' ? 'Verifying your email...' : message}
-            </CardDescription>
-          </CardHeader>
+    <div className={`min-h-screen flex items-center justify-center p-4 ${isDark ? 'bg-dark-900' : 'bg-gray-50'}`}>
+      <Card className="w-full max-w-md text-center p-8 shadow-xl">
+        <div className="mb-6">
+          {getIcon()}
+        </div>
 
-          <div className="flex justify-center py-6">
-            {status === 'success' ? (
-              <CheckCircle size={48} className={iconColor} />
-            ) : status === 'error' ? (
-              <XCircle size={48} className={iconColor} />
-            ) : (
-              <div className="w-12 h-12 rounded-full border-4 border-brand-500 border-t-transparent animate-spin"></div>
-            )}
-          </div>
+        <h2 className={`text-2xl font-bold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+          {status === 'loading' ? 'Verifying...' : status === 'success' ? 'Verified!' : 'Verification Failed'}
+        </h2>
 
-          {status === 'error' && (
-            <div className="pb-6">
-              <Button onClick={() => navigate('/login')}>Go to Login</Button>
-            </div>
-          )}
-        </Card>
-      </div>
-    </MainLayout>
+        <p className={`text-lg mb-8 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
+          {message}
+        </p>
+
+        {status === 'success' && (
+          <p className="text-sm text-gray-400 mb-6">
+            Redirecting to login in {redirectCount}s...
+          </p>
+        )}
+
+        <Button
+          fullWidth
+          onClick={() => navigate('/login', {
+            state: { email: verifiedEmail, message, type: 'success' },
+            replace: true
+          })}
+          disabled={status === 'loading'}
+          variant={status === 'error' ? 'outline' : 'primary'}
+        >
+          {status === 'success' ? 'Continue to Login' : 'Back to Login'}
+        </Button>
+      </Card>
+    </div>
   );
 }

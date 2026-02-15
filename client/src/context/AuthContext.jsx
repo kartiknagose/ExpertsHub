@@ -1,6 +1,7 @@
-import { createContext, useReducer, useCallback, useEffect } from 'react';
+import { useReducer, useCallback, useEffect } from 'react';
 import { login as apiLogin, registerCustomer, registerWorker, logout as apiLogout, getCurrentUser } from '../api';
 import { resolveProfilePhotoUrl } from '../utils/profilePhoto';
+import { AuthContext } from './AuthContextBase';
 
 /**
  * Auth Context
@@ -8,8 +9,6 @@ import { resolveProfilePhotoUrl } from '../utils/profilePhoto';
  * Global authentication state management
  * Provides: user info, loading state, auth actions
  */
-
-export const AuthContext = createContext();
 
 /**
  * Initial auth state
@@ -77,6 +76,7 @@ function authReducer(state, action) {
         ...state,
         user: null,
         isAuthenticated: false,
+        isLoading: false,
       };
 
     case ACTIONS.CLEAR_ERROR:
@@ -134,7 +134,7 @@ export function AuthProvider({ children }) {
           type: ACTIONS.LOGIN_SUCCESS,
           payload: user,
         });
-      } catch (error) {
+      } catch (_error) {
         // Session missing/expired or network error - clear auth state
         localStorage.removeItem('user');
         dispatch({ type: ACTIONS.LOGOUT });
@@ -171,8 +171,8 @@ export function AuthProvider({ children }) {
     try {
       // Call logout API to clear server cookie
       await apiLogout();
-    } catch (error) {
-      console.error('Logout error:', error);
+    } catch (_error) {
+      console.error('Logout error');
     } finally {
       // Clear auth state and cached user
       localStorage.removeItem('user');
@@ -190,8 +190,8 @@ export function AuthProvider({ children }) {
    */
   const login = useCallback(async (credentials) => {
     try {
-      dispatch({ type: ACTIONS.SET_LOADING, payload: true });
-      
+      // dispatch({ type: ACTIONS.SET_LOADING, payload: true });
+
       // Call login API
       const data = await apiLogin(credentials);
 
@@ -215,7 +215,7 @@ export function AuthProvider({ children }) {
 
       // Update auth state
       dispatch({ type: ACTIONS.LOGIN_SUCCESS, payload: resolvedUser });
-      
+
       return { success: true };
     } catch (error) {
       const errorMessage =
@@ -236,24 +236,13 @@ export function AuthProvider({ children }) {
    */
   const register = useCallback(async (data) => {
     try {
-      dispatch({ type: ACTIONS.SET_LOADING, payload: true });
-      
+      // dispatch({ type: ACTIONS.SET_LOADING, payload: true });
+
       // Call register API
       const response = await registerCustomer(data);
-      
-      const user = response.user ? { ...response.user } : null;
-      if (user?.profilePhotoUrl) {
-        user.profilePhotoUrl = resolveProfilePhotoUrl(user.profilePhotoUrl);
-      }
+      // User must verify email before logging in.
 
-      // Store user for UI convenience (cookie handles auth)
-      if (user) {
-        localStorage.setItem('user', JSON.stringify(user));
-      }
-
-      // Update auth state
-      dispatch({ type: ACTIONS.LOGIN_SUCCESS, payload: user });
-      
+      // dispatch({ type: ACTIONS.SET_LOADING, payload: false }); // Not needed as we didn't set it to true
       return { success: true };
     } catch (error) {
       const errorMessage =
@@ -272,24 +261,12 @@ export function AuthProvider({ children }) {
    */
   const registerAsWorker = useCallback(async (data) => {
     try {
-      dispatch({ type: ACTIONS.SET_LOADING, payload: true });
-      
+      // dispatch({ type: ACTIONS.SET_LOADING, payload: true });
+
       // Call worker register API
       const response = await registerWorker(data);
-      
-      const user = response.user ? { ...response.user } : null;
-      if (user?.profilePhotoUrl) {
-        user.profilePhotoUrl = resolveProfilePhotoUrl(user.profilePhotoUrl);
-      }
 
-      // Store user for UI convenience (cookie handles auth)
-      if (user) {
-        localStorage.setItem('user', JSON.stringify(user));
-      }
-
-      // Update auth state
-      dispatch({ type: ACTIONS.LOGIN_SUCCESS, payload: user });
-      
+      // dispatch({ type: ACTIONS.SET_LOADING, payload: false });
       return { success: true };
     } catch (error) {
       const errorMessage =

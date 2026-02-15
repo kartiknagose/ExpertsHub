@@ -34,8 +34,8 @@ export const createBooking = async (data) => {
  * - Workers see bookings assigned to them
  * @returns {Promise} Response with array of bookings
  */
-export const getAllBookings = async () => {
-  const response = await axiosInstance.get(BOOKINGS_ENDPOINTS.BASE);
+export const getAllBookings = async (params) => {
+  const response = await axiosInstance.get(BOOKINGS_ENDPOINTS.BASE, { params });
   return response.data;
 };
 
@@ -82,5 +82,50 @@ export const cancelBooking = async (bookingId) => {
  */
 export const payBooking = async (bookingId, data = {}) => {
   const response = await axiosInstance.post(BOOKINGS_ENDPOINTS.PAY(bookingId), data);
+  return response.data;
+};
+
+/**
+ * Get open bookings (WORKER only)
+ * - Returns list of job opportunities
+ * @returns {Promise} Response with list of available bookings
+ */
+export const getOpenBookings = async () => {
+  const response = await axiosInstance.get('/bookings/open');
+  return response.data;
+};
+
+/**
+ * Accept an open booking (WORKER only)
+ * - Claims a job
+ * @param {string} bookingId - Booking ID to claim
+ * @returns {Promise} Response with confirmed booking
+ */
+export const acceptBooking = async (bookingId) => {
+  const response = await axiosInstance.post(`/bookings/${bookingId}/accept`);
+  return response.data;
+};
+
+/**
+ * Verify Start OTP (WORKER only)
+ * - Starts the job
+ * @param {string} bookingId - Booking ID
+ * @param {string} otp - Start OTP provided by customer
+ * @returns {Promise} Response with started booking
+ */
+export const verifyBookingStart = async (bookingId, otp) => {
+  const response = await axiosInstance.post(`/bookings/${bookingId}/start`, { otp });
+  return response.data;
+};
+
+/**
+ * Verify Completion OTP (WORKER only)
+ * - Completes the job
+ * @param {string} bookingId - Booking ID
+ * @param {string} otp - Completion OTP provided by customer
+ * @returns {Promise} Response with completed booking
+ */
+export const verifyBookingCompletion = async (bookingId, otp) => {
+  const response = await axiosInstance.post(`/bookings/${bookingId}/complete`, { otp });
   return response.data;
 };

@@ -1,14 +1,20 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
+  html,
+  body {
+    @apply h-full overflow-x-hidden;
+    overscroll-behavior: none;
+  }
+
   body {
     @apply bg-white text-neutral-900 antialiased;
     font-feature-settings: 'cv11', 'ss01';
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-family: 'Space Grotesk', system-ui, -apple-system, sans-serif;
   }
 
   /* Hide native password reveal icons (Edge/Chrome) */
@@ -30,7 +36,7 @@
 
   /* Focus styles */
   *:focus-visible {
-    @apply outline-none ring-2 ring-primary-500 ring-offset-2;
+    @apply outline-none ring-2 ring-brand-500 ring-offset-2;
   }
 
   .dark *:focus-visible {
@@ -57,12 +63,12 @@
 
   /* Button Primary */
   .btn-primary {
-    @apply btn bg-primary-600 text-white hover:bg-primary-700;
-    @apply focus-visible:ring-primary-500;
+    @apply btn bg-brand-600 text-white hover:bg-brand-700;
+    @apply focus-visible:ring-brand-500;
   }
 
   .dark .btn-primary {
-    @apply bg-primary-500 hover:bg-primary-600;
+    @apply bg-brand-500 hover:bg-brand-600;
   }
 
   /* Button Secondary */
@@ -89,13 +95,13 @@
   .input {
     @apply w-full px-4 py-2.5 bg-white border border-neutral-300 rounded-lg;
     @apply text-neutral-900 placeholder:text-neutral-400;
-    @apply focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20;
+    @apply focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20;
     @apply transition-colors duration-200;
   }
 
   .dark .input {
     @apply bg-neutral-900 border-neutral-700 text-neutral-100;
-    @apply focus:border-primary-500;
+    @apply focus:border-brand-500;
   }
 
   /* Badge */
@@ -104,11 +110,11 @@
   }
 
   .badge-primary {
-    @apply badge bg-primary-100 text-primary-700;
+    @apply badge bg-brand-100 text-brand-700;
   }
 
   .dark .badge-primary {
-    @apply bg-primary-900/30 text-primary-300;
+    @apply bg-brand-900/30 text-brand-300;
   }
 
   .badge-success {
@@ -174,9 +180,4 @@ html {
 /* Selection Style */
 ::selection {
   @apply bg-brand-200 text-brand-900;
-}
-
-/* Focus Visible */
-:focus-visible {
-  @apply outline-none ring-2 ring-brand-500 ring-offset-2;
 }

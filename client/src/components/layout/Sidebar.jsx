@@ -12,6 +12,7 @@ import {
   Lock,
   ChevronLeft,
   ChevronRight,
+  Search,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useTheme } from '../../context/ThemeContext';
@@ -22,14 +23,13 @@ const navConfig = {
     { label: 'Dashboard', to: '/dashboard', icon: Home },
     { label: 'Browse Services', to: '/services', icon: Briefcase },
     { label: 'My Bookings', to: '/bookings', icon: Calendar },
-    { label: 'My Profile', to: '/profile', icon: User },
     { label: 'Reviews', to: '/reviews', icon: Star },
   ],
   WORKER: [
     { label: 'Dashboard', to: '/worker/dashboard', icon: Home },
+    { label: 'Browse Services', to: '/services', icon: Search },
     { label: 'My Services', to: '/worker/services', icon: Briefcase },
     { label: 'Bookings', to: '/worker/bookings', icon: Calendar },
-    { label: 'My Profile', to: '/worker/profile', icon: User },
     { label: 'Availability', to: '/worker/availability', icon: Clock },
     { label: 'Verification', to: '/worker/verification', icon: ShieldCheck },
   ],
@@ -38,6 +38,7 @@ const navConfig = {
     { label: 'Services', to: '/admin/services', icon: Briefcase },
     { label: 'Bookings', to: '/admin/bookings', icon: Calendar },
     { label: 'Users', to: '/admin/users', icon: User },
+    { label: 'Verification', to: '/admin/verification', icon: ShieldCheck },
   ],
 };
 

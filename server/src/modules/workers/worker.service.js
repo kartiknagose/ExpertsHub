@@ -6,12 +6,13 @@ async function upsertWorkerProfile(userId, { bio, hourlyRate, skills, serviceAre
   const data = {
     bio: bio ?? null,
     hourlyRate: hourlyRate ?? null, // allow null; validate number in controller before
-    skills: skills ? JSON.stringify(skills) : null,
-    serviceAreas: serviceAreas ? JSON.stringify(serviceAreas) : null,
+    skills: skills ?? null,
+    serviceAreas: serviceAreas ?? null,
     user: { connect: { id: userId } },
   };
 
   return prisma.$transaction(async (tx) => {
+    const user = await tx.user.findUnique({ where: { id: userId }, select: { role: true } });
     // If profile exists -> update, else -> create
     const existing = await tx.workerProfile.findUnique({ where: { userId } });
     let profile;
@@ -22,9 +23,11 @@ async function upsertWorkerProfile(userId, { bio, hourlyRate, skills, serviceAre
       profile = await tx.workerProfile.create({ data });
     }
 
+    const nextRole = user?.role === 'ADMIN' ? 'ADMIN' : 'WORKER';
     await tx.user.update({
       where: { id: userId },
       data: {
+        role: nextRole,
         profilePhotoUrl: profilePhotoUrl || undefined,
         isProfileComplete: true,
       },
@@ -47,6 +50,7 @@ async function getMyWorkerProfile(userId) {
           role: true,
           profilePhotoUrl: true,
           emailVerified: true,
+          isProfileComplete: true,
         },
       },
     },
@@ -164,8 +168,8 @@ async function removeWorkerService(userId, serviceId) {
   });
 }
 
-module.exports = { 
-  upsertWorkerProfile, 
+module.exports = {
+  upsertWorkerProfile,
   getMyWorkerProfile,
   addWorkerService,
   getMyWorkerServices,

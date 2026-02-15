@@ -15,56 +15,37 @@ import {
   CheckCircle,
   Activity,
   Calendar,
-  DollarSign
+  DollarSign,
+  Target,
+  MapPin,
+  ChevronRight,
+  User,
+  AlertCircle
 } from 'lucide-react';
 import { MainLayout } from '../../components/layout/MainLayout';
-import { PageHeader, Card, CardHeader, CardTitle, CardDescription, Button, Badge, Spinner, StatCard, Skeleton, SimpleBarChart, SimpleDonutChart } from '../../components/common';
+import { PageHeader, Card, CardHeader, CardTitle, CardDescription, Button, Badge, StatCard, Skeleton, AsyncState, Spinner, SimpleBarChart, SimpleDonutChart } from '../../components/common';
+
 import { useTheme } from '../../context/ThemeContext';
-import { getAllBookings, updateBookingStatus, cancelBooking } from '../../api/bookings';
+import { getAllBookings, updateBookingStatus, cancelBooking, getOpenBookings, acceptBooking } from '../../api/bookings';
 import { getMyAvailability } from '../../api/availability';
 import { getMyServices, getMyWorkerProfile } from '../../api/workers';
+import { queryKeys } from '../../utils/queryKeys';
+import { getBookingStatusVariant } from '../../utils/statusHelpers';
 
-const statusVariant = (status) => {
-  switch (status) {
-    case 'PENDING':
-      return 'warning';
-    case 'CONFIRMED':
-      return 'info';
-    case 'IN_PROGRESS':
-      return 'default';
-    case 'COMPLETED':
-      return 'success';
-    case 'CANCELLED':
-      return 'error';
-    default:
-      return 'default';
-  }
-};
 
 export function WorkerDashboardPage() {
   const { isDark } = useTheme();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   const { data, isLoading, isError, error, refetch } = useQuery({
-    queryKey: ['bookings'],
+    queryKey: queryKeys.bookings.worker(),
     queryFn: getAllBookings,
   });
 
-  const availabilityQuery = useQuery({
-    queryKey: ['availability'],
-    queryFn: getMyAvailability,
-  });
-
-  const profileQuery = useQuery({
+  const { data: profile } = useQuery({
     queryKey: ['worker-profile'],
     queryFn: getMyWorkerProfile,
-  });
-
-  const servicesQuery = useQuery({
-    queryKey: ['worker-services'],
-    queryFn: getMyServices,
   });
 
   const statusMutation = useMutation({
@@ -72,7 +53,7 @@ export function WorkerDashboardPage() {
     onSuccess: (_, variables) => {
       const labels = { CONFIRMED: 'accepted', IN_PROGRESS: 'started', COMPLETED: 'completed' };
       toast.success(`Job ${labels[variables.status] || 'updated'} successfully!`);
-      queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.bookings.worker() });
     },
     onError: (err) => {
       toast.error(err?.response?.data?.error || 'Failed to update booking status.');
@@ -83,406 +64,318 @@ export function WorkerDashboardPage() {
     mutationFn: (id) => cancelBooking(id),
     onSuccess: () => {
       toast.success('Booking rejected successfully.');
-      queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.bookings.worker() });
     },
     onError: (err) => {
       toast.error(err?.response?.data?.error || 'Failed to reject booking.');
     },
   });
 
-  const bookings = data?.bookings || [];
-  const availability = availabilityQuery.data?.availability || [];
-  const profile = profileQuery.data?.profile;
-  const services = servicesQuery.data?.services || [];
+  // Query for Open Jobs (Job Board)
+  const { data: openJobsData, refetch: refetchOpenJobs } = useQuery({
+    queryKey: ['open-bookings'],
+    queryFn: getOpenBookings,
+  });
 
-  const summary = useMemo(() => {
-    return {
-      total: bookings.length,
-      pending: bookings.filter((b) => b.status === 'PENDING').length,
-      confirmed: bookings.filter((b) => b.status === 'CONFIRMED').length,
-      inProgress: bookings.filter((b) => b.status === 'IN_PROGRESS').length,
-      completed: bookings.filter((b) => b.status === 'COMPLETED').length,
-      cancelled: bookings.filter((b) => b.status === 'CANCELLED').length,
-    };
-  }, [bookings]);
+  const acceptJobMutation = useMutation({
+    mutationFn: (id) => acceptBooking(id),
+    onSuccess: () => {
+      toast.success('Job accepted! You can now see customer details.');
+      queryClient.invalidateQueries({ queryKey: queryKeys.bookings.worker() });
+      queryClient.invalidateQueries({ queryKey: ['open-bookings'] });
+    },
+    onError: (err) => {
+      toast.error(err?.response?.data?.error || 'Failed to accept job.');
+    },
+  });
+
+  const openJobs = openJobsData?.bookings || [];
+  const bookings = data?.bookings || [];
+
+  // Stats Calculation
+  const stats = useMemo(() => {
+    const totalJobs = bookings.length;
+    const completedJobs = bookings.filter((b) => b.status === 'COMPLETED').length;
+    const pendingJobs = bookings.filter((b) => ['PENDING', 'CONFIRMED', 'IN_PROGRESS'].includes(b.status)).length;
+    const totalEarnings = bookings
+      .filter((b) => b.status === 'COMPLETED')
+      .reduce((sum, b) => sum + (Number(b.totalAmount) || 0), 0);
+
+    // Calculate rating (mock based on profile if available, else standard)
+    const rating = profile?.rating || 0;
+
+    return [
+      { label: 'Total Earnings', value: `₹${totalEarnings}`, icon: Wallet, color: 'text-green-500', bg: 'bg-green-500/10' },
+      { label: 'Active Jobs', value: pendingJobs, icon: Activity, color: 'text-blue-500', bg: 'bg-blue-500/10' },
+      { label: 'Completed Jobs', value: completedJobs, icon: CheckCircle, color: 'text-purple-500', bg: 'bg-purple-500/10' },
+      { label: 'Rating', value: rating ? rating.toFixed(1) : 'New', icon: Star, color: 'text-yellow-500', bg: 'bg-yellow-500/10' },
+    ];
+  }, [bookings, profile]);
 
   const chartData = useMemo(() => {
-    // Last 7 days earnings
+    // Earnings (Last 7 Days)
     const last7Days = Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(); // Today
+      const d = new Date();
       d.setDate(d.getDate() - (6 - i));
       return d;
     });
 
-    const earnings = last7Days.map(date => {
-      const dateStr = date.toISOString().split('T')[0];
-      // Note: Using createdAt for simplicity as seed data has random dates
-      // Real app might use 'completedAt' or 'updatedAt'
-      const dayEarnings = bookings
-        .filter(b => b.createdAt.startsWith(dateStr) && (b.status === 'COMPLETED' || b.status === 'CONFIRMED'))
-        .reduce((sum, b) => sum + (Number(b.totalPrice) || 0), 0);
+    const earningsData = last7Days.map(date => {
+      const dateString = date.toISOString().split('T')[0];
+      const dailyTotal = bookings
+        .filter(b => {
+          if (b.status !== 'COMPLETED') return false;
+          // Use scheduledDate as the reference date
+          if (!b.scheduledDate) return false;
+          const bookingDate = new Date(b.scheduledDate).toISOString().split('T')[0];
+          return bookingDate === dateString;
+        })
+        .reduce((sum, b) => sum + (Number(b.totalAmount) || 0), 0);
 
       return {
         label: date.toLocaleDateString('en-US', { weekday: 'short' }),
-        value: dayEarnings,
-        tooltip: `₹${dayEarnings}`
+        value: dailyTotal,
+        tooltip: `₹${dailyTotal}`
       };
     });
 
-    const status = [
-      { label: 'Completed', value: summary.completed, color: '#10b981' },
-      { label: 'Confirmed', value: summary.confirmed, color: '#3b82f6' },
-      { label: 'Pending', value: summary.pending, color: '#f59e0b' },
-      { label: 'Cancelled', value: summary.cancelled, color: '#ef4444' },
+    // Job Status Distribution
+    const activeJobsCount = bookings.filter(b => ['PENDING', 'CONFIRMED', 'IN_PROGRESS'].includes(b.status)).length;
+    const completedCount = bookings.filter(b => b.status === 'COMPLETED').length;
+    const cancelledCount = bookings.filter(b => ['CANCELLED', 'REJECTED'].includes(b.status)).length;
+
+    const statusData = [
+      { label: 'Completed', value: completedCount, color: '#10b981' }, // emerald-500
+      { label: 'Active', value: activeJobsCount, color: '#3b82f6' },    // blue-500
+      { label: 'Cancelled', value: cancelledCount, color: '#ef4444' }   // red-500
     ];
 
-    return { earnings, status };
-  }, [bookings, summary]);
-
-  const earnings = useMemo(() => {
-    return bookings
-      .filter((booking) => booking.status === 'COMPLETED')
-      .reduce((sum, booking) => sum + Number(booking.totalPrice || 0), 0);
+    return { earningsData, statusData };
   }, [bookings]);
 
-  const upcomingJobs = useMemo(() => {
-    const now = new Date();
-    return bookings
-      .filter((booking) => new Date(booking.scheduledAt || booking.scheduledDate) >= now)
-      .sort((a, b) => new Date(a.scheduledAt || a.scheduledDate) - new Date(b.scheduledAt || b.scheduledDate))
-      .slice(0, 3);
-  }, [bookings]);
+  const activeBookings = bookings.filter(b => ['CONFIRMED', 'IN_PROGRESS'].includes(b.status));
 
   return (
     <MainLayout>
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        <PageHeader
-          title="Worker Dashboard"
-          subtitle="Track your jobs, confirmations, and progress."
-        />
+      <div className={`min-h-screen pb-20 ${isDark ? 'bg-dark-950' : 'bg-gray-50'}`}>
 
-        {/* Loading State - Skeletons */}
-        {isLoading && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
-            {[...Array(6)].map((_, i) => (
-              <Card key={i} className="h-32 flex flex-col justify-between">
-                <Skeleton className="h-4 w-24 mb-4" />
-                <Skeleton className="h-8 w-16" />
-                <div className="flex justify-end">
-                  <Skeleton className="h-10 w-10 rounded-xl" />
-                </div>
-              </Card>
+        {/* Welcome Header */}
+        <div className={`pt-12 pb-16 px-4 sm:px-6 lg:px-8 relative overflow-hidden ${isDark ? 'bg-gradient-to-r from-brand-900 via-dark-900 to-dark-950' : 'bg-gradient-to-r from-brand-600 via-brand-500 to-accent-500'}`}>
+          <div className="absolute inset-0 bg-[url('/pattern.svg')] opacity-10"></div>
+          <div className="max-w-7xl mx-auto relative z-10 text-white">
+            <div className="flex justify-between items-end">
+              <div>
+                <h1 className="text-3xl md:text-4xl font-bold mb-2">Welcome back, {profile?.user?.name || 'Pro'}!</h1>
+                <p className="text-brand-100 text-lg max-w-2xl">
+                  Here's what's happening with your business today. You have {activeBookings.length} active jobs.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                className="hidden sm:flex bg-white/10 border-white/20 text-white hover:bg-white/20 backdrop-blur-sm"
+                onClick={() => navigate('/worker/availability')}
+              >
+                <Clock size={16} className="mr-2" /> Manage Availability
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-8 relative z-20">
+
+          {/* Stats Grid */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
+            {stats.map((stat, index) => (
+              <StatCard
+                key={index}
+                label={stat.label}
+                value={stat.value}
+                icon={stat.icon}
+                trend={index === 0 ? "+12%" : null}
+                trendDirection="up"
+                className="shadow-lg border-none ring-1 ring-black/5 dark:ring-white/5"
+              />
             ))}
           </div>
-        )}
 
-        {isError && (
-          <Card className="p-6">
-            <p className="text-error-500 mb-3">
-              {error?.response?.data?.error || error?.message || 'Failed to load dashboard'}
-            </p>
-            <div className="flex flex-wrap gap-3">
-              <Button size="sm" onClick={() => refetch()}>
-                Retry
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => navigate('/system-status')}>
-                Check System Status
-              </Button>
-            </div>
-          </Card>
-        )}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <SimpleBarChart
+              title="Weekly Earnings"
+              data={chartData.earningsData}
+              height="h-64"
+            />
+            <SimpleDonutChart
+              title="Job Status Overview"
+              data={chartData.statusData}
+            />
+          </div>
 
-        {!isLoading && !isError && (
-          <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
-              <StatCard
-                title="Total Jobs"
-                value={summary.total}
-                icon={Briefcase}
-                color="brand"
-                delay={0}
-              />
-              <StatCard
-                title="Pending"
-                value={summary.pending}
-                icon={Clock}
-                color="warning"
-                delay={1}
-              />
-              <StatCard
-                title="Confirmed"
-                value={summary.confirmed}
-                icon={Calendar}
-                color="info"
-                delay={2}
-              />
-              <StatCard
-                title="In Progress"
-                value={summary.inProgress}
-                icon={Activity}
-                color="info"
-                delay={3}
-              />
-              <StatCard
-                title="Completed"
-                value={summary.completed}
-                icon={CheckCircle}
-                color="success"
-                delay={4}
-              />
-              <StatCard
-                title="Earnings"
-                value={`₹${earnings.toFixed(0)}`}
-                icon={DollarSign}
-                color="success"
-                delay={5}
-                trend={{
-                  value: 12,
-                  direction: 'up',
-                  label: 'vs last month'
-                }}
-              />
-            </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
-            {/* Charts Section (ISSUE-039) */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-              <SimpleBarChart
-                title="Weekly Earnings"
-                data={chartData.earnings}
-                className="lg:col-span-2"
-                height="h-64"
-              />
-              <SimpleDonutChart
-                title="Job Status"
-                data={chartData.status}
-              />
-            </div>
+            {/* Main Column: Jobs */}
+            <div className="lg:col-span-2 space-y-8">
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Upcoming Jobs</CardTitle>
-                  <CardDescription>Your next scheduled appointments</CardDescription>
-                </CardHeader>
+              {/* Active Jobs Section */}
+              <section>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className={`text-xl font-bold flex items-center gap-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                    <Briefcase className="text-brand-500" size={20} /> Active Jobs
+                  </h2>
+                  <Button variant="ghost" size="sm" onClick={() => navigate('/worker/bookings')}>View All</Button>
+                </div>
 
-                {upcomingJobs.length === 0 && (
-                  <div className="space-y-3">
-                    <p className={isDark ? 'text-gray-300' : 'text-gray-600'}>
-                      No upcoming jobs scheduled.
-                    </p>
-                    <div className="flex flex-wrap gap-3">
-                      <Button size="sm" onClick={() => navigate('/worker/services')}>
-                        Add Services
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => navigate('/worker/availability')}>
-                        Set Availability
-                      </Button>
-                    </div>
-                  </div>
-                )}
-
-                {upcomingJobs.length > 0 && (
+                {isLoading ? (
                   <div className="space-y-4">
-                    {upcomingJobs.map((booking) => (
-                      <div key={booking.id} className="flex flex-col gap-2 border-b last:border-0 pb-3 last:pb-0">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className={isDark ? 'text-gray-100 font-medium' : 'text-gray-900 font-medium'}>
-                              {booking.service?.name || `Job #${booking.id}`}
-                            </p>
-                            <p className={isDark ? 'text-gray-400 text-sm' : 'text-gray-600 text-sm'}>
-                              {new Date(booking.scheduledAt || booking.scheduledDate).toLocaleString()}
-                            </p>
+                    {[1, 2].map(i => <Skeleton key={i} className="h-32 rounded-2xl" />)}
+                  </div>
+                ) : activeBookings.length > 0 ? (
+                  <div className="space-y-4">
+                    {activeBookings.map((booking) => (
+                      <div key={booking.id} className={`p-6 rounded-2xl border transition-all duration-200 hover:shadow-md ${isDark ? 'bg-dark-800 border-dark-700' : 'bg-white border-gray-100'}`}>
+                        <div className="flex justify-between items-start mb-4">
+                          <div className="flex gap-4">
+                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${isDark ? 'bg-brand-900/30 text-brand-400' : 'bg-brand-50 text-brand-600'}`}>
+                              <CalendarCheck size={24} />
+                            </div>
+                            <div>
+                              <h3 className={`font-bold text-lg ${isDark ? 'text-white' : 'text-gray-900'}`}>{booking.service?.name}</h3>
+                              <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mt-1">
+                                <User size={14} /> {booking.customer?.name}
+                              </div>
+                            </div>
                           </div>
-                          <Badge variant={statusVariant(booking.status)}>
-                            {booking.status}
+                          <Badge variant={getBookingStatusVariant(booking.status).variant}>
+                            {booking.status.replace('_', ' ')}
                           </Badge>
                         </div>
 
-                        {/* Quick Actions */}
-                        <div className="flex justify-end gap-2 mt-1">
-                          {booking.status === 'PENDING' && (
-                            <>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="text-red-500 border-red-200 hover:bg-red-50 dark:hover:bg-red-900/10"
-                                onClick={() => cancelMutation.mutate(booking.id)}
-                                loading={cancelMutation.isPending}
-                              >
-                                Reject
-                              </Button>
-                              <Button
-                                size="sm"
-                                onClick={() => statusMutation.mutate({ id: booking.id, status: 'CONFIRMED' })}
-                                loading={statusMutation.isPending}
-                              >
-                                Accept
-                              </Button>
-                            </>
-                          )}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4 pl-16">
+                          <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                            <Calendar size={16} className="text-gray-400" />
+                            {new Date(booking.scheduledDate).toLocaleString()}
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                            <MapPin size={16} className="text-gray-400" />
+                            <span className="truncate">{booking.addressDetails}</span>
+                          </div>
+                        </div>
 
+                        <div className="pl-16 flex gap-3">
                           {booking.status === 'CONFIRMED' && (
                             <Button
                               size="sm"
-                              variant="outline"
                               onClick={() => statusMutation.mutate({ id: booking.id, status: 'IN_PROGRESS' })}
                               loading={statusMutation.isPending}
+                              className="bg-brand-600 text-white hover:bg-brand-700"
                             >
                               Start Job
                             </Button>
                           )}
-
                           {booking.status === 'IN_PROGRESS' && (
                             <Button
                               size="sm"
-                              className="bg-green-600 hover:bg-green-700 text-white"
                               onClick={() => statusMutation.mutate({ id: booking.id, status: 'COMPLETED' })}
                               loading={statusMutation.isPending}
+                              className="bg-green-600 text-white hover:bg-green-700"
                             >
                               Complete Job
                             </Button>
                           )}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => navigate(`/worker/bookings/${booking.id}`)}
+                          >
+                            View Details
+                          </Button>
                         </div>
                       </div>
                     ))}
                   </div>
-                )}
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Availability</CardTitle>
-                  <CardDescription>Weekly slots for customers</CardDescription>
-                </CardHeader>
-
-                {availabilityQuery.isLoading && (
-                  <div className="flex items-center justify-center py-10">
-                    <Spinner size="lg" />
+                ) : (
+                  <div className={`text-center py-12 rounded-2xl border border-dashed ${isDark ? 'border-dark-700 bg-dark-800/50' : 'border-gray-200 bg-gray-50'}`}>
+                    <Briefcase className="mx-auto text-gray-400 mb-2" size={32} />
+                    <h3 className={`text-lg font-medium ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>No active jobs</h3>
+                    <p className="text-gray-500">Check the Open Requests tab to find work.</p>
                   </div>
                 )}
+              </section>
 
-                {!availabilityQuery.isLoading && availability.length === 0 && (
-                  <p className={isDark ? 'text-gray-300' : 'text-gray-600'}>
-                    No availability slots yet.
-                  </p>
-                )}
-
-                {!availabilityQuery.isLoading && availability.length > 0 && (
-                  <div className="space-y-2">
-                    {availability.slice(0, 4).map((slot) => (
-                      <div key={slot.id} className="flex items-center justify-between">
-                        <span className={isDark ? 'text-gray-200' : 'text-gray-800'}>
-                          {dayLabels[slot.dayOfWeek] || `Day ${slot.dayOfWeek}`}
-                        </span>
-                        <Badge variant="info">{slot.startTime} - {slot.endTime}</Badge>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Profile Status</CardTitle>
-                  <CardDescription>Keep your profile competitive</CardDescription>
-                </CardHeader>
-
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className={isDark ? 'text-gray-300' : 'text-gray-700'}>Rating</span>
-                    <Badge variant={profile?.rating ? 'success' : 'default'}>
-                      {profile?.rating?.toFixed?.(1) || '0.0'}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className={isDark ? 'text-gray-300' : 'text-gray-700'}>Total Reviews</span>
-                    <Badge variant="info">{profile?.totalReviews || 0}</Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className={isDark ? 'text-gray-300' : 'text-gray-700'}>Services</span>
-                    <Badge variant="default">{services.length}</Badge>
-                  </div>
+              {/* Open Requests Section */}
+              <section>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className={`text-xl font-bold flex items-center gap-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                    <Target className="text-accent-500" size={20} /> Open Requests
+                  </h2>
+                  <Button variant="ghost" size="sm" onClick={() => refetchOpenJobs()}>Refresh</Button>
                 </div>
 
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <Button size="sm" icon={Briefcase} onClick={() => navigate('/worker/services')}>
-                    Manage Services
-                  </Button>
-                  <Button size="sm" variant="outline" icon={Wallet} onClick={() => navigate('/worker/profile')}>
-                    Update Profile
-                  </Button>
-                </div>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>My Services</CardTitle>
-                  <CardDescription>What customers can book</CardDescription>
-                </CardHeader>
-
-                {servicesQuery.isLoading && (
-                  <div className="flex items-center justify-center py-8">
-                    <Spinner size="lg" />
-                  </div>
-                )}
-
-                {!servicesQuery.isLoading && services.length === 0 && (
-                  <div className="space-y-3">
-                    <p className={isDark ? 'text-gray-300' : 'text-gray-600'}>
-                      No services added yet.
-                    </p>
-                    <Button size="sm" onClick={() => navigate('/worker/services')}>
-                      Add Services
-                    </Button>
-                  </div>
-                )}
-
-                {!servicesQuery.isLoading && services.length > 0 && (
-                  <div className="space-y-3">
-                    {services.slice(0, 4).map((entry) => (
-                      <div key={entry.serviceId} className="flex items-center justify-between">
-                        <div>
-                          <p className={isDark ? 'text-gray-100' : 'text-gray-900'}>
-                            {entry.service?.name || 'Service'}
-                          </p>
-                          <p className={isDark ? 'text-gray-400 text-sm' : 'text-gray-600 text-sm'}>
-                            {entry.service?.category || 'General'}
-                          </p>
+                {openJobs.length > 0 ? (
+                  <div className="space-y-4">
+                    {openJobs.map((job) => (
+                      <Card key={job.id} className="hover:shadow-lg transition-shadow border-l-4 border-l-accent-500">
+                        <div className="p-6">
+                          <div className="flex justify-between items-start mb-2">
+                            <h3 className={`font-bold text-lg ${isDark ? 'text-white' : 'text-gray-900'}`}>{job.service?.name}</h3>
+                            <Badge variant="outline" className="text-accent-600 border-accent-200 bg-accent-50">New Lead</Badge>
+                          </div>
+                          <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400 mb-4">
+                            <span className="flex items-center gap-1"><MapPin size={14} /> {job.addressDetails?.split(',')[0] || 'Local'}</span>
+                            <span className="flex items-center gap-1"><Calendar size={14} /> {new Date(job.scheduledDate).toLocaleDateString()}</span>
+                          </div>
+                          <Button
+                            fullWidth
+                            onClick={() => acceptJobMutation.mutate(job.id)}
+                            loading={acceptJobMutation.isPending}
+                            className="bg-black dark:bg-white dark:text-black text-white hover:bg-gray-800 dark:hover:bg-gray-200"
+                          >
+                            Accept Job
+                          </Button>
                         </div>
-                        <Badge variant="info">Active</Badge>
-                      </div>
+                      </Card>
                     ))}
                   </div>
+                ) : (
+                  <div className={`text-center py-12 rounded-2xl border border-dashed ${isDark ? 'border-dark-700 bg-dark-800/50' : 'border-gray-200 bg-gray-50'}`}>
+                    <Target className="mx-auto text-gray-400 mb-2" size={32} />
+                    <h3 className={`text-lg font-medium ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>No listed jobs nearby</h3>
+                    <p className="text-gray-500">We'll notify you when new requests come in.</p>
+                  </div>
                 )}
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Quick Actions</CardTitle>
-                  <CardDescription>Stay on top of your workflow</CardDescription>
-                </CardHeader>
-                <div className="space-y-3">
-                  <Button fullWidth icon={CalendarCheck} onClick={() => navigate('/worker/bookings')}>
-                    Review Bookings
-                  </Button>
-                  <Button fullWidth variant="outline" icon={Clock} onClick={() => navigate('/worker/availability')}>
-                    Set Availability
-                  </Button>
-                  <Button fullWidth variant="outline" icon={Briefcase} onClick={() => navigate('/worker/services')}>
-                    Add Services
-                  </Button>
-                  <Button fullWidth variant="ghost" icon={Star} onClick={() => navigate('/worker/reviews')}>
-                    View Reviews
-                  </Button>
-                  <Button fullWidth variant="ghost" icon={ShieldCheck} onClick={() => navigate('/worker/verification')}>
-                    Verification Status
-                  </Button>
-                </div>
-              </Card>
+              </section>
             </div>
-          </>
-        )}
+
+            {/* Sidebar: Quick Actions */}
+            <div className="lg:col-span-1 space-y-6">
+              <Card className="border-none shadow-lg shadow-brand-500/5">
+                <CardHeader>
+                  <CardTitle className="text-lg">Quick Actions</CardTitle>
+                </CardHeader>
+                <div className="p-4 pt-0 space-y-2">
+                  <Button variant="ghost" fullWidth className="justify-start h-12" onClick={() => navigate('/worker/availability')}>
+                    <Clock size={18} className="mr-3 text-blue-500" /> Availability
+                  </Button>
+                  <Button variant="ghost" fullWidth className="justify-start h-12" onClick={() => navigate('/worker/services')}>
+                    <Briefcase size={18} className="mr-3 text-purple-500" /> My Services
+                  </Button>
+                  <Button variant="ghost" fullWidth className="justify-start h-12" onClick={() => navigate('/worker/profile')}>
+                    <User size={18} className="mr-3 text-green-500" /> Profile
+                  </Button>
+                  <Button variant="ghost" fullWidth className="justify-start h-12" onClick={() => navigate('/worker/reviews')}>
+                    <Star size={18} className="mr-3 text-yellow-500" /> Reviews
+                  </Button>
+                </div>
+              </Card>
+
+              <div className={`p-6 rounded-2xl ${isDark ? 'bg-brand-900/10 border border-brand-800' : 'bg-brand-50 border border-brand-100'}`}>
+                <h3 className={`font-bold mb-2 ${isDark ? 'text-brand-100' : 'text-brand-900'}`}>Pro Tip</h3>
+                <p className={`text-sm ${isDark ? 'text-brand-200' : 'text-brand-700'}`}>
+                  Updating your availability calendar weekly increases your chances of getting hired by 40%.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </MainLayout>
   );

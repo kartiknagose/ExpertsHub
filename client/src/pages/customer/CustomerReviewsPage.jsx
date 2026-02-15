@@ -7,49 +7,12 @@ import { Star, MessageSquare, Send, CheckCircle2, Sparkles } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion';
 import { MainLayout } from '../../components/layout/MainLayout';
 import { Card, CardHeader, CardTitle, CardDescription, PageHeader } from '../../components/common';
-import { Badge, Button, Spinner } from '../../components/common';
+import { Badge, Button, AsyncState } from '../../components/common';
 import { useTheme } from '../../context/ThemeContext';
 import { createReview, getMyReviews, getPendingReviews } from '../../api/reviews';
+import { queryKeys } from '../../utils/queryKeys';
+import { StarRating, getRatingLabel } from '../../components/features/reviews/StarRating';
 
-// Interactive star rating component
-function StarRating({ value, onChange, size = 28 }) {
-  const [hovered, setHovered] = useState(0);
-
-  return (
-    <div className="flex gap-1">
-      {[1, 2, 3, 4, 5].map((star) => (
-        <button
-          key={star}
-          type="button"
-          onClick={() => onChange(star)}
-          onMouseEnter={() => setHovered(star)}
-          onMouseLeave={() => setHovered(0)}
-          className="transition-transform duration-150 hover:scale-125 focus:outline-none"
-          aria-label={`Rate ${star} star${star !== 1 ? 's' : ''}`}
-        >
-          <Star
-            size={size}
-            className={`transition-colors duration-200 ${star <= (hovered || value)
-                ? 'fill-yellow-400 text-yellow-400'
-                : 'fill-transparent text-gray-300 dark:text-gray-600'
-              }`}
-          />
-        </button>
-      ))}
-    </div>
-  );
-}
-
-const ratingLabel = (rating) => {
-  switch (rating) {
-    case 1: return 'Poor';
-    case 2: return 'Below Average';
-    case 3: return 'Good';
-    case 4: return 'Very Good';
-    case 5: return 'Excellent';
-    default: return '';
-  }
-};
 
 export function CustomerReviewsPage() {
   const { isDark } = useTheme();
@@ -58,12 +21,12 @@ export function CustomerReviewsPage() {
   const [submitted, setSubmitted] = useState({});
 
   const pendingQuery = useQuery({
-    queryKey: ['reviews', 'pending'],
+    queryKey: queryKeys.reviews.customerPending(),
     queryFn: getPendingReviews,
   });
 
   const reviewsQuery = useQuery({
-    queryKey: ['reviews', 'written'],
+    queryKey: queryKeys.reviews.customerWritten(),
     queryFn: getMyReviews,
   });
 
@@ -72,14 +35,17 @@ export function CustomerReviewsPage() {
     onSuccess: (_, variables) => {
       setSubmitted((prev) => ({ ...prev, [variables.bookingId]: true }));
       setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ['reviews'] });
-        queryClient.invalidateQueries({ queryKey: ['bookings'] });
+        queryClient.invalidateQueries({ queryKey: queryKeys.reviews.customerPending() });
+        queryClient.invalidateQueries({ queryKey: queryKeys.reviews.customerWritten() });
+        queryClient.invalidateQueries({ queryKey: queryKeys.bookings.customer() });
       }, 1500);
     },
   });
 
   const pendingBookings = pendingQuery.data?.bookings || [];
   const reviews = reviewsQuery.data?.reviews || [];
+  const hasError = pendingQuery.isError || reviewsQuery.isError;
+  const loadError = pendingQuery.error || reviewsQuery.error;
 
   const updateDraft = (bookingId, field, value) => {
     setDrafts((prev) => ({
@@ -111,13 +77,11 @@ export function CustomerReviewsPage() {
           subtitle="Share your experience to help the community make better choices."
         />
 
-        {isLoading && (
-          <div className="flex items-center justify-center py-16">
-            <Spinner size="lg" />
-          </div>
-        )}
-
-        {!isLoading && (
+        <AsyncState
+          isLoading={isLoading}
+          isError={hasError}
+          error={loadError}
+        >
           <div className="space-y-10">
 
             {/* Pending Reviews Section */}
@@ -200,7 +164,7 @@ export function CustomerReviewsPage() {
                                     draft.rating >= 3 ? 'text-blue-500' :
                                       draft.rating >= 2 ? 'text-yellow-500' : 'text-red-500'
                                   }`}>
-                                  {ratingLabel(draft.rating)}
+                                  {getRatingLabel(draft.rating)}
                                 </span>
                               </div>
                             </div>
@@ -304,7 +268,7 @@ export function CustomerReviewsPage() {
               </div>
             </section>
           </div>
-        )}
+        </AsyncState>
       </div>
     </MainLayout>
   );

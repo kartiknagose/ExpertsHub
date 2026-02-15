@@ -30,7 +30,8 @@ export function StatCard({
     icon: Icon,
     color = 'brand',
     trend,
-    delay = 0
+    delay = 0,
+    ...props
 }) {
     const { isDark } = useTheme();
     const ref = useRef(null);
@@ -69,7 +70,7 @@ export function StatCard({
             animate={isInView ? { opacity: 1, y: 0 } : {}}
             transition={{ duration: 0.5, delay: delay * 0.1 }}
         >
-            <Card hoverable className="h-full">
+            <Card hoverable className={`h-full ${props.className || ''}`} {...props}>
                 <div className="flex items-start justify-between mb-4">
                     <div>
                         <p className={`text-sm font-medium ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
@@ -91,10 +92,10 @@ export function StatCard({
                     <div className="flex items-center gap-2 text-sm">
                         <span
                             className={`flex items-center gap-1 font-medium ${trend.direction === 'up'
-                                    ? 'text-green-500'
-                                    : trend.direction === 'down'
-                                        ? 'text-red-500'
-                                        : 'text-gray-500'
+                                ? 'text-green-500'
+                                : trend.direction === 'down'
+                                    ? 'text-red-500'
+                                    : 'text-gray-500'
                                 }`}
                         >
                             {trend.direction === 'up' && <TrendingUp size={16} />}

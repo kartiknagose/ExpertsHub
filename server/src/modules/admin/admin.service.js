@@ -1,12 +1,13 @@
 const prisma = require('../../config/prisma');
 
 async function getDashboardStats() {
-  const [users, workers, services, bookings, pendingBookings] = await Promise.all([
+  const [users, workers, services, bookings, pendingBookings, pendingVerifications] = await Promise.all([
     prisma.user.count(),
     prisma.user.count({ where: { role: 'WORKER' } }),
     prisma.service.count(),
     prisma.booking.count(),
     prisma.booking.count({ where: { status: 'PENDING' } }),
+    prisma.workerVerificationApplication.count({ where: { status: 'PENDING' } }),
   ]);
 
   return {
@@ -15,6 +16,7 @@ async function getDashboardStats() {
     services,
     bookings,
     pendingBookings,
+    pendingVerifications,
   };
 }
 
@@ -28,6 +30,7 @@ async function listUsers(role) {
       email: true,
       mobile: true,
       role: true,
+      isActive: true,
       emailVerified: true,
       profilePhotoUrl: true,
       createdAt: true,
@@ -58,8 +61,23 @@ async function listWorkers() {
   });
 }
 
+async function updateUserStatus(userId, isActive) {
+  return prisma.user.update({
+    where: { id: userId },
+    data: { isActive },
+  });
+}
+
+async function deleteUser(userId) {
+  return prisma.user.delete({
+    where: { id: userId },
+  });
+}
+
 module.exports = {
   getDashboardStats,
   listUsers,
   listWorkers,
+  updateUserStatus,
+  deleteUser,
 };

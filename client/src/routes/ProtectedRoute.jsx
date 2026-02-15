@@ -1,4 +1,4 @@
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth, useAuthStatus } from '../hooks/useAuth';
 
 /**
@@ -91,6 +91,8 @@ export function AdminRoute({ children }) {
  */
 export function PublicRoute({ children }) {
   const { isAuthenticated, isLoading, user } = useAuth();
+  const location = useLocation();
+  const allowPublic = new URLSearchParams(location.search).get('force') === 'true';
 
   // Step 1: Still checking
   if (isLoading) {
@@ -102,6 +104,10 @@ export function PublicRoute({ children }) {
         </div>
       </div>
     );
+  }
+
+  if (allowPublic) {
+    return children;
   }
 
   // Step 2: User is already logged in → redirect based on role
@@ -242,15 +248,13 @@ export function CustomerRoute({ children }) {
     return <Navigate to="/login" replace />;
   }
 
-  if (user?.role !== 'CUSTOMER') {
+  if (user?.role !== 'CUSTOMER' && user?.role !== 'WORKER') {
     // Redirect to appropriate dashboard based on role
     if (user?.role === 'ADMIN') {
       return <Navigate to="/admin/dashboard" replace />;
     }
-    if (user?.role === 'WORKER') {
-      return <Navigate to="/worker/dashboard" replace />;
-    }
-    return <Navigate to="/dashboard" replace />;
+    // If not matching any above (and somehow we are here), default safe fallback
+    return <Navigate to="/login" replace />;
   }
 
   return children;

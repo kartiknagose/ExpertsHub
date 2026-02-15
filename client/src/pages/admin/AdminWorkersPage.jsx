@@ -1,13 +1,15 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Star } from 'lucide-react';
+import { Star, Search } from 'lucide-react';
 import { MainLayout } from '../../components/layout/MainLayout';
 import { Card, CardHeader, CardTitle, CardDescription } from '../../components/common';
-import { Badge, Spinner } from '../../components/common';
+import { Badge, AsyncState } from '../../components/common';
 import { useTheme } from '../../context/ThemeContext';
 import { getAdminWorkers } from '../../api/admin';
 
 export function AdminWorkersPage() {
   const { isDark } = useTheme();
+  const [searchTerm, setSearchTerm] = useState('');
 
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['admin-workers'],
@@ -15,6 +17,11 @@ export function AdminWorkersPage() {
   });
 
   const workers = data?.workers || [];
+
+  const filteredWorkers = workers.filter(worker =>
+    (worker.user?.name && worker.user.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (worker.user?.email && worker.user.email.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
 
   return (
     <MainLayout>
@@ -28,33 +35,40 @@ export function AdminWorkersPage() {
           </p>
         </div>
 
-        {isLoading && (
-          <div className="flex items-center justify-center py-16">
-            <Spinner size="lg" />
-          </div>
-        )}
+        <div className="mb-6 relative max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+          <input
+            type="text"
+            placeholder="Search by name or email..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className={`w-full pl-10 pr-4 py-2.5 rounded-lg border outline-none transition-colors ${isDark
+              ? 'bg-dark-900 border-dark-700 text-white focus:border-brand-500'
+              : 'bg-white border-gray-200 text-gray-900 focus:border-brand-500'}`}
+          />
+        </div>
 
-        {isError && (
-          <Card className="p-6">
-            <p className="text-error-500 mb-3">
-              {error?.response?.data?.error || error?.message || 'Failed to load workers.'}
-            </p>
-            <button type="button" className="text-sm text-brand-500" onClick={() => refetch()}>
-              Retry
-            </button>
-          </Card>
-        )}
-
-        {!isLoading && !isError && (
+        <AsyncState
+          isLoading={isLoading}
+          isError={isError}
+          error={error}
+          onRetry={refetch}
+          isEmpty={!isLoading && !isError && filteredWorkers.length === 0}
+          emptyTitle={searchTerm ? "No results found" : "No worker profiles found"}
+          emptyMessage={searchTerm ? "Try different keywords." : "Check back after workers complete onboarding."}
+          errorFallback={
+            <Card className="p-6">
+              <p className="text-error-500 mb-3">
+                {error?.response?.data?.error || error?.message || 'Failed to load workers.'}
+              </p>
+              <button type="button" className="text-sm text-brand-500" onClick={() => refetch()}>
+                Retry
+              </button>
+            </Card>
+          }
+        >
           <div className="space-y-4">
-            {workers.length === 0 && (
-              <Card className="p-6">
-                <p className={isDark ? 'text-gray-300' : 'text-gray-600'}>
-                  No worker profiles found.
-                </p>
-              </Card>
-            )}
-            {workers.map((worker) => (
+            {filteredWorkers.map((worker) => (
               <Card key={worker.id} className="p-6">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
@@ -81,7 +95,7 @@ export function AdminWorkersPage() {
               </Card>
             ))}
           </div>
-        )}
+        </AsyncState>
       </div>
     </MainLayout>
   );

@@ -85,7 +85,13 @@ export function ForgotPasswordPage() {
                 <p>Reset link (dev):</p>
                 <button
                   type="button"
-                  onClick={() => navigate(resetLink)}
+                  onClick={() => {
+                    if (resetLink.startsWith('http')) {
+                      window.location.href = resetLink;
+                    } else {
+                      navigate(resetLink);
+                    }
+                  }}
                   className="text-brand-500 hover:text-brand-600 font-medium"
                 >
                   Open reset link

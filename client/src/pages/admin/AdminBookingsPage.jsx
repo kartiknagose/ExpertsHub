@@ -3,26 +3,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CalendarClock, CheckCircle, XCircle, PlayCircle } from 'lucide-react';
 import { MainLayout } from '../../components/layout/MainLayout';
 import { Card, CardHeader, CardTitle, CardDescription } from '../../components/common';
-import { Badge, Button, Spinner, PageHeader, EmptyState } from '../../components/common';
+import { Badge, Button, PageHeader, AsyncState } from '../../components/common';
 import { useTheme } from '../../context/ThemeContext';
 import { cancelBooking, getAllBookings, updateBookingStatus } from '../../api/bookings';
+import { queryKeys } from '../../utils/queryKeys';
+import { getBookingStatusVariant } from '../../utils/statusHelpers';
 
-const statusVariant = (status) => {
-  switch (status) {
-    case 'PENDING':
-      return 'warning';
-    case 'CONFIRMED':
-      return 'info';
-    case 'IN_PROGRESS':
-      return 'default';
-    case 'COMPLETED':
-      return 'success';
-    case 'CANCELLED':
-      return 'error';
-    default:
-      return 'default';
-  }
-};
 
 const statusFilters = ['ALL', 'PENDING', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
 
@@ -32,18 +18,18 @@ export function AdminBookingsPage() {
   const queryClient = useQueryClient();
 
   const bookingsQuery = useQuery({
-    queryKey: ['bookings'],
-    queryFn: getAllBookings,
+    queryKey: queryKeys.bookings.admin(),
+    queryFn: () => getAllBookings({ viewAs: 'ADMIN' }),
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ bookingId, status }) => updateBookingStatus(bookingId, { status }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['bookings'] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.bookings.admin() }),
   });
 
   const cancelMutation = useMutation({
     mutationFn: (bookingId) => cancelBooking(bookingId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['bookings'] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.bookings.admin() }),
   });
 
   const bookings = bookingsQuery.data?.bookings || [];
@@ -113,28 +99,14 @@ export function AdminBookingsPage() {
           ))}
         </div>
 
-        {bookingsQuery.isLoading && (
-          <div className="flex items-center justify-center py-16">
-            <Spinner size="lg" />
-          </div>
-        )}
-
-        {bookingsQuery.isError && (
-          <Card className="p-6">
-            <p className="text-error-500 mb-3">
-              {bookingsQuery.error?.response?.data?.error || bookingsQuery.error?.message || 'Failed to load bookings.'}
-            </p>
-          </Card>
-        )}
-
-        {!bookingsQuery.isLoading && !bookingsQuery.isError && filteredBookings.length === 0 && (
-            <EmptyState
-              title="No bookings for this filter"
-              message="Try a different status filter to see more results."
-            />
-        )}
-
-        {!bookingsQuery.isLoading && !bookingsQuery.isError && filteredBookings.length > 0 && (
+        <AsyncState
+          isLoading={bookingsQuery.isLoading}
+          isError={bookingsQuery.isError}
+          error={bookingsQuery.error}
+          isEmpty={!bookingsQuery.isLoading && !bookingsQuery.isError && filteredBookings.length === 0}
+          emptyTitle="No bookings for this filter"
+          emptyMessage="Try a different status filter to see more results."
+        >
           <div className="grid grid-cols-1 gap-5">
             {filteredBookings.map((booking) => (
               <Card key={booking.id}>
@@ -146,7 +118,7 @@ export function AdminBookingsPage() {
                         {new Date(booking.scheduledAt || booking.scheduledDate).toLocaleString()}
                       </CardDescription>
                     </div>
-                    <Badge variant={statusVariant(booking.status)}>
+                    <Badge variant={getBookingStatusVariant(booking.status)}>
                       {booking.status}
                     </Badge>
                   </div>
@@ -182,7 +154,7 @@ export function AdminBookingsPage() {
               </Card>
             ))}
           </div>
-        )}
+        </AsyncState>
       </div>
     </MainLayout>
   );

@@ -22,7 +22,7 @@ const customerProfileSchema = [
     .isLength({ min: 2, max: 100 }).withMessage('Country must be between 2 and 100 characters'),
   body('profilePhotoUrl')
     .optional({ nullable: true, checkFalsy: true })
-    .isURL().withMessage('Profile photo must be a valid URL'),
+    .isString().withMessage('Profile photo must be a valid path'),
 ];
 
 module.exports = { customerProfileSchema };

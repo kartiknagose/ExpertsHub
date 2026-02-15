@@ -67,16 +67,11 @@ export function ProfileGate({ children }) {
     return children;
   }
 
-  const gateKey = user?.id ? `profile-setup-shown:${user.id}` : null;
-  const hasShownGate = gateKey ? localStorage.getItem(gateKey) === 'true' : false;
-
-  if (needsProfile && !hasShownGate) {
+  if (needsProfile) {
     if (user?.role === 'CUSTOMER' && !isPathAllowed(location.pathname, customerPaths)) {
-      localStorage.setItem(gateKey, 'true');
       return <Navigate to="/profile/setup" replace />;
     }
     if (user?.role === 'WORKER' && !isPathAllowed(location.pathname, workerPaths)) {
-      localStorage.setItem(gateKey, 'true');
       return <Navigate to="/worker/profile/setup" replace />;
     }
   }

@@ -19,6 +19,7 @@ const reviewRoutes = require('./modules/reviews/review.routes');
 const verificationRoutes = require('./modules/verification/verification.routes');
 const adminRoutes = require('./modules/admin/admin.routes');
 const paymentRoutes = require('./modules/payments/payment.routes');
+const safetyRoutes = require('./modules/safety/safety.routes');
 
 // Routes
 const authRoutes = require('./modules/auth/auth.routes');
@@ -38,8 +39,9 @@ app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
 app.use(i18n);
 
-// Static uploads
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// Static uploads - Make sure we serve from the correct absolute path
+// We use path.resolve to match the actual location of uploads seen in directory listing (src/uploads)
+app.use('/uploads', express.static(path.resolve(__dirname, 'uploads')));
 
 // Health check
 app.get('/health', (req, res) => {
@@ -58,6 +60,7 @@ app.use('/api/reviews', reviewRoutes);
 app.use('/api/verification', verificationRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/safety', safetyRoutes);
 
 // 404 and error handlers
 app.use(notFoundHandler);

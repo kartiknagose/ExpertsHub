@@ -17,7 +17,7 @@
  */
 
 const { Router } = require('express');
-const { create, list, getOne, getWorkers } = require('./service.controller');
+const { create, list, getOne, getWorkers, update, remove } = require('./service.controller');
 const authenticate = require('../../middleware/auth'); // Check if user is logged in
 const { requireAdmin } = require('../../middleware/requireRole'); // Check if user is admin
 const validate = require('../../middleware/validation'); // Check if request data is valid
@@ -106,6 +106,22 @@ router.get('/:id', getOne);
  * Access: Public
  */
 router.get('/:id/workers', getWorkers);
+
+// ... (previous routes)
+
+/**
+ * ROUTE 5: UPDATE A SERVICE
+ * Endpoint: PATCH /api/services/:id
+ * Access: Admin Only
+ */
+router.patch('/:id', authenticate, requireAdmin, update);
+
+/**
+ * ROUTE 6: DELETE A SERVICE
+ * Endpoint: DELETE /api/services/:id
+ * Access: Admin Only
+ */
+router.delete('/:id', authenticate, requireAdmin, remove);
 
 // Export the router so index.js can mount it at /api/services
 module.exports = router;

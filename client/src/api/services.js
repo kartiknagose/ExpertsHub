@@ -19,14 +19,14 @@ const SERVICES_ENDPOINTS = {
  */
 export const getAllServices = async (filters = {}) => {
   const params = new URLSearchParams();
-  
+
   // Add filters to query params if provided
   if (filters.category) params.append('category', filters.category);
   if (filters.search) params.append('search', filters.search);
-  
+
   const queryString = params.toString();
   const url = queryString ? `${SERVICES_ENDPOINTS.BASE}?${queryString}` : SERVICES_ENDPOINTS.BASE;
-  
+
   const response = await axiosInstance.get(url);
   return response.data;
 };
@@ -58,6 +58,25 @@ export const createService = async (data) => {
  */
 export const getServiceWorkers = async (serviceId) => {
   const response = await axiosInstance.get(SERVICES_ENDPOINTS.WORKERS(serviceId));
+  return response.data;
+};
+
+/**
+ * Update a service (admin only)
+ * @param {string} id - Service ID
+ * @param {Object} data - Updated data
+ */
+export const updateService = async (id, data) => {
+  const response = await axiosInstance.patch(SERVICES_ENDPOINTS.BY_ID(id), data);
+  return response.data;
+};
+
+/**
+ * Delete a service (admin only)
+ * @param {string} id - Service ID
+ */
+export const deleteService = async (id) => {
+  const response = await axiosInstance.delete(SERVICES_ENDPOINTS.BY_ID(id));
   return response.data;
 };
 

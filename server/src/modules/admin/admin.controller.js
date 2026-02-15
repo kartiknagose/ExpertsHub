@@ -1,5 +1,5 @@
 const asyncHandler = require('../../common/utils/asyncHandler');
-const { getDashboardStats, listUsers, listWorkers } = require('./admin.service');
+const { getDashboardStats, listUsers, listWorkers, updateUserStatus, deleteUser } = require('./admin.service');
 
 const allowedRoles = new Set(['CUSTOMER', 'WORKER', 'ADMIN']);
 
@@ -22,4 +22,17 @@ exports.getUsers = asyncHandler(async (req, res) => {
 exports.getWorkers = asyncHandler(async (req, res) => {
   const workers = await listWorkers();
   res.json({ workers });
+});
+exports.updateUser = asyncHandler(async (req, res) => {
+  const id = Number(req.params.id);
+  const { isActive } = req.body;
+  if (typeof isActive !== 'boolean') return res.status(400).json({ error: 'isActive must be a boolean' });
+  const user = await updateUserStatus(id, isActive);
+  res.json({ user });
+});
+
+exports.removeUser = asyncHandler(async (req, res) => {
+  const id = Number(req.params.id);
+  await deleteUser(id);
+  res.json({ message: 'User deleted successfully' });
 });

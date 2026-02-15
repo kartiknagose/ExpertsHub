@@ -92,7 +92,20 @@ router.get(
 );
 
 /**
- * ROUTE 3: GET A SINGLE BOOKING BY ID
+ * ROUTE 3: GET OPEN BOOKINGS (JOB BOARD)
+ * 
+ * Endpoint: GET /api/bookings/open
+ * Access: Private (WORKER only)
+ * NOTE: This must be defined BEFORE /:id routes to avoid conflict
+ */
+router.get(
+  '/open',
+  authenticate,
+  bookingController.getOpenBookings
+);
+
+/**
+ * ROUTE 4: GET A SINGLE BOOKING BY ID
  * 
  * Endpoint: GET /api/bookings/:id
  * Access: Private (must be logged in and involved in the booking)
@@ -172,6 +185,44 @@ router.post(
   payBookingSchema,
   validate,
   bookingController.payBooking
+);
+
+
+
+/**
+ * ROUTE 7: ACCEPT AN OPEN BOOKING
+ * 
+ * Endpoint: POST /api/bookings/:id/accept
+ * Access: Private (WORKER only)
+ */
+router.post(
+  '/:id/accept',
+  authenticate,
+  bookingController.acceptBooking
+);
+
+/**
+ * ROUTE 8: VERIFY START OTP
+ * 
+ * Endpoint: POST /api/bookings/:id/start
+ * Access: Private (WORKER only)
+ */
+router.post(
+  '/:id/start',
+  authenticate,
+  bookingController.verifyBookingStart
+);
+
+/**
+ * ROUTE 9: VERIFY COMPLETION OTP
+ * 
+ * Endpoint: POST /api/bookings/:id/complete
+ * Access: Private (WORKER only)
+ */
+router.post(
+  '/:id/complete',
+  authenticate,
+  bookingController.verifyBookingCompletion
 );
 
 // Export the router so index.js can mount it at /api/bookings

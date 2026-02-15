@@ -8,6 +8,7 @@ const WORKERS_ENDPOINTS = {
   PROFILE: '/workers/profile',
   ME: '/workers/me',
   ME_SERVICES: '/workers/me/services',
+  ADD_SERVICE: '/workers/services',
   WORKER_SERVICES: (workerId) => `/workers/${workerId}/services`,
   DELETE_SERVICE: (serviceId) => `/workers/services/${serviceId}`,
 };
@@ -41,7 +42,7 @@ export const getMyWorkerProfile = async () => {
  * @returns {Promise} Response confirming association
  */
 export const addServiceToWorker = async (data) => {
-  const response = await axiosInstance.post(WORKERS_ENDPOINTS.ME_SERVICES, data);
+  const response = await axiosInstance.post(WORKERS_ENDPOINTS.ADD_SERVICE, data);
   return response.data;
 };
 

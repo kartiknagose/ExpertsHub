@@ -6,6 +6,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  url      = "postgresql://postgres:toor@localhost:5432/urbanpro_v2?schema=public"
 }
 
 enum Role {
@@ -60,6 +61,7 @@ model User {
   emailVerifiedAt DateTime?
   profilePhotoUrl String?
   isProfileComplete Boolean @default(false)
+  isActive      Boolean   @default(true)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -68,12 +70,16 @@ model User {
 
   bookingsCustomer Booking[] @relation("customerBookings")
 
+  rating        Float     @default(0)
+  totalReviews  Int       @default(0)
+
   reviewsWritten  Review[] @relation("reviewsWritten")
   reviewsReceived Review[] @relation("reviewsReceived")
   emailVerifications EmailVerification[]
   passwordResetTokens PasswordResetToken[]
   workerVerificationApplications WorkerVerificationApplication[]
   payments Payment[]
+  emergencyContacts EmergencyContact[]
 }
 
 model EmailVerification {
@@ -122,7 +128,7 @@ model Address {
 
 model Service {
   id           Int      @id @default(autoincrement())
-  name         String
+  name         String   @unique
   description  String?
   category     String?
   basePrice    Decimal?
@@ -246,11 +252,21 @@ model Booking {
   address            String?
   notes              String?
   cancellationReason String?
+  
+  // OTP Verification Fields
+  startOtp          String?    // 4-digit code
+  completionOtp     String?    // 4-digit code (for job completion if needed)
+  otpGeneratedAt    DateTime?
+  startedAt         DateTime?  // When job actually started (OTP verified)
+  completedAt       DateTime?  // When job was marked complete
+  
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 
   reviews            Review[]
   payments           Payment[]
+  photos             BookingPhoto[]
+  sosAlerts          SOSAlert[]
 
   @@index([status])
   @@index([customerId])
@@ -288,4 +304,49 @@ model Review {
   createdAt     DateTime @default(now())
 
   @@unique([bookingId, reviewerId])
+  @@index([bookingId])
+  @@index([reviewerId])
+  @@index([revieweeId])
+}
+
+model BookingPhoto {
+  id        Int      @id @default(autoincrement())
+  bookingId Int
+  booking   Booking  @relation(fields: [bookingId], references: [id])
+  url       String
+  type      PhotoType
+  caption   String?
+  createdAt DateTime @default(now())
+}
+
+enum PhotoType {
+  BEFORE
+  AFTER
+}
+
+model EmergencyContact {
+  id       Int    @id @default(autoincrement())
+  userId   Int
+  user     User   @relation(fields: [userId], references: [id])
+  name     String
+  phone    String
+  relation String // "Parent", "Spouse", "Friend"
+}
+
+model SOSAlert {
+  id        Int      @id @default(autoincrement())
+  bookingId Int
+  booking   Booking  @relation(fields: [bookingId], references: [id])
+  triggeredBy Int    // User ID of who pressed it
+  latitude  Float?
+  longitude Float?
+  status    SOSStatus @default(ACTIVE)
+  resolvedAt DateTime?
+  createdAt DateTime @default(now())
+}
+
+enum SOSStatus {
+  ACTIVE
+  ACKNOWLEDGED
+  RESOLVED
 }

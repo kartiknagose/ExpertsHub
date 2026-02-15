@@ -13,3 +13,6 @@ export { ErrorBoundary } from './ErrorBoundary';
 export { StatCard } from './StatCard';
 export { Skeleton } from './Skeleton';
 export { SimpleBarChart, SimpleDonutChart } from './SimpleChart';
+export { AsyncState } from './AsyncState';
+export { ImageUpload } from './ImageUpload';
+

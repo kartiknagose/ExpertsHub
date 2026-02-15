@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Clock, PlusCircle, Trash2 } from 'lucide-react';
 import { MainLayout } from '../../components/layout/MainLayout';
 import { Card, CardHeader, CardTitle, CardDescription } from '../../components/common';
-import { Button, Spinner, Badge } from '../../components/common';
+import { Button, Badge, AsyncState } from '../../components/common';
 import { useTheme } from '../../context/ThemeContext';
 import { createAvailability, deleteAvailability, getMyAvailability } from '../../api/availability';
 
@@ -13,10 +13,11 @@ export function WorkerAvailabilityPage() {
   const { isDark } = useTheme();
   const queryClient = useQueryClient();
   const [formState, setFormState] = useState({
-    dayOfWeek: '1',
+    dayOfWeek: String(new Date().getDay()),
     startTime: '09:00',
     endTime: '17:00',
   });
+  const [formError, setFormError] = useState('');
 
   const availabilityQuery = useQuery({
     queryKey: ['availability'],
@@ -27,6 +28,9 @@ export function WorkerAvailabilityPage() {
     mutationFn: (payload) => createAvailability(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['availability'] });
+      setFormError('');
+      // Reset time but keep day for easier multiple entries
+      setFormState(prev => ({ ...prev, startTime: '09:00', endTime: '17:00' }));
     },
   });
 
@@ -53,6 +57,13 @@ export function WorkerAvailabilityPage() {
 
   const handleSubmit = (event) => {
     event.preventDefault();
+    setFormError('');
+
+    if (formState.startTime >= formState.endTime) {
+      setFormError('End time must be after start time.');
+      return;
+    }
+
     createMutation.mutate({
       dayOfWeek: Number(formState.dayOfWeek),
       startTime: formState.startTime,
@@ -85,11 +96,10 @@ export function WorkerAvailabilityPage() {
                   Day of Week
                 </label>
                 <select
-                  className={`w-full px-4 py-2.5 rounded-lg border transition-colors duration-200 focus:outline-none focus:ring-2 ${
-                    isDark
-                      ? 'bg-dark-800 border-dark-600 text-gray-100 focus:border-brand-500 focus:ring-brand-500/50'
-                      : 'bg-white border-gray-300 text-gray-900 focus:border-brand-600 focus:ring-brand-600/50'
-                  }`}
+                  className={`w-full px-4 py-2.5 rounded-lg border transition-colors duration-200 focus:outline-none focus:ring-2 ${isDark
+                    ? 'bg-dark-800 border-dark-600 text-gray-100 focus:border-brand-500 focus:ring-brand-500/50'
+                    : 'bg-white border-gray-300 text-gray-900 focus:border-brand-600 focus:ring-brand-600/50'
+                    }`}
                   value={formState.dayOfWeek}
                   onChange={(event) => handleChange('dayOfWeek', event.target.value)}
                 >
@@ -109,11 +119,10 @@ export function WorkerAvailabilityPage() {
                   type="time"
                   value={formState.startTime}
                   onChange={(event) => handleChange('startTime', event.target.value)}
-                  className={`w-full px-4 py-2.5 rounded-lg border transition-colors duration-200 focus:outline-none focus:ring-2 ${
-                    isDark
-                      ? 'bg-dark-800 border-dark-600 text-gray-100 focus:border-brand-500 focus:ring-brand-500/50'
-                      : 'bg-white border-gray-300 text-gray-900 focus:border-brand-600 focus:ring-brand-600/50'
-                  }`}
+                  className={`w-full px-4 py-2.5 rounded-lg border transition-colors duration-200 focus:outline-none focus:ring-2 ${isDark
+                    ? 'bg-dark-800 border-dark-600 text-gray-100 focus:border-brand-500 focus:ring-brand-500/50'
+                    : 'bg-white border-gray-300 text-gray-900 focus:border-brand-600 focus:ring-brand-600/50'
+                    }`}
                 />
               </div>
 
@@ -125,11 +134,10 @@ export function WorkerAvailabilityPage() {
                   type="time"
                   value={formState.endTime}
                   onChange={(event) => handleChange('endTime', event.target.value)}
-                  className={`w-full px-4 py-2.5 rounded-lg border transition-colors duration-200 focus:outline-none focus:ring-2 ${
-                    isDark
-                      ? 'bg-dark-800 border-dark-600 text-gray-100 focus:border-brand-500 focus:ring-brand-500/50'
-                      : 'bg-white border-gray-300 text-gray-900 focus:border-brand-600 focus:ring-brand-600/50'
-                  }`}
+                  className={`w-full px-4 py-2.5 rounded-lg border transition-colors duration-200 focus:outline-none focus:ring-2 ${isDark
+                    ? 'bg-dark-800 border-dark-600 text-gray-100 focus:border-brand-500 focus:ring-brand-500/50'
+                    : 'bg-white border-gray-300 text-gray-900 focus:border-brand-600 focus:ring-brand-600/50'
+                    }`}
                 />
               </div>
 
@@ -155,30 +163,21 @@ export function WorkerAvailabilityPage() {
               <CardTitle>Your Weekly Schedule</CardTitle>
               <CardDescription>Manage active availability slots.</CardDescription>
             </CardHeader>
-
-            {availabilityQuery.isLoading && (
-              <div className="flex items-center justify-center py-16">
-                <Spinner size="lg" />
-              </div>
-            )}
-
-            {availabilityQuery.isError && (
-              <div className="px-6 pb-6">
-                <p className="text-sm text-error-500">
-                  {availabilityQuery.error?.response?.data?.error || availabilityQuery.error?.message || 'Failed to load availability.'}
-                </p>
-              </div>
-            )}
-
-            {!availabilityQuery.isLoading && !availabilityQuery.isError && availability.length === 0 && (
-              <div className="px-6 pb-6">
-                <p className={isDark ? 'text-gray-300' : 'text-gray-600'}>
-                  No availability added yet.
-                </p>
-              </div>
-            )}
-
-            {!availabilityQuery.isLoading && !availabilityQuery.isError && availability.length > 0 && (
+            <AsyncState
+              isLoading={availabilityQuery.isLoading}
+              isError={availabilityQuery.isError}
+              error={availabilityQuery.error}
+              isEmpty={!availabilityQuery.isLoading && !availabilityQuery.isError && availability.length === 0}
+              emptyTitle="No availability yet"
+              emptyMessage="Add slots so customers know when you are available."
+              errorFallback={
+                <div className="px-6 pb-6">
+                  <p className="text-sm text-error-500">
+                    {availabilityQuery.error?.response?.data?.error || availabilityQuery.error?.message || 'Failed to load availability.'}
+                  </p>
+                </div>
+              }
+            >
               <div className="space-y-5 px-6 pb-6">
                 {grouped.map((slots, index) => (
                   <div key={dayLabels[index]}>
@@ -221,7 +220,7 @@ export function WorkerAvailabilityPage() {
                   </div>
                 ))}
               </div>
-            )}
+            </AsyncState>
           </Card>
         </div>
       </div>

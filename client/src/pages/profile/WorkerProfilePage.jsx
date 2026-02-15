@@ -2,6 +2,7 @@
 // Allows workers to view and update their profile
 
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -24,6 +25,7 @@ const workerProfileSchema = z.object({
 
 export function WorkerProfilePage() {
   const { isDark } = useTheme();
+  const navigate = useNavigate();
   const { user: authUser, setUser } = useAuth();
   const [profileData, setProfileData] = useState(null);
   const [skillsList, setSkillsList] = useState([]);
@@ -93,6 +95,14 @@ export function WorkerProfilePage() {
           setServiceAreasList(normalizedAreas);
           setInitialSkillsList(normalizedSkills);
           setInitialAreasList(normalizedAreas);
+
+          // If important fields are missing, treat as setup/edit mode
+          if (!profile.bio || !profile.hourlyRate || normalizedSkills.length === 0 || normalizedAreas.length === 0) {
+            setIsEditing(true);
+          }
+        } else {
+          // No profile at all, definitely setup mode
+          setIsEditing(true);
         }
 
         const resolvedPhoto = resolveProfilePhotoUrl(
@@ -223,15 +233,22 @@ export function WorkerProfilePage() {
       }
 
       setSuccessMessage('Profile updated successfully.');
-      if (profilePhotoUrl) {
-        const resolvedPhoto = resolveProfilePhotoUrl(profilePhotoUrl);
-        setInitialPhotoUrl(resolvedPhoto);
-        const updatedUser = { ...authUser, profilePhotoUrl };
+
+      if (refreshedProfile?.user) {
+        const updatedUser = { ...authUser, ...refreshedProfile.user };
+        // Ensure manual update of profilePhotoUrl if for some reason backend didn't return it instantly
+        if (profilePhotoUrl) {
+          updatedUser.profilePhotoUrl = profilePhotoUrl;
+        }
+
         localStorage.setItem('user', JSON.stringify(updatedUser));
         setUser(updatedUser);
       }
+
       if (profilePhotoUrl) {
         setPhotoPreview(resolveProfilePhotoUrl(profilePhotoUrl));
+      } else if (refreshedProfile?.user?.profilePhotoUrl) {
+        setPhotoPreview(resolveProfilePhotoUrl(refreshedProfile.user.profilePhotoUrl));
       }
       setIsEditing(false);
     } catch (error) {
@@ -381,6 +398,17 @@ export function WorkerProfilePage() {
                     </div>
                   </div>
                 </div>
+                {!isEditing && (
+                  <div className="mt-6 pt-4 border-t border-gray-100 dark:border-dark-700">
+                    <Button
+                      variant="outline"
+                      fullWidth
+                      onClick={() => navigate('/worker/services')}
+                    >
+                      Manage Offered Services
+                    </Button>
+                  </div>
+                )}
               </Card>
             </div>
 
@@ -388,7 +416,9 @@ export function WorkerProfilePage() {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle>{isEditing ? 'Edit Profile' : 'Profile Details'}</CardTitle>
+                    <CardTitle>
+                      {!profileData?.bio ? 'Complete Your Profile' : (isEditing ? 'Edit Profile' : 'Profile Details')}
+                    </CardTitle>
                     <CardDescription>
                       {isEditing
                         ? 'Update your profile information and save changes.'
@@ -439,11 +469,10 @@ export function WorkerProfilePage() {
                           Profile Photo
                         </label>
                         <label
-                          className={`flex items-center gap-4 rounded-xl border border-dashed p-4 transition-colors cursor-pointer ${
-                            isDark
-                              ? 'border-dark-600 hover:border-brand-500 bg-dark-800/40'
-                              : 'border-gray-200 hover:border-brand-500 bg-gray-50'
-                          }`}
+                          className={`flex items-center gap-4 rounded-xl border border-dashed p-4 transition-colors cursor-pointer ${isDark
+                            ? 'border-dark-600 hover:border-brand-500 bg-dark-800/40'
+                            : 'border-gray-200 hover:border-brand-500 bg-gray-50'
+                            }`}
                         >
                           <div className="w-16 h-16 rounded-full bg-gray-200 dark:bg-dark-700 overflow-hidden">
                             {photoPreview ? (
@@ -476,11 +505,10 @@ export function WorkerProfilePage() {
                         <textarea
                           rows={4}
                           placeholder="Tell customers about your experience"
-                          className={`w-full rounded-xl border px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 ${
-                            isDark
-                              ? 'border-dark-600 bg-dark-900 text-gray-100 placeholder:text-gray-500'
-                              : 'border-gray-200 bg-white text-gray-800 placeholder:text-gray-400'
-                          }`}
+                          className={`w-full rounded-xl border px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 ${isDark
+                            ? 'border-dark-600 bg-dark-900 text-gray-100 placeholder:text-gray-500'
+                            : 'border-gray-200 bg-white text-gray-800 placeholder:text-gray-400'
+                            }`}
                           {...register('bio')}
                         />
                         {errors.bio?.message && (
@@ -504,9 +532,8 @@ export function WorkerProfilePage() {
                           {skillsList.map((skill) => (
                             <span
                               key={skill}
-                              className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium ${
-                                isDark ? 'bg-dark-700 text-gray-200' : 'bg-gray-100 text-gray-700'
-                              }`}
+                              className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium ${isDark ? 'bg-dark-700 text-gray-200' : 'bg-gray-100 text-gray-700'
+                                }`}
                             >
                               {skill}
                               <button type="button" onClick={() => removeSkill(skill)} className="text-gray-400 hover:text-gray-200">
@@ -526,11 +553,10 @@ export function WorkerProfilePage() {
                               }
                             }}
                             placeholder="Type a skill and press Enter"
-                            className={`flex-1 rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 ${
-                              isDark
-                                ? 'border-dark-600 bg-dark-900 text-gray-100 placeholder:text-gray-500'
-                                : 'border-gray-200 bg-white text-gray-800 placeholder:text-gray-400'
-                            }`}
+                            className={`flex-1 rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 ${isDark
+                              ? 'border-dark-600 bg-dark-900 text-gray-100 placeholder:text-gray-500'
+                              : 'border-gray-200 bg-white text-gray-800 placeholder:text-gray-400'
+                              }`}
                           />
                           <button
                             type="button"
@@ -558,9 +584,8 @@ export function WorkerProfilePage() {
                           {serviceAreasList.map((area) => (
                             <span
                               key={area}
-                              className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium ${
-                                isDark ? 'bg-dark-700 text-gray-200' : 'bg-gray-100 text-gray-700'
-                              }`}
+                              className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium ${isDark ? 'bg-dark-700 text-gray-200' : 'bg-gray-100 text-gray-700'
+                                }`}
                             >
                               {area}
                               <button type="button" onClick={() => removeArea(area)} className="text-gray-400 hover:text-gray-200">
@@ -580,11 +605,10 @@ export function WorkerProfilePage() {
                               }
                             }}
                             placeholder="Add a city or locality"
-                            className={`flex-1 rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 ${
-                              isDark
-                                ? 'border-dark-600 bg-dark-900 text-gray-100 placeholder:text-gray-500'
-                                : 'border-gray-200 bg-white text-gray-800 placeholder:text-gray-400'
-                            }`}
+                            className={`flex-1 rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 ${isDark
+                              ? 'border-dark-600 bg-dark-900 text-gray-100 placeholder:text-gray-500'
+                              : 'border-gray-200 bg-white text-gray-800 placeholder:text-gray-400'
+                              }`}
                           />
                           <button
                             type="button"

@@ -7,49 +7,12 @@ import { Star, MessageSquare, User, Send, CheckCircle2, Sparkles, TrendingUp } f
 import { motion, AnimatePresence } from 'framer-motion';
 import { MainLayout } from '../../components/layout/MainLayout';
 import { Card, CardHeader, CardTitle, CardDescription, PageHeader } from '../../components/common';
-import { Badge, Button, Spinner } from '../../components/common';
+import { Badge, Button, AsyncState } from '../../components/common';
 import { useTheme } from '../../context/ThemeContext';
 import { createReview, getReviewsAboutMe, getMyReviews, getPendingReviews } from '../../api/reviews';
+import { queryKeys } from '../../utils/queryKeys';
+import { StarRating, getRatingLabel } from '../../components/features/reviews/StarRating';
 
-// Interactive star rating component
-function StarRating({ value, onChange, size = 28 }) {
-  const [hovered, setHovered] = useState(0);
-
-  return (
-    <div className="flex gap-1">
-      {[1, 2, 3, 4, 5].map((star) => (
-        <button
-          key={star}
-          type="button"
-          onClick={() => onChange(star)}
-          onMouseEnter={() => setHovered(star)}
-          onMouseLeave={() => setHovered(0)}
-          className="transition-transform duration-150 hover:scale-125 focus:outline-none"
-          aria-label={`Rate ${star} star${star !== 1 ? 's' : ''}`}
-        >
-          <Star
-            size={size}
-            className={`transition-colors duration-200 ${star <= (hovered || value)
-                ? 'fill-yellow-400 text-yellow-400'
-                : 'fill-transparent text-gray-300 dark:text-gray-600'
-              }`}
-          />
-        </button>
-      ))}
-    </div>
-  );
-}
-
-const ratingLabel = (rating) => {
-  switch (rating) {
-    case 1: return 'Poor';
-    case 2: return 'Below Average';
-    case 3: return 'Good';
-    case 4: return 'Very Good';
-    case 5: return 'Excellent';
-    default: return '';
-  }
-};
 
 const ratingVariant = (rating) => {
   if (rating >= 4) return 'success';
@@ -67,19 +30,19 @@ export function WorkerReviewsPage() {
 
   // Fetch reviews about me (from customers)
   const receivedQuery = useQuery({
-    queryKey: ['reviews', 'received'],
+    queryKey: queryKeys.reviews.workerReceived(),
     queryFn: getReviewsAboutMe,
   });
 
   // Fetch reviews I've written (about customers)
   const writtenQuery = useQuery({
-    queryKey: ['reviews', 'written'],
+    queryKey: queryKeys.reviews.workerWritten(),
     queryFn: getMyReviews,
   });
 
   // Fetch bookings pending my review
   const pendingQuery = useQuery({
-    queryKey: ['reviews', 'pending'],
+    queryKey: queryKeys.reviews.workerPending(),
     queryFn: getPendingReviews,
   });
 
@@ -88,8 +51,10 @@ export function WorkerReviewsPage() {
     onSuccess: (_, variables) => {
       setSubmitted((prev) => ({ ...prev, [variables.bookingId]: true }));
       setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ['reviews'] });
-        queryClient.invalidateQueries({ queryKey: ['bookings'] });
+        queryClient.invalidateQueries({ queryKey: queryKeys.reviews.workerReceived() });
+        queryClient.invalidateQueries({ queryKey: queryKeys.reviews.workerWritten() });
+        queryClient.invalidateQueries({ queryKey: queryKeys.reviews.workerPending() });
+        queryClient.invalidateQueries({ queryKey: queryKeys.bookings.worker() });
       }, 1500);
     },
   });
@@ -97,6 +62,8 @@ export function WorkerReviewsPage() {
   const receivedReviews = receivedQuery.data?.reviews || [];
   const writtenReviews = writtenQuery.data?.reviews || [];
   const pendingBookings = pendingQuery.data?.bookings || [];
+  const hasError = receivedQuery.isError || writtenQuery.isError || pendingQuery.isError;
+  const loadError = receivedQuery.error || writtenQuery.error || pendingQuery.error;
 
   // Calculate average rating from received reviews
   const avgRating = receivedReviews.length > 0
@@ -139,13 +106,11 @@ export function WorkerReviewsPage() {
           subtitle="View customer feedback and share your experience with customers."
         />
 
-        {isLoading && (
-          <div className="flex items-center justify-center py-16">
-            <Spinner size="lg" />
-          </div>
-        )}
-
-        {!isLoading && (
+        <AsyncState
+          isLoading={isLoading}
+          isError={hasError}
+          error={loadError}
+        >
           <div className="space-y-8">
 
             {/* Rating Summary Card */}
@@ -347,7 +312,7 @@ export function WorkerReviewsPage() {
                                     draft.rating >= 3 ? 'text-blue-500' :
                                       draft.rating >= 2 ? 'text-yellow-500' : 'text-red-500'
                                   }`}>
-                                  {ratingLabel(draft.rating)}
+                                  {getRatingLabel(draft.rating)}
                                 </span>
                               </div>
                             </div>
@@ -444,7 +409,7 @@ export function WorkerReviewsPage() {
               )}
             </AnimatePresence>
           </div>
-        )}
+        </AsyncState>
       </div>
     </MainLayout>
   );

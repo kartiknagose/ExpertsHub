@@ -86,13 +86,11 @@ export function Navbar({ onOpenSidebar = () => { }, sidebarOffset = '', showBran
           { name: 'Services', href: '/services', icon: Briefcase },
           { name: 'My Bookings', href: '/bookings', icon: Calendar },
           { name: 'Reviews', href: '/reviews', icon: Star },
-          { name: 'My Profile', href: '/profile', icon: User },
         ];
 
       case 'WORKER':
         return [
           { name: 'Dashboard', href: '/worker/dashboard', icon: Home },
-          { name: 'My Profile', href: '/worker/profile', icon: User },
           { name: 'My Services', href: '/worker/services', icon: Briefcase },
           { name: 'Bookings', href: '/worker/bookings', icon: Calendar },
           { name: 'Availability', href: '/worker/availability', icon: Clock },
@@ -123,20 +121,11 @@ export function Navbar({ onOpenSidebar = () => { }, sidebarOffset = '', showBran
         return [
           { label: 'Dashboard', href: '/worker/dashboard' },
           { label: 'My Profile', href: '/worker/profile' },
-          { label: 'My Services', href: '/worker/services' },
-          { label: 'Bookings', href: '/worker/bookings' },
-          { label: 'Availability', href: '/worker/availability' },
-          { label: 'Reviews', href: '/worker/reviews' },
           { label: 'Verification', href: '/worker/verification' },
         ];
       case 'ADMIN':
         return [
           { label: 'Dashboard', href: '/admin/dashboard' },
-          { label: 'Services', href: '/admin/services' },
-          { label: 'Workers', href: '/admin/workers' },
-          { label: 'Bookings', href: '/admin/bookings' },
-          { label: 'Users', href: '/admin/users' },
-          { label: 'Verification', href: '/admin/verification' },
         ];
       case 'CUSTOMER':
       default:
@@ -144,8 +133,6 @@ export function Navbar({ onOpenSidebar = () => { }, sidebarOffset = '', showBran
           { label: 'Dashboard', href: '/dashboard' },
           { label: 'My Profile', href: '/profile' },
           { label: 'My Bookings', href: '/bookings' },
-          { label: 'Reviews', href: '/reviews' },
-          { label: 'Browse Services', href: '/services' },
         ];
     }
   }, [user?.role]);

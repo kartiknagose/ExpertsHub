@@ -86,10 +86,10 @@ async function listServices({ category, search } = {}) {
       { category: { contains: search, mode: 'insensitive' } },
     ];
   }
-  
+
   // Fetch services from database, sorted alphabetically
-  return prisma.service.findMany({ 
-    where, 
+  return prisma.service.findMany({
+    where,
     orderBy: { name: 'asc' } // 'asc' means ascending (A-Z)
   });
 }
@@ -120,7 +120,12 @@ async function getServiceById(id) {
  */
 async function getServiceWorkers(serviceId) {
   const workers = await prisma.workerService.findMany({
-    where: { serviceId },
+    where: {
+      serviceId,
+      worker: {
+        isVerified: true,
+      },
+    },
     include: {
       worker: {
         select: {
@@ -130,7 +135,7 @@ async function getServiceWorkers(serviceId) {
           totalReviews: true,
           isVerified: true,
           user: {
-            select: { id: true, name: true, email: true },
+            select: { id: true, name: true, email: true, profilePhotoUrl: true },
           },
         },
       },
@@ -141,10 +146,47 @@ async function getServiceWorkers(serviceId) {
   return workers.map((entry) => entry.worker);
 }
 
+/**
+ * UDPATE A SERVICE
+ * @param {number} id - Service ID
+ * @param {object} data - { name, description, ... }
+ */
+async function updateService(id, data) {
+  // Optional: Check name uniqueness if name is being changed
+  if (data.name) {
+    const existing = await prisma.service.findFirst({
+      where: {
+        name: { equals: data.name, mode: 'insensitive' },
+        NOT: { id }
+      }
+    });
+    if (existing) {
+      throw new Error(`Service '${data.name}' already exists.`);
+    }
+  }
+
+  return prisma.service.update({
+    where: { id },
+    data,
+  });
+}
+
+/**
+ * DELETE A SERVICE
+ * @param {number} id - Service ID
+ */
+async function deleteService(id) {
+  return prisma.service.delete({
+    where: { id },
+  });
+}
+
 // Export all service functions so controllers can use them
-module.exports = { 
+module.exports = {
   createService,    // NEW: For creating services
   listServices,     // Existing: For browsing services
   getServiceById,   // Existing: For viewing service details
-  getServiceWorkers // NEW: For listing workers offering a service
+  getServiceWorkers, // NEW: For listing workers offering a service
+  updateService,
+  deleteService,
 };

@@ -7,15 +7,12 @@ import { Footer } from './Footer';
 import { Sidebar } from './Sidebar';
 import { useAuth } from '../../hooks/useAuth';
 import { useTheme } from '../../context/ThemeContext';
+// import correct path
+import { ProfileIncompleteAlert } from '../common/ProfileIncompleteAlert';
 
-/**
- * MainLayout Component
- * Wraps page content with navigation and footer
- * @param {React.ReactNode} children - Page content
- */
 export function MainLayout({ children }) {
   const { isDark } = useTheme();
-  const { isAuthenticated } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
@@ -25,12 +22,19 @@ export function MainLayout({ children }) {
     : 'bg-gradient-to-br from-gray-50 via-white to-gray-50 min-h-screen';
 
   return (
-    <div className={backgroundStyles}>
+    <div className={`${backgroundStyles} flex flex-col relative`}>
       <Navbar
         onOpenSidebar={() => setIsSidebarOpen(true)}
         sidebarOffset={isAuthenticated ? (isSidebarCollapsed ? 'lg:pl-20' : 'lg:pl-64') : ''}
         showBrand={!isAuthenticated}
       />
+
+      {/* Show alert for authenticated users with incomplete profiles or pending verification */}
+      {isAuthenticated && (
+        <div className={isAuthenticated ? (isSidebarCollapsed ? 'lg:pl-20' : 'lg:pl-64') : ''}>
+          <ProfileIncompleteAlert />
+        </div>
+      )}
 
       {isAuthenticated && (
         <Sidebar
@@ -43,9 +47,8 @@ export function MainLayout({ children }) {
 
       {/* Main content area */}
       <main
-        className={`flex-1 ${
-          isAuthenticated ? (isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64') : ''
-        }`}
+        className={`flex-1 ${isAuthenticated ? (isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64') : ''
+          }`}
       >
         {children}
       </main>

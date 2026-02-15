@@ -1,6 +1,8 @@
 const asyncHandler = require('../../common/utils/asyncHandler');
 const prisma = require('../../config/prisma');
 const { registerUser, registerWorker, loginUser, verifyEmailToken, requestPasswordReset, resetPasswordWithToken } = require('./auth.service');
+const { sendVerificationEmail, sendPasswordResetEmail } = require('../../common/utils/mailer');
+const AppError = require('../../common/errors/AppError');
 
 const COOKIE_OPTIONS = {
   httpOnly: true,
@@ -12,9 +14,29 @@ const COOKIE_OPTIONS = {
 exports.register = asyncHandler(async (req, res) => {
   const { name, email, mobile, password } = req.body;
   const { user, token, verificationToken } = await registerUser({ name, email, mobile, password });
-  const baseUrl = process.env.CORS_ORIGIN || 'http://localhost:5173';
+  const baseUrl = req.get('origin') || process.env.CORS_ORIGIN || 'http://localhost:5173';
   const verificationLink = `${baseUrl}/verify-email?token=${verificationToken}`;
-  res.cookie('token', token, COOKIE_OPTIONS);
+  try {
+    await sendVerificationEmail({ to: user.email, link: verificationLink });
+  } catch (error) {
+    console.error('❌ Verification email failed (SMTP Error):');
+    if (error.response) console.error('Response:', error.response);
+    if (error.code) console.error('Code:', error.code);
+    console.error('Message:', error.message);
+  }
+
+  // ALWAYS log link in dev for easy testing
+  // ALWAYS log link in dev for easy testing
+  if (process.env.NODE_ENV === 'development') {
+    console.log('DEV ONLY - Manual Verification Link:', verificationLink);
+    try {
+      require('fs').writeFileSync(require('path').join(process.cwd(), 'verification_link.txt'), verificationLink);
+    } catch (e) {
+      console.error('Failed to write verification link to file:', e);
+    }
+  }
+  // REMOVED: res.cookie('token', token, COOKIE_OPTIONS);
+  // User must verify email before logging in, so we don't set the auth cookie yet.
   res.status(201).json({
     user: {
       id: user.id,
@@ -23,16 +45,30 @@ exports.register = asyncHandler(async (req, res) => {
       role: user.role,
       profilePhotoUrl: user.profilePhotoUrl || null,
     },
-    verificationLink,
   });
 });
+
 
 exports.registerWorker = asyncHandler(async (req, res) => {
   const { name, email, mobile, password } = req.body;
   const { user, token, verificationToken } = await registerWorker({ name, email, mobile, password });
-  const baseUrl = process.env.CORS_ORIGIN || 'http://localhost:5173';
+  const baseUrl = req.get('origin') || process.env.CORS_ORIGIN || 'http://localhost:5173';
   const verificationLink = `${baseUrl}/verify-email?token=${verificationToken}`;
-  res.cookie('token', token, COOKIE_OPTIONS);
+  try {
+    await sendVerificationEmail({ to: user.email, link: verificationLink });
+  } catch (error) {
+    console.error('❌ Verification email failed (SMTP Error):');
+    if (error.response) console.error('Response:', error.response);
+    if (error.code) console.error('Code:', error.code);
+    console.error('Message:', error.message);
+  }
+
+  // ALWAYS log link in dev for easy testing
+  if (process.env.NODE_ENV === 'development') {
+    console.log('DEV ONLY - Manual Verification Link:', verificationLink);
+  }
+  // REMOVED: res.cookie('token', token, COOKIE_OPTIONS);
+  // User must verify email before logging in, so we don't set the auth cookie yet.
   res.status(201).json({
     user: {
       id: user.id,
@@ -41,7 +77,6 @@ exports.registerWorker = asyncHandler(async (req, res) => {
       role: user.role,
       profilePhotoUrl: user.profilePhotoUrl || null,
     },
-    verificationLink,
   });
 });
 
@@ -56,6 +91,8 @@ exports.login = asyncHandler(async (req, res) => {
       email: user.email,
       role: user.role,
       profilePhotoUrl: user.profilePhotoUrl || null,
+      isProfileComplete: user.isProfileComplete,
+      isVerified: user.isVerified || false, // For workers
     },
   });
 });
@@ -76,10 +113,24 @@ exports.me = asyncHandler(async (req, res) => {
       role: true,
       profilePhotoUrl: true,
       emailVerified: true,
+      isProfileComplete: true,
+      workerProfile: {
+        select: { isVerified: true }
+      }
     },
   });
 
-  res.json({ user });
+  if (!user) {
+    return res.status(404).json({ message: 'User not found' });
+  }
+
+  const userData = {
+    ...user,
+    isVerified: user.workerProfile?.isVerified || false,
+  };
+  delete userData.workerProfile;
+
+  res.json({ user: userData });
 });
 
 exports.verifyEmail = asyncHandler(async (req, res) => {
@@ -90,9 +141,27 @@ exports.verifyEmail = asyncHandler(async (req, res) => {
 
 exports.forgotPassword = asyncHandler(async (req, res) => {
   const { email } = req.body;
-  const baseUrl = process.env.CORS_ORIGIN || 'http://localhost:5173';
+  const baseUrl = req.get('origin') || process.env.CORS_ORIGIN || 'http://localhost:5173';
+
+  // NOTE: result contains { resetLink, message }
   const result = await requestPasswordReset({ email, baseUrl });
-  res.json(result);
+
+  // If there's a reset link, send the email
+  if (result.resetLink) {
+    try {
+      await sendPasswordResetEmail({ to: email, link: result.resetLink });
+    } catch (error) {
+      console.error('Password reset email failed:', error);
+      // We still return success to avoid leaking email existence
+    }
+
+    if (process.env.NODE_ENV === 'development') {
+      console.log('DEV ONLY - Password Reset Link:', result.resetLink);
+    }
+  }
+
+  // Always return the standard message, never the link
+  res.json({ message: result.message });
 });
 
 exports.resetPassword = asyncHandler(async (req, res) => {

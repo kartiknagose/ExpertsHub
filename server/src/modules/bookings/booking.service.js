@@ -18,6 +18,10 @@
 
 const prisma = require('../../config/prisma'); // Our database connection
 
+// Helper to generate 4-digit OTP
+const generateOTP = () => Math.floor(1000 + Math.random() * 9000).toString();
+
+
 /**
  * CREATE A NEW BOOKING
  * 
@@ -33,8 +37,44 @@ const prisma = require('../../config/prisma'); // Our database connection
  * @returns {Promise<object>} - The newly created booking
  * @throws {Error} - If validation fails (worker not found, service not offered, etc.)
  */
+// HELPER: Check if worker is available (2-hour buffer)
+async function isWorkerAvailable(workerId, date) {
+  const start = new Date(date);
+  const end = new Date(start.getTime() + 2 * 60 * 60 * 1000); // 2 hours later
+
+  // Check for overlapping bookings
+  // A booking overlaps if it starts before our end AND ends after our start
+  // We check for any booking that starts within a +/- 2 hour window of the requested time
+
+  const conflictingBooking = await prisma.booking.findFirst({
+    where: {
+      workerProfileId: workerId,
+      status: { in: ['CONFIRMED', 'IN_PROGRESS'] }, // Only confirmed/active jobs block time
+      scheduledAt: {
+        gte: new Date(start.getTime() - 119 * 60 * 1000), // Check ~2 hours before
+        lt: end // Check up until our end time
+      }
+    }
+  });
+
+  return !conflictingBooking;
+}
+
+// HELPER: Check if address is in worker's service area
+function isLocationMatch(workerServiceAreas, address) {
+  if (!workerServiceAreas || !Array.isArray(workerServiceAreas) || workerServiceAreas.length === 0) return true;
+  if (!address) return false;
+
+  const normalizedAddress = address.toLowerCase();
+  // Check if any defined service area is part of the address string
+  return workerServiceAreas.some(area => normalizedAddress.includes(area.toLowerCase()));
+}
+
 async function createBooking(customerId, bookingData) {
   const { workerProfileId, serviceId, scheduledDate, addressDetails, estimatedPrice, notes } = bookingData;
+
+  // LOGIC BRANCH: Is this a Direct Booking (worker selected) or Open Booking (no worker)?
+  const isDirectBooking = !!workerProfileId;
 
   // VALIDATE: Scheduled date must be in the future (at least 1 hour from now)
   const scheduledDateObj = new Date(scheduledDate);
@@ -51,17 +91,31 @@ async function createBooking(customerId, bookingData) {
 
   // VALIDATE: Customer cannot book themselves as a worker (implicit check - they shouldn't be a worker)
   const customer = await prisma.user.findUnique({ where: { id: customerId } });
-  if (customer.role === 'WORKER') {
+  // Removed restriction: Workers can now book services too.
+  /* if (customer.role === 'WORKER') {
     throw new Error('Workers cannot book services (use customer account instead).');
-  }
+  } */
 
-  // VALIDATE: Verify the worker exists and has a worker profile
-  const workerProfile = await prisma.workerProfile.findUnique({
-    where: { id: workerProfileId },
-  });
+  // VALIDATE: Worker specific checks (ONLY IF WORKER IS SELECTED)
+  if (isDirectBooking) {
+    // Verify the worker exists and has a worker profile
+    const workerProfile = await prisma.workerProfile.findUnique({
+      where: { id: workerProfileId },
+    });
 
-  if (!workerProfile) {
-    throw new Error('Worker not found. Please select a valid worker.');
+    if (!workerProfile) {
+      throw new Error('Worker not found. Please select a valid worker.');
+    }
+
+    // CHECK 1: LOCATION
+    if (!isLocationMatch(workerProfile.serviceAreas, addressDetails)) {
+      throw new Error(`This worker only accepts jobs in: ${workerProfile.serviceAreas?.join(', ') || 'their local area'}. Address provided: ${addressDetails}`);
+    }
+
+    // CHECK 2: AVAILABILITY
+    if (!(await isWorkerAvailable(workerProfileId, scheduledDateObj))) {
+      throw new Error('Worker is already booked for this time slot. Please choose another time.');
+    }
   }
 
   // VALIDATE: Verify the service exists
@@ -73,18 +127,20 @@ async function createBooking(customerId, bookingData) {
     throw new Error('Service not found. Please select a valid service.');
   }
 
-  // VALIDATE: Verify the worker actually offers this service
-  const workerOffersService = await prisma.workerService.findUnique({
-    where: {
-      workerId_serviceId: {
-        workerId: workerProfileId,
-        serviceId: serviceId,
+  // VALIDATE: Verify the worker actually offers this service (ONLY IF WORKER IS SELECTED)
+  if (isDirectBooking) {
+    const workerOffersService = await prisma.workerService.findUnique({
+      where: {
+        workerId_serviceId: {
+          workerId: workerProfileId,
+          serviceId: serviceId,
+        },
       },
-    },
-  });
+    });
 
-  if (!workerOffersService) {
-    throw new Error('This worker does not offer the selected service. Please choose another worker or service.');
+    if (!workerOffersService) {
+      throw new Error('This worker does not offer the selected service. Please choose another worker or service.');
+    }
   }
 
   // VALIDATE: Address must be at least 10 characters
@@ -106,7 +162,8 @@ async function createBooking(customerId, bookingData) {
   const newBooking = await prisma.booking.create({
     data: {
       customerId: customerId,
-      workerProfileId: workerProfileId,
+
+      workerProfileId: isDirectBooking ? workerProfileId : null, // Null for Open Booking
       serviceId: serviceId,
       scheduledAt: scheduledDateObj,
       address: addressDetails,
@@ -123,11 +180,11 @@ async function createBooking(customerId, bookingData) {
         select: {
           id: true,
           userId: true,
-          user: { select: { id: true, name: true, email: true } },
+          user: { select: { id: true, name: true, email: true, mobile: true, profilePhotoUrl: true, rating: true, totalReviews: true } },
         },
       },
       customer: {
-        select: { id: true, name: true, email: true },
+        select: { id: true, name: true, email: true, mobile: true, profilePhotoUrl: true, rating: true, totalReviews: true },
       },
     },
   });
@@ -181,11 +238,11 @@ async function getBookingsByUser(userId, role) {
         select: {
           id: true,
           userId: true,
-          user: { select: { id: true, name: true, email: true } },
+          user: { select: { id: true, name: true, email: true, mobile: true, profilePhotoUrl: true, rating: true, totalReviews: true } },
         },
       },
       customer: {
-        select: { id: true, name: true, email: true },
+        select: { id: true, name: true, email: true, mobile: true, profilePhotoUrl: true, rating: true, totalReviews: true },
       },
     },
     orderBy: {
@@ -221,10 +278,10 @@ async function getBookingById(bookingId, userId, role) {
       reviews: true,
       workerProfile: {
         select: { id: true, userId: true },
-        include: { user: { select: { id: true, name: true, email: true } } },
+        include: { user: { select: { id: true, name: true, email: true, mobile: true, profilePhotoUrl: true, rating: true, totalReviews: true } } },
       },
       customer: {
-        select: { id: true, name: true, email: true },
+        select: { id: true, name: true, email: true, mobile: true, profilePhotoUrl: true, rating: true, totalReviews: true },
       },
     },
   });
@@ -327,10 +384,10 @@ async function updateBookingStatus(bookingId, newStatus, userId, role) {
           select: {
             id: true,
             userId: true,
-            user: { select: { id: true, name: true, email: true } },
+            user: { select: { id: true, name: true, email: true, mobile: true, profilePhotoUrl: true, rating: true, totalReviews: true } },
           },
         },
-        customer: { select: { id: true, name: true, email: true } },
+        customer: { select: { id: true, name: true, email: true, mobile: true, profilePhotoUrl: true, rating: true, totalReviews: true } },
       },
     });
   });
@@ -451,8 +508,8 @@ async function payBooking(bookingId, userId, userRole, paymentReference) {
       },
       include: {
         service: { select: { id: true, name: true, category: true } },
-        workerProfile: { select: { id: true, userId: true, user: { select: { id: true, name: true } } } },
-        customer: { select: { id: true, name: true, email: true } },
+        workerProfile: { select: { id: true, userId: true, user: { select: { id: true, name: true, profilePhotoUrl: true, rating: true, totalReviews: true } } } },
+        customer: { select: { id: true, name: true, email: true, mobile: true, profilePhotoUrl: true, rating: true, totalReviews: true } },
       },
     });
 
@@ -470,6 +527,192 @@ async function payBooking(bookingId, userId, userRole, paymentReference) {
   });
 }
 
+/**
+ * GET OPEN BOOKINGS FOR A WORKER
+ * 
+ * Business Logic:
+ * - Worker sees jobs matching their SKILLS/SERVICES
+ * - Worker sees jobs in their AREA (if we had location filtering)
+ * - Only shows PENDING jobs with NO assigned worker
+ */
+async function getOpenBookingsForWorker(userId) {
+  // 1. Get the worker's profile and their services
+  const worker = await prisma.workerProfile.findUnique({
+    where: { userId },
+    include: {
+      services: {
+        select: { serviceId: true }
+      }
+    }
+  });
+
+  if (!worker) {
+    throw new Error('Worker profile not found.');
+  }
+
+  const workerServiceIds = worker.services.map(s => s.serviceId);
+
+  // 2. Find PENDING bookings with NO worker assigned, matching their services
+  const openBookings = await prisma.booking.findMany({
+    where: {
+      status: 'PENDING',
+      workerProfileId: null, // Open booking
+      serviceId: { in: workerServiceIds } // Matches worker's skills
+    },
+    include: {
+      service: { select: { id: true, name: true, category: true, basePrice: true } },
+      customer: {
+        select: {
+          id: true,
+          name: true,
+          addresses: {
+            take: 1,
+            select: { city: true }
+          }
+        }
+      }
+    },
+    orderBy: {
+      scheduledAt: 'asc' // Show urgent jobs first
+    }
+  });
+
+  // 3. Filter by Location (Service Area)
+  // Only show jobs where the job address matches one of the worker's service areas
+  const relevantBookings = openBookings.filter(booking => {
+    return isLocationMatch(worker.serviceAreas, booking.address);
+  });
+
+  // Map to flatten city for frontend convenience
+  return relevantBookings.map(booking => ({
+    ...booking,
+    customer: {
+      ...booking.customer,
+      city: booking.customer.addresses?.[0]?.city || 'Local Area'
+    }
+  }));
+}
+
+/**
+ * ACCEPT AN OPEN BOOKING
+ * 
+ * Business Logic:
+ * - Worker claims a job
+ * - Status changes PENDING -> CONFIRMED
+ * - Worker ID is assigned to the booking
+ */
+async function acceptBooking(bookingId, userId) {
+  const worker = await prisma.workerProfile.findUnique({
+    where: { userId }
+  });
+
+  if (!worker) {
+    throw new Error('Only registered workers can accept bookings.');
+  }
+
+  // Transaction to ensure no two workers accept the same job at the exact same millisecond
+  return prisma.$transaction(async (tx) => {
+    const booking = await tx.booking.findUnique({
+      where: { id: bookingId }
+    });
+
+    if (!booking) throw new Error('Booking not found.');
+
+    if (booking.workerProfileId !== null) {
+      throw new Error('This booking has already been accepted by another worker.');
+    }
+
+    if (booking.status !== 'PENDING') {
+      throw new Error('Booking is no longer available.');
+    }
+
+    // CHECK AVAILABILITY: Prevents double booking
+    if (!(await isWorkerAvailable(worker.id, booking.scheduledAt))) {
+      throw new Error('You cannot accept this job because you have another booking scheduled near this time.');
+    }
+
+    // Assign to worker and confirm, generating Start OTP
+    const updated = await tx.booking.update({
+      where: { id: bookingId },
+      data: {
+        workerProfileId: worker.id,
+        status: 'CONFIRMED',
+        startOtp: generateOTP(),
+        otpGeneratedAt: new Date(),
+        updatedAt: new Date()
+      },
+      include: {
+        customer: { select: { id: true, name: true, email: true, mobile: true, profilePhotoUrl: true, rating: true, totalReviews: true } },
+        workerProfile: { select: { id: true, userId: true, user: { select: { id: true, name: true, profilePhotoUrl: true, rating: true, totalReviews: true } } } },
+        service: true
+      }
+    });
+
+    return updated; // In real app, SMS/Email this OTP to customer
+  });
+
+}
+
+/**
+ * VERIFY OTP TO START JOB
+ * Worker enters OTP provided by Customer
+ */
+async function verifyBookingStart(bookingId, otp, userId) {
+  const worker = await prisma.workerProfile.findUnique({ where: { userId } });
+  if (!worker) throw new Error('Only workers can start jobs.');
+
+  const booking = await prisma.booking.findUnique({ where: { id: bookingId } });
+
+  if (!booking) throw new Error('Booking not found.');
+  if (booking.workerProfileId !== worker.id) throw new Error('You are not assigned to this job.');
+  if (booking.status !== 'CONFIRMED') throw new Error('Job must be CONFIRMED before starting.');
+
+  if (booking.startOtp !== otp) {
+    throw new Error('Invalid Start OTP.');
+  }
+
+  // OTP Valid -> Start Job and generate Completion OTP
+  return prisma.booking.update({
+    where: { id: bookingId },
+    data: {
+      status: 'IN_PROGRESS',
+      startedAt: new Date(),
+      completionOtp: generateOTP(), // Generate completion OTP now
+      otpGeneratedAt: new Date(),
+      updatedAt: new Date()
+    }
+  });
+}
+
+/**
+ * VERIFY OTP TO COMPLETE JOB
+ * Worker enters OTP provided by Customer
+ */
+async function verifyBookingCompletion(bookingId, otp, userId) {
+  const worker = await prisma.workerProfile.findUnique({ where: { userId } });
+  if (!worker) throw new Error('Only workers can complete jobs.');
+
+  const booking = await prisma.booking.findUnique({ where: { id: bookingId } });
+
+  if (!booking) throw new Error('Booking not found.');
+  if (booking.workerProfileId !== worker.id) throw new Error('You are not assigned to this job.');
+  if (booking.status !== 'IN_PROGRESS') throw new Error('Job must be IN_PROGRESS before completing.');
+
+  if (booking.completionOtp !== otp) {
+    throw new Error('Invalid Completion OTP.');
+  }
+
+  // OTP Valid -> Complete Job
+  return prisma.booking.update({
+    where: { id: bookingId },
+    data: {
+      status: 'COMPLETED',
+      completedAt: new Date(),
+      updatedAt: new Date()
+    }
+  });
+}
+
 // Export all service functions so controllers can use them
 module.exports = {
   createBooking,
@@ -478,4 +721,8 @@ module.exports = {
   updateBookingStatus,
   cancelBooking,
   payBooking,
+  getOpenBookingsForWorker,
+  acceptBooking,
+  verifyBookingStart,
+  verifyBookingCompletion
 };

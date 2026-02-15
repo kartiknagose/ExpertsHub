@@ -44,6 +44,7 @@ async function getCustomerProfile(userId) {
       role: true,
       profilePhotoUrl: true,
       emailVerified: true,
+      isProfileComplete: true,
       addresses: true,
     },
   });

@@ -90,18 +90,27 @@ async function createReview(userId, userRole, data) {
     },
   });
 
-  // 5. If the reviewee is a worker, update their aggregate rating
+  // 5. Update aggregate rating for the reviewee (can be Customer or Worker)
+  const aggregate = await prisma.review.aggregate({
+    where: { revieweeId },
+    _avg: { rating: true },
+    _count: { rating: true },
+  });
+
+  await prisma.user.update({
+    where: { id: revieweeId },
+    data: {
+      rating: aggregate._avg.rating || 0,
+      totalReviews: aggregate._count.rating || 0,
+    },
+  });
+
+  // 6. If reviewee is a worker, also sync to WorkerProfile for legacy compatibility/charts
   const revieweeWorkerProfile = await prisma.workerProfile.findUnique({
     where: { userId: revieweeId },
   });
 
   if (revieweeWorkerProfile) {
-    const aggregate = await prisma.review.aggregate({
-      where: { revieweeId },
-      _avg: { rating: true },
-      _count: { rating: true },
-    });
-
     await prisma.workerProfile.update({
       where: { userId: revieweeId },
       data: {

@@ -24,9 +24,10 @@ const { body, param } = require('express-validator');
  * 5. estimatedPrice - How much they expect to pay (optional, worker can adjust)
  */
 const createBookingSchema = [
-  // Check if workerProfileId exists and is a valid number
+  // workerProfileId is OPTIONAL now. 
+  // If provided, it's a Direct Booking. If null/undefined, it's an Open Booking.
   body('workerProfileId')
-    .notEmpty().withMessage('Worker ID is required')
+    .optional({ nullable: true })
     .isInt({ min: 1 }).withMessage('Worker ID must be a valid number'),
 
   // Check if serviceId exists and is a valid number

@@ -13,7 +13,7 @@
  */
 
 const asyncHandler = require('../../common/utils/asyncHandler');
-const { createService, listServices, getServiceById, getServiceWorkers } = require('./service.service');
+const { createService, listServices, getServiceById, getServiceWorkers, updateService, deleteService } = require('./service.service');
 
 /**
  * CREATE A NEW SERVICE
@@ -71,10 +71,10 @@ exports.create = asyncHandler(async (req, res) => {
 exports.list = asyncHandler(async (req, res) => {
   // Extract filters from query string (e.g., ?category=Plumbing&search=cleaning)
   const { category, search } = req.query;
-  
+
   // Call service function to fetch services (with optional filter)
   const services = await listServices({ category, search });
-  
+
   // Send services back to client
   res.json({ services });
   // Status 200 (default) means "OK" (request successful)
@@ -104,7 +104,7 @@ exports.getOne = asyncHandler(async (req, res) => {
   // Extract service ID from URL parameter
   // If URL is /api/services/5, then req.params.id = '5' (string)
   const id = Number(req.params.id); // Convert string to number
-  
+
   // Check if conversion was successful
   if (Number.isNaN(id)) {
     // ID is not a valid number (e.g., /api/services/abc)
@@ -114,14 +114,14 @@ exports.getOne = asyncHandler(async (req, res) => {
 
   // Call service function to fetch the specific service
   const service = await getServiceById(id);
-  
+
   // Check if service was found
   if (!service) {
     // Service doesn't exist in database
     return res.status(404).json({ error: 'Service not found' });
     // Status 404 means "Not Found"
   }
-  
+
   // Service found, send it back to client
   res.json({ service });
 });
@@ -146,4 +146,18 @@ exports.getWorkers = asyncHandler(async (req, res) => {
 
   const workers = await getServiceWorkers(id);
   res.json({ workers });
+});
+
+exports.update = asyncHandler(async (req, res) => {
+  const id = Number(req.params.id);
+  if (Number.isNaN(id)) return res.status(400).json({ error: 'Invalid ID' });
+  const updated = await updateService(id, req.body);
+  res.json({ service: updated });
+});
+
+exports.remove = asyncHandler(async (req, res) => {
+  const id = Number(req.params.id);
+  if (Number.isNaN(id)) return res.status(400).json({ error: 'Invalid ID' });
+  await deleteService(id);
+  res.json({ message: 'Service deleted' });
 });

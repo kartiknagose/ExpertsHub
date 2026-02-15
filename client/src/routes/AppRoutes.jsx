@@ -1,7 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { PublicRoute, WorkerRoute, CustomerRoute, AdminRoute } from './ProtectedRoute';
-import { ProfileGate } from '../components/auth/ProfileGate';
 import { LoadingOverlay } from '../components/common';
 
 // Lazy load all pages for better performance (Code Splitting)
@@ -32,14 +31,12 @@ const TermsPage = lazy(() => import('../pages/legal/TermsPage').then(m => ({ def
 const CookiesPage = lazy(() => import('../pages/legal/CookiesPage').then(m => ({ default: m.CookiesPage })));
 
 // Customer
-const CustomerProfileSetupPage = lazy(() => import('../pages/profile/CustomerProfileSetupPage').then(m => ({ default: m.CustomerProfileSetupPage })));
 const CustomerProfilePage = lazy(() => import('../pages/profile/CustomerProfilePage').then(m => ({ default: m.CustomerProfilePage })));
 const CustomerDashboardPage = lazy(() => import('../pages/customer/CustomerDashboardPage').then(m => ({ default: m.CustomerDashboardPage })));
 const CustomerBookingsPage = lazy(() => import('../pages/customer/CustomerBookingsPage').then(m => ({ default: m.CustomerBookingsPage })));
 const CustomerReviewsPage = lazy(() => import('../pages/customer/CustomerReviewsPage').then(m => ({ default: m.CustomerReviewsPage })));
 
 // Worker
-const WorkerProfileSetupPage = lazy(() => import('../pages/profile/WorkerProfileSetupPage').then(m => ({ default: m.WorkerProfileSetupPage })));
 const WorkerProfilePage = lazy(() => import('../pages/profile/WorkerProfilePage').then(m => ({ default: m.WorkerProfilePage })));
 const WorkerDashboardPage = lazy(() => import('../pages/worker/WorkerDashboardPage').then(m => ({ default: m.WorkerDashboardPage })));
 const WorkerServicesPage = lazy(() => import('../pages/worker/WorkerServicesPage').then(m => ({ default: m.WorkerServicesPage })));
@@ -64,66 +61,63 @@ const AdminVerificationPage = lazy(() => import('../pages/admin/AdminVerificatio
  */
 export function AppRoutes() {
   return (
-    <ProfileGate>
-      <Suspense fallback={<LoadingOverlay />}>
-        <Routes>
-          {/* ===== PUBLIC ROUTES (No authentication required) ===== */}
-          <Route path="/" element={<PublicRoute><LandingPage /></PublicRoute>} />
+    <Suspense fallback={<LoadingOverlay />}>
+      <Routes>
+        {/* ===== PUBLIC ROUTES (No authentication required) ===== */}
+        <Route path="/" element={<PublicRoute><LandingPage /></PublicRoute>} />
 
-          {/* Auth Routes - Redirect to dashboard if already logged in */}
-          <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
-          <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
-          <Route path="/forgot-password" element={<PublicRoute><ForgotPasswordPage /></PublicRoute>} />
-          <Route path="/reset-password" element={<PublicRoute><ResetPasswordPage /></PublicRoute>} />
+        {/* Auth Routes - Redirect to dashboard if already logged in */}
+        <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
+        <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
+        <Route path="/forgot-password" element={<PublicRoute><ForgotPasswordPage /></PublicRoute>} />
+        <Route path="/reset-password" element={<PublicRoute><ResetPasswordPage /></PublicRoute>} />
 
-          <Route path="/register-worker" element={<Navigate to="/register?role=worker" replace />} />
-          <Route path="/verify-email" element={<VerifyEmailPage />} />
-          <Route path="/services" element={<ServicesPage />} />
-          <Route path="/services/:id" element={<ServiceDetailPage />} />
-          <Route path="/system-status" element={<SystemStatusPage />} />
-          <Route path="/about" element={<AboutPage />} />
-          <Route path="/contact" element={<ContactPage />} />
-          <Route path="/how-it-works" element={<HowItWorksPage />} />
-          <Route path="/pricing" element={<PricingPage />} />
-          <Route path="/security" element={<SecurityPage />} />
-          <Route path="/faq" element={<FaqPage />} />
-          <Route path="/privacy" element={<PrivacyPage />} />
-          <Route path="/terms" element={<TermsPage />} />
-          <Route path="/cookies" element={<CookiesPage />} />
-          <Route path="/blog" element={<BlogPage />} />
-          <Route path="/careers" element={<CareersPage />} />
+        <Route path="/register-worker" element={<Navigate to="/register?role=worker" replace />} />
+        <Route path="/verify-email" element={<VerifyEmailPage />} />
+        <Route path="/services" element={<ServicesPage />} />
+        <Route path="/services/:id" element={<ServiceDetailPage />} />
+        <Route path="/system-status" element={<SystemStatusPage />} />
+        <Route path="/about" element={<AboutPage />} />
+        <Route path="/contact" element={<ContactPage />} />
+        <Route path="/how-it-works" element={<HowItWorksPage />} />
+        <Route path="/pricing" element={<PricingPage />} />
+        <Route path="/security" element={<SecurityPage />} />
+        <Route path="/faq" element={<FaqPage />} />
+        <Route path="/privacy" element={<PrivacyPage />} />
+        <Route path="/terms" element={<TermsPage />} />
+        <Route path="/cookies" element={<CookiesPage />} />
+        <Route path="/blog" element={<BlogPage />} />
+        <Route path="/careers" element={<CareersPage />} />
 
-          {/* Customer Routes */}
-          <Route path="/profile/setup" element={<CustomerRoute><CustomerProfileSetupPage /></CustomerRoute>} />
-          <Route path="/profile" element={<CustomerRoute><CustomerProfilePage /></CustomerRoute>} />
-          <Route path="/bookings" element={<CustomerRoute><CustomerBookingsPage /></CustomerRoute>} />
-          <Route path="/reviews" element={<CustomerRoute><CustomerReviewsPage /></CustomerRoute>} />
-          <Route path="/dashboard" element={<CustomerRoute><CustomerDashboardPage /></CustomerRoute>} />
+        {/* Customer Routes */}
+        <Route path="/profile" element={<CustomerRoute><CustomerProfilePage /></CustomerRoute>} />
+        <Route path="/profile/setup" element={<Navigate to="/profile" replace />} />
+        <Route path="/bookings" element={<CustomerRoute><CustomerBookingsPage /></CustomerRoute>} />
+        <Route path="/reviews" element={<CustomerRoute><CustomerReviewsPage /></CustomerRoute>} />
+        <Route path="/dashboard" element={<CustomerRoute><CustomerDashboardPage /></CustomerRoute>} />
 
-          {/* Worker Routes */}
-          <Route path="/worker/setup-profile" element={<WorkerRoute><WorkerProfileSetupPage /></WorkerRoute>} />
-          <Route path="/worker/profile/setup" element={<WorkerRoute><WorkerProfileSetupPage /></WorkerRoute>} />
-          <Route path="/worker/dashboard" element={<WorkerRoute><WorkerDashboardPage /></WorkerRoute>} />
-          <Route path="/worker/profile" element={<WorkerRoute><WorkerProfilePage /></WorkerRoute>} />
-          <Route path="/worker/services" element={<WorkerRoute><WorkerServicesPage /></WorkerRoute>} />
-          <Route path="/worker/bookings" element={<WorkerRoute><WorkerBookingsPage /></WorkerRoute>} />
-          <Route path="/worker/availability" element={<WorkerRoute><WorkerAvailabilityPage /></WorkerRoute>} />
-          <Route path="/worker/verification" element={<WorkerRoute><WorkerVerificationPage /></WorkerRoute>} />
-          <Route path="/worker/reviews" element={<WorkerRoute><WorkerReviewsPage /></WorkerRoute>} />
+        {/* Worker Routes */}
+        <Route path="/worker/profile" element={<WorkerRoute><WorkerProfilePage /></WorkerRoute>} />
+        <Route path="/worker/profile/setup" element={<Navigate to="/worker/profile" replace />} />
+        <Route path="/worker/setup-profile" element={<Navigate to="/worker/profile" replace />} />
+        <Route path="/worker/dashboard" element={<WorkerRoute><WorkerDashboardPage /></WorkerRoute>} />
+        <Route path="/worker/services" element={<WorkerRoute><WorkerServicesPage /></WorkerRoute>} />
+        <Route path="/worker/bookings" element={<WorkerRoute><WorkerBookingsPage /></WorkerRoute>} />
+        <Route path="/worker/availability" element={<WorkerRoute><WorkerAvailabilityPage /></WorkerRoute>} />
+        <Route path="/worker/verification" element={<WorkerRoute><WorkerVerificationPage /></WorkerRoute>} />
+        <Route path="/worker/reviews" element={<WorkerRoute><WorkerReviewsPage /></WorkerRoute>} />
 
-          {/* Admin Routes */}
-          <Route path="/admin/dashboard" element={<AdminRoute><AdminDashboardPage /></AdminRoute>} />
-          <Route path="/admin/services" element={<AdminRoute><AdminServicesPage /></AdminRoute>} />
-          <Route path="/admin/workers" element={<AdminRoute><AdminWorkersPage /></AdminRoute>} />
-          <Route path="/admin/bookings" element={<AdminRoute><AdminBookingsPage /></AdminRoute>} />
-          <Route path="/admin/users" element={<AdminRoute><AdminUsersPage /></AdminRoute>} />
-          <Route path="/admin/verification" element={<AdminRoute><AdminVerificationPage /></AdminRoute>} />
+        {/* Admin Routes */}
+        <Route path="/admin/dashboard" element={<AdminRoute><AdminDashboardPage /></AdminRoute>} />
+        <Route path="/admin/services" element={<AdminRoute><AdminServicesPage /></AdminRoute>} />
+        <Route path="/admin/bookings" element={<AdminRoute><AdminBookingsPage /></AdminRoute>} />
+        <Route path="/admin/users" element={<AdminRoute><AdminUsersPage /></AdminRoute>} />
+        <Route path="/admin/verification" element={<AdminRoute><AdminVerificationPage /></AdminRoute>} />
 
-          {/* 404 - Wildcard */}
-          <Route path="*" element={<NotFoundPage />} />
-        </Routes>
-      </Suspense>
-    </ProfileGate>
+        {/* 404 - Wildcard */}
+        <Route path="*" element={<NotFoundPage />} />
+      </Routes>
+    </Suspense>
   );
 }
 
