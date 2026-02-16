@@ -1,7 +1,7 @@
 // Customer dashboard page
 // Shows booking summary and quick actions
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
@@ -22,9 +22,12 @@ import {
   Zap,
   ChevronRight,
   Search,
-  ShieldAlert
+  ShieldAlert,
+  MessageSquare,
 } from 'lucide-react';
+import { StarRating } from '../../components/features/reviews/StarRating';
 import { getAllBookings, payBooking } from '../../api/bookings';
+import { createReview } from '../../api/reviews';
 import { getAllServices } from '../../api/services';
 import { queryKeys } from '../../utils/queryKeys';
 import { getBookingStatusVariant } from '../../utils/statusHelpers';
@@ -52,6 +55,17 @@ export function CustomerDashboardPage() {
       queryClient.invalidateQueries({ queryKey: queryKeys.bookings.customer() });
     },
   });
+
+  // Inline review mutation
+  const reviewMutation = useMutation({
+    mutationFn: (payload) => createReview(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.bookings.customer() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.bookings.worker() });
+    },
+  });
+
+  const [activeReview, setActiveReview] = useState({ bookingId: null, rating: 0, comment: '' });
 
   const bookings = data?.bookings || [];
   const services = servicesQuery.data?.services || servicesQuery.data || [];
@@ -235,16 +249,74 @@ export function CustomerDashboardPage() {
                                           Pay now
                                         </Button>
                                       )}
-                                      {(!booking.reviews || booking.reviews.length === 0) && (
-                                        <Button
-                                          size="sm"
-                                          variant="outline"
-                                          className="h-9 px-6 font-bold flex-1 sm:flex-none"
-                                          onClick={() => navigate('/reviews')}
-                                        >
-                                          Rate & Review
-                                        </Button>
-                                      )}
+                                          {(!booking.reviews || booking.reviews.length === 0) && booking.paymentStatus === 'PAID' && (
+                                            <div className="flex items-center gap-3">
+                                              {/* Inline star rating for quick submission */}
+                                              <div className="flex items-center">
+                                                <StarRating
+                                                  value={activeReview.bookingId === booking.id ? activeReview.rating : 0}
+                                                  size={18}
+                                                  onChange={(rating) => setActiveReview({ bookingId: booking.id, rating, comment: '' })}
+                                                />
+                                              </div>
+
+                                              {/* Toggle inline comment box */}
+                                              <button
+                                                aria-label="Add comment"
+                                                title="Add a comment"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  if (activeReview.bookingId === booking.id) {
+                                                    // collapse
+                                                    setActiveReview({ bookingId: null, rating: 0, comment: '' });
+                                                  } else {
+                                                    setActiveReview({ bookingId: booking.id, rating: 0, comment: '' });
+                                                  }
+                                                }}
+                                                className="p-2 rounded-md text-gray-500 hover:bg-gray-100 dark:hover:bg-dark-700"
+                                              >
+                                                <MessageSquare size={18} />
+                                              </button>
+                                            </div>
+                                          )}
+
+                                          {/* Inline comment + submit area */}
+                                          {activeReview.bookingId === booking.id && (
+                                            <div className="mt-3 w-full sm:w-auto flex flex-col gap-2" onClick={(e) => e.stopPropagation()}>
+                                              <textarea
+                                                placeholder="Write a short comment (optional)"
+                                                value={activeReview.comment}
+                                                onChange={(e) => setActiveReview((s) => ({ ...s, comment: e.target.value }))}
+                                                className="w-full sm:w-80 p-2 rounded-md border border-gray-200 dark:border-dark-700 bg-white dark:bg-dark-800 text-sm"
+                                                rows={2}
+                                              />
+                                              <div className="flex gap-2">
+                                                <Button
+                                                  size="sm"
+                                                  className="px-4"
+                                                  onClick={async () => {
+                                                    if (!activeReview.rating) return; // require rating
+                                                    reviewMutation.mutate({
+                                                      bookingId: booking.id,
+                                                      rating: activeReview.rating,
+                                                      comment: activeReview.comment,
+                                                    });
+                                                    setActiveReview({ bookingId: null, rating: 0, comment: '' });
+                                                  }}
+                                                  loading={reviewMutation.isLoading}
+                                                >
+                                                  Submit
+                                                </Button>
+                                                <Button
+                                                  size="sm"
+                                                  variant="outline"
+                                                  onClick={(e) => { e.stopPropagation(); setActiveReview({ bookingId: null, rating: 0, comment: '' }); }}
+                                                >
+                                                  Cancel
+                                                </Button>
+                                              </div>
+                                            </div>
+                                          )}
                                     </>
                                   )}
                                   {booking.status === 'PENDING' && (

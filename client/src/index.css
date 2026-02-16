@@ -14,6 +14,8 @@
   body {
     /* Slightly off-white background improves separation in light mode */
     @apply bg-neutral-50 text-neutral-900 antialiased;
+    /* Subtle background accents to create depth in light mode */
+    background-image: radial-gradient(circle at 10% 10%, rgba(62,143,255,0.03), transparent 12%), radial-gradient(circle at 90% 80%, rgba(232,31,255,0.02), transparent 12%);
     font-feature-settings: 'cv11', 'ss01';
     font-family: 'Space Grotesk', system-ui, -apple-system, sans-serif;
   }
@@ -50,6 +52,13 @@
   .card {
     /* Keep cards white but add a stronger shadow and clear border for separation */
     @apply bg-white border border-neutral-200 rounded-xl shadow-md;
+    transition: box-shadow 180ms ease, transform 180ms ease;
+  }
+
+  /* stronger hover to make cards feel layered in light mode */
+  .card:hover {
+    @apply shadow-xl;
+    transform: translateY(-4px);
   }
 
   .dark .card {
@@ -95,8 +104,8 @@
 
   /* Input */
   .input {
-    @apply w-full px-4 py-2.5 bg-white border border-neutral-300 rounded-lg;
-    @apply text-neutral-900 placeholder:text-neutral-400;
+    @apply w-full px-4 py-2.5 bg-white border border-neutral-400 rounded-lg;
+    @apply text-neutral-900 placeholder:text-neutral-500;
     @apply focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20;
     @apply transition-colors duration-200;
   }

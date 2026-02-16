@@ -18,6 +18,8 @@ import {
   Calendar,
   AlertCircle
 } from 'lucide-react';
+import { MessageSquare, Star as StarIcon } from 'lucide-react';
+import { StarRating } from '../../components/features/reviews/StarRating';
 import { MainLayout } from '../../components/layout/MainLayout';
 import { Card, Badge, Button, PageHeader, AsyncState, Modal, Input, ImageUpload } from '../../components/common';
 import { useTheme } from '../../context/ThemeContext';
@@ -33,6 +35,9 @@ import { UserMiniProfile } from '../../components/features/bookings/UserMiniProf
 import { queryKeys } from '../../utils/queryKeys';
 import { getBookingStatusVariant } from '../../utils/statusHelpers';
 import { toast } from 'sonner';
+import { createReview } from '../../api/reviews';
+import { useMutation } from '@tanstack/react-query';
+import { StarRating } from '../../components/features/reviews/StarRating';
 
 const statusFilters = ['ALL', 'PENDING', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
 
@@ -83,6 +88,13 @@ export function WorkerBookingsPage() {
     },
     onError: (error) => toast.error(error.response?.data?.message || 'Update failed'),
   });
+
+  const reviewMutation = useMutation({
+    mutationFn: (payload) => createReview(payload),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.bookings.worker() }),
+  });
+
+  const [activeReview, setActiveReview] = useState({ bookingId: null, rating: 0, comment: '' });
 
   const handleCancelClick = (bookingId) => {
     setActiveBookingId(bookingId);
@@ -376,7 +388,63 @@ export function WorkerBookingsPage() {
                           >
                             Go to Details
                           </Button>
+                          {booking.status === 'COMPLETED' && booking.paymentStatus === 'PAID' && (!booking.reviews || booking.reviews.length === 0) && (
+                            <div className="ml-3 flex items-center gap-2">
+                              <StarRating
+                                value={activeReview.bookingId === booking.id ? activeReview.rating : 0}
+                                size={16}
+                                onChange={(r) => setActiveReview({ bookingId: booking.id, rating: r, comment: '' })}
+                              />
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setActiveReview((s) => s.bookingId === booking.id ? { bookingId: null, rating: 0, comment: '' } : { bookingId: booking.id, rating: 0, comment: '' }); }}
+                                className="p-2 rounded-md text-gray-500 hover:bg-gray-100 dark:hover:bg-dark-700"
+                                title="Add comment"
+                              >
+                                <MessageSquare size={16} />
+                              </button>
+                            </div>
+                          )}
                         </div>
+                        {activeReview.bookingId === booking.id && (
+                          <div className="mt-4 px-4 sm:px-0" onClick={(e) => e.stopPropagation()}>
+                            <textarea
+                              placeholder="Write a short comment (optional)"
+                              value={activeReview.comment}
+                              onChange={(e) => setActiveReview((s) => ({ ...s, comment: e.target.value }))}
+                              className="w-full p-2 rounded-md border border-gray-200 dark:border-dark-700 bg-white dark:bg-dark-800 text-sm"
+                              rows={2}
+                            />
+                            <div className="flex gap-2 mt-2">
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  if (!activeReview.rating) return toast.error('Please provide a rating');
+                                  reviewMutation.mutate({ bookingId: booking.id, rating: activeReview.rating, comment: activeReview.comment });
+                                  setActiveReview({ bookingId: null, rating: 0, comment: '' });
+                                }}
+                                loading={reviewMutation.isLoading}
+                              >
+                                Submit
+                              </Button>
+                              <Button size="sm" variant="outline" onClick={() => setActiveReview({ bookingId: null, rating: 0, comment: '' })}>Cancel</Button>
+                            </div>
+                          </div>
+                        )}
+                        {/* Pending review indicator for completed & paid bookings */}
+                        {booking.status === 'COMPLETED' && booking.paymentStatus === 'PAID' && (!booking.reviews || booking.reviews.length === 0) && (
+                          <div className="flex items-center gap-3 mt-3 sm:mt-0">
+                            <div className="flex items-center">
+                              <StarRating value={0} onChange={() => {}} size={16} />
+                            </div>
+                            <button
+                              title="Pending comment"
+                              className="p-2 rounded-md text-gray-500 hover:bg-gray-100 dark:hover:bg-dark-700"
+                              onClick={(e) => { e.stopPropagation(); navigate(`/worker/bookings/${booking.id}`); }}
+                            >
+                              <MessageSquare size={16} />
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
