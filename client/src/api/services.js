@@ -23,6 +23,9 @@ export const getAllServices = async (filters = {}) => {
   // Add filters to query params if provided
   if (filters.category) params.append('category', filters.category);
   if (filters.search) params.append('search', filters.search);
+  if (filters.minPrice) params.append('minPrice', filters.minPrice);
+  if (filters.maxPrice) params.append('maxPrice', filters.maxPrice);
+  if (filters.minRating) params.append('minRating', filters.minRating);
 
   const queryString = params.toString();
   const url = queryString ? `${SERVICES_ENDPOINTS.BASE}?${queryString}` : SERVICES_ENDPOINTS.BASE;

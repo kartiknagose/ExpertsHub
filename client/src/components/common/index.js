@@ -1,18 +1,29 @@
-// Centralized exports for all common components
-// Import components easily: import { Button, Input, Card } from '@/components/common'
+// Barrel re-exports for all shared components.
+// UI primitives live in ../ui/, domain-aware components live here.
+// Both are re-exported so existing imports from 'components/common' still work.
 
-export { Button } from './Button';
-export { Input } from './Input';
-export { Card, CardHeader, CardTitle, CardDescription, CardFooter } from './Card';
-export { Badge } from './Badge';
-export { Spinner, LoadingOverlay, LoadingButton } from './Spinner';
-export { Modal, ModalFooter } from './Modal';
+// ── UI Primitives (re-exported from ../ui/) ──
+export { Button } from '../ui/Button';
+export { Input } from '../ui/Input';
+export { Textarea } from '../ui/Textarea';
+export { Select } from '../ui/Select';
+export { Card, CardHeader, CardTitle, CardDescription, CardFooter } from '../ui/Card';
+export { Badge } from '../ui/Badge';
+export { Spinner, LoadingOverlay, LoadingButton } from '../ui/Spinner';
+export { Modal, ModalFooter } from '../ui/Modal';
+export { ConfirmDialog } from '../ui/ConfirmDialog';
+export { Skeleton, BookingCardSkeleton, StatGridSkeleton, SkeletonContainer } from '../ui/Skeleton';
+
+// ── Domain-aware shared components ──
+export { BookingStatusBadge, PaymentStatusBadge, VerificationStatusBadge, RoleBadge } from './StatusBadges';
 export { PageHeader } from './PageHeader';
 export { EmptyState } from './EmptyState';
 export { ErrorBoundary } from './ErrorBoundary';
 export { StatCard } from './StatCard';
-export { Skeleton } from './Skeleton';
 export { SimpleBarChart, SimpleDonutChart } from './SimpleChart';
 export { AsyncState } from './AsyncState';
 export { ImageUpload } from './ImageUpload';
+export { Avatar } from './Avatar';
+export { QuickReview } from './QuickReview';
+export { BookingCard } from './BookingCard';
 

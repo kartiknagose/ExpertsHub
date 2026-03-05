@@ -1,4 +1,5 @@
 const prisma = require('../../config/prisma');
+const AppError = require('../../common/errors/AppError');
 
 const timeToMinutes = (time) => {
   const [hours, minutes] = time.split(':').map(Number);
@@ -8,7 +9,7 @@ const timeToMinutes = (time) => {
 const ensureWorkerProfile = async (userId) => {
   const profile = await prisma.workerProfile.findUnique({ where: { userId } });
   if (!profile) {
-    throw new Error('Worker profile not found.');
+    throw new AppError(404, 'Worker profile not found.');
   }
   return profile;
 };
@@ -30,7 +31,7 @@ async function createAvailability(userId, data) {
   const endMinutes = timeToMinutes(endTime);
 
   if (startMinutes >= endMinutes) {
-    throw new Error('Start time must be before end time.');
+    throw new AppError(400, 'Start time must be before end time.');
   }
 
   const existing = await prisma.availability.findMany({
@@ -44,7 +45,7 @@ async function createAvailability(userId, data) {
   });
 
   if (hasOverlap) {
-    throw new Error('Availability overlaps with an existing slot.');
+    throw new AppError(409, 'Availability overlaps with an existing slot.');
   }
 
   return prisma.availability.create({
@@ -62,7 +63,7 @@ async function removeAvailability(userId, availabilityId) {
 
   const slot = await prisma.availability.findUnique({ where: { id: availabilityId } });
   if (!slot || slot.workerId !== profile.id) {
-    throw new Error('Availability slot not found.');
+    throw new AppError(404, 'Availability slot not found.');
   }
 
   await prisma.availability.delete({ where: { id: availabilityId } });

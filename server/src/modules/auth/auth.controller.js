@@ -1,8 +1,8 @@
 const asyncHandler = require('../../common/utils/asyncHandler');
-const prisma = require('../../config/prisma');
-const { registerUser, registerWorker, loginUser, verifyEmailToken, requestPasswordReset, resetPasswordWithToken } = require('./auth.service');
-const { sendVerificationEmail, sendPasswordResetEmail } = require('../../common/utils/mailer');
 const AppError = require('../../common/errors/AppError');
+const prisma = require('../../config/prisma');
+const { registerUser, loginUser, verifyEmailToken, requestPasswordReset, resetPasswordWithToken } = require('./auth.service');
+const { sendVerificationEmail, sendPasswordResetEmail } = require('../../common/utils/mailer');
 
 const COOKIE_OPTIONS = {
   httpOnly: true,
@@ -12,10 +12,10 @@ const COOKIE_OPTIONS = {
 };
 
 exports.register = asyncHandler(async (req, res) => {
-  const { name, email, mobile, password } = req.body;
-  const { user, token, verificationToken } = await registerUser({ name, email, mobile, password });
+  const { name, email, mobile, password, role } = req.body;
+  const { user, verificationToken } = await registerUser({ name, email, mobile, password, role });
   const baseUrl = req.get('origin') || process.env.CORS_ORIGIN || 'http://localhost:5173';
-  const verificationLink = `${baseUrl}/verify-email?token=${verificationToken}`;
+  const verificationLink = `${baseUrl}/verify-email?token=${encodeURIComponent(verificationToken)}`;
   try {
     await sendVerificationEmail({ to: user.email, link: verificationLink });
   } catch (error) {
@@ -25,7 +25,6 @@ exports.register = asyncHandler(async (req, res) => {
     console.error('Message:', error.message);
   }
 
-  // ALWAYS log link in dev for easy testing
   // ALWAYS log link in dev for easy testing
   if (process.env.NODE_ENV === 'development') {
     console.log('DEV ONLY - Manual Verification Link:', verificationLink);
@@ -35,39 +34,6 @@ exports.register = asyncHandler(async (req, res) => {
       console.error('Failed to write verification link to file:', e);
     }
   }
-  // REMOVED: res.cookie('token', token, COOKIE_OPTIONS);
-  // User must verify email before logging in, so we don't set the auth cookie yet.
-  res.status(201).json({
-    user: {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      profilePhotoUrl: user.profilePhotoUrl || null,
-    },
-  });
-});
-
-
-exports.registerWorker = asyncHandler(async (req, res) => {
-  const { name, email, mobile, password } = req.body;
-  const { user, token, verificationToken } = await registerWorker({ name, email, mobile, password });
-  const baseUrl = req.get('origin') || process.env.CORS_ORIGIN || 'http://localhost:5173';
-  const verificationLink = `${baseUrl}/verify-email?token=${verificationToken}`;
-  try {
-    await sendVerificationEmail({ to: user.email, link: verificationLink });
-  } catch (error) {
-    console.error('❌ Verification email failed (SMTP Error):');
-    if (error.response) console.error('Response:', error.response);
-    if (error.code) console.error('Code:', error.code);
-    console.error('Message:', error.message);
-  }
-
-  // ALWAYS log link in dev for easy testing
-  if (process.env.NODE_ENV === 'development') {
-    console.log('DEV ONLY - Manual Verification Link:', verificationLink);
-  }
-  // REMOVED: res.cookie('token', token, COOKIE_OPTIONS);
   // User must verify email before logging in, so we don't set the auth cookie yet.
   res.status(201).json({
     user: {
@@ -121,7 +87,7 @@ exports.me = asyncHandler(async (req, res) => {
   });
 
   if (!user) {
-    return res.status(404).json({ message: 'User not found' });
+    throw new AppError(404, 'User not found');
   }
 
   const userData = {

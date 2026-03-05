@@ -1,22 +1,5 @@
 /**
  * BOOKING ROUTES - API ENDPOINTS
- * 
- * What are routes?
- * Routes define the URLs (endpoints) that clients can call to interact with your API.
- * Think of them like doors in a building - each door leads to a different room (function).
- * 
- * Example:
- * - POST /api/bookings → Create a new booking
- * - GET /api/bookings → Get all my bookings
- * - GET /api/bookings/5 → Get booking with ID 5
- * - PATCH /api/bookings/5/status → Update status of booking 5
- * - PATCH /api/bookings/5/cancel → Cancel booking 5
- * 
- * This file connects:
- * 1. HTTP method (GET, POST, PATCH, DELETE)
- * 2. URL path (/bookings, /bookings/:id)
- * 3. Middleware (authentication, validation)
- * 4. Controller function (what to do when this URL is called)
  */
 
 const express = require('express');
@@ -25,7 +8,7 @@ const router = express.Router();
 // Import middleware
 const authenticate = require('../../middleware/auth');
 const validate = require('../../middleware/validation');
-const { bookingLimiter } = require('../../config/rateLimit');
+const { bookingLimiter, otpLimiter } = require('../../config/rateLimit');
 const { requireCustomer, requireWorker } = require('../../middleware/requireRole');
 
 // Import validation schemas
@@ -41,62 +24,28 @@ const bookingController = require('./booking.controller');
 
 /**
  * ROUTE 1: CREATE A NEW BOOKING
- * 
- * Endpoint: POST /api/bookings
- * Access: Private (must be logged in)
- * 
- * Flow:
- * 1. authenticate middleware checks if user has valid JWT token
- * 2. createBookingSchema validates request body (workerId, serviceId, date, etc.)
- * 3. validate middleware checks for validation errors
- * 4. If all checks pass, bookingController.createBooking runs
- * 
- * Example Request:
- * POST http://localhost:3000/api/bookings
- * Headers: Cookie: token=<JWT_TOKEN>
- * Body: { "workerId": 1, "serviceId": 2, "scheduledDate": "2026-02-15T10:00:00Z", ... }
  */
 router.post(
   '/',
-  authenticate,           // Step 1: Check if user is logged in
-  requireCustomer,        // Step 1.5: Only customers can create bookings
-  bookingLimiter,         // Step 2: Rate limiting (max 20 per hour)
-  createBookingSchema,    // Step 3: Validate request body
-  validate,               // Step 4: Check for validation errors
-  bookingController.createBooking // Step 5: Execute controller function
+  authenticate,
+  requireCustomer,
+  bookingLimiter,
+  createBookingSchema,
+  validate,
+  bookingController.createBooking
 );
 
 /**
  * ROUTE 2: GET ALL MY BOOKINGS
- * 
- * Endpoint: GET /api/bookings
- * Access: Private (must be logged in)
- * 
- * Flow:
- * 1. authenticate middleware checks JWT token
- * 2. If valid, bookingController.getMyBookings runs
- * 
- * Behavior:
- * - Customers see bookings they created
- * - Workers see bookings assigned to them
- * - Admins see ALL bookings
- * 
- * Example Request:
- * GET http://localhost:3000/api/bookings
- * Headers: Cookie: token=<JWT_TOKEN>
  */
 router.get(
   '/',
-  authenticate,                   // Step 1: Check if user is logged in
-  bookingController.getMyBookings // Step 2: Execute controller function
+  authenticate,
+  bookingController.getMyBookings
 );
 
 /**
  * ROUTE 3: GET OPEN BOOKINGS (JOB BOARD)
- * 
- * Endpoint: GET /api/bookings/open
- * Access: Private (WORKER only)
- * NOTE: This must be defined BEFORE /:id routes to avoid conflict
  */
 router.get(
   '/open',
@@ -106,77 +55,37 @@ router.get(
 
 /**
  * ROUTE 4: GET A SINGLE BOOKING BY ID
- * 
- * Endpoint: GET /api/bookings/:id
- * Access: Private (must be logged in and involved in the booking)
- * 
- * URL Parameter:
- * - :id is a placeholder for the booking ID
- * - Example: GET /api/bookings/5 → fetch booking with ID = 5
- * 
- * Example Request:
- * GET http://localhost:3000/api/bookings/5
- * Headers: Cookie: token=<JWT_TOKEN>
  */
 router.get(
   '/:id',
-  authenticate,                      // Step 1: Check if user is logged in
-  bookingController.getBookingById   // Step 2: Execute controller function
+  authenticate,
+  bookingController.getBookingById
 );
 
 /**
- * ROUTE 4: UPDATE BOOKING STATUS
- * 
- * Endpoint: PATCH /api/bookings/:id/status
- * Access: Private (must be the assigned worker or admin)
- * 
- * Use Case:
- * - Worker accepts booking: { "status": "CONFIRMED" }
- * - Worker starts job: { "status": "IN_PROGRESS" }
- * - Worker completes job: { "status": "COMPLETED" }
- * 
- * Example Request:
- * PATCH http://localhost:3000/api/bookings/5/status
- * Headers: Cookie: token=<JWT_TOKEN>
- * Body: { "status": "CONFIRMED" }
+ * ROUTE 5: UPDATE BOOKING STATUS
  */
 router.patch(
   '/:id/status',
-  authenticate,                         // Step 1: Check if user is logged in
-  updateBookingStatusSchema,            // Step 2: Validate status value
-  validate,                             // Step 3: Check for validation errors
-  bookingController.updateBookingStatus // Step 4: Execute controller function
+  authenticate,
+  updateBookingStatusSchema,
+  validate,
+  bookingController.updateBookingStatus
 );
 
 /**
- * ROUTE 5: CANCEL A BOOKING
- * 
- * Endpoint: PATCH /api/bookings/:id/cancel
- * Access: Private (must be customer, worker, or admin)
- * 
- * Use Case:
- * - Customer cancels before service starts
- * - Worker cancels if they can't complete the job
- * - Admin cancels for management reasons
- * 
- * Example Request:
- * PATCH http://localhost:3000/api/bookings/5/cancel
- * Headers: Cookie: token=<JWT_TOKEN>
- * Body: { "cancellationReason": "Emergency came up" }
+ * ROUTE 6: CANCEL A BOOKING
  */
 router.patch(
   '/:id/cancel',
-  authenticate,                      // Step 1: Check if user is logged in
-  cancelBookingSchema,               // Step 2: Validate cancellation reason (if provided)
-  validate,                          // Step 3: Check for validation errors
-  bookingController.cancelBooking    // Step 4: Execute controller function
+  authenticate,
+  cancelBookingSchema,
+  validate,
+  bookingController.cancelBooking
 );
 
 /**
- * ROUTE 6: PAY FOR A BOOKING
- * 
- * Endpoint: POST /api/bookings/:id/pay
- * Access: Private (CUSTOMER only)
+ * ROUTE 7: PAY FOR A BOOKING
  */
 router.post(
   '/:id/pay',
@@ -187,13 +96,8 @@ router.post(
   bookingController.payBooking
 );
 
-
-
 /**
- * ROUTE 7: ACCEPT AN OPEN BOOKING
- * 
- * Endpoint: POST /api/bookings/:id/accept
- * Access: Private (WORKER only)
+ * ROUTE 8: ACCEPT AN OPEN BOOKING
  */
 router.post(
   '/:id/accept',
@@ -203,30 +107,98 @@ router.post(
 );
 
 /**
- * ROUTE 8: VERIFY START OTP
- * 
- * Endpoint: POST /api/bookings/:id/start
- * Access: Private (WORKER only)
+ * ROUTE 9: VERIFY START OTP
  */
 router.post(
   '/:id/start',
   authenticate,
   requireWorker,
+  otpLimiter,
   bookingController.verifyBookingStart
 );
 
 /**
- * ROUTE 9: VERIFY COMPLETION OTP
- * 
- * Endpoint: POST /api/bookings/:id/complete
- * Access: Private (WORKER only)
+ * ROUTE 10: VERIFY COMPLETION OTP
  */
 router.post(
   '/:id/complete',
   authenticate,
   requireWorker,
+  otpLimiter,
   bookingController.verifyBookingCompletion
 );
 
-// Export the router so index.js can mount it at /api/bookings
+// ─── SESSION MANAGEMENT ROUTES (Phase 7) ───────────────────────────
+
+/**
+ * ROUTE 11: GET SESSIONS FOR A BOOKING
+ */
+router.get(
+  '/:id/sessions',
+  authenticate,
+  bookingController.getBookingSessions
+);
+
+/**
+ * ROUTE 12: CREATE A NEW SESSION (schedule next visit)
+ */
+router.post(
+  '/:id/sessions',
+  authenticate,
+  requireWorker,
+  bookingController.createSession
+);
+
+/**
+ * ROUTE 13: START A SESSION (verify session OTP)
+ */
+router.post(
+  '/:id/sessions/:sessionId/start',
+  authenticate,
+  requireWorker,
+  otpLimiter,
+  bookingController.startSession
+);
+
+/**
+ * ROUTE 14: END A SESSION
+ */
+router.post(
+  '/:id/sessions/:sessionId/end',
+  authenticate,
+  requireWorker,
+  bookingController.endSession
+);
+
+// ─── RESCHEDULING ROUTE (Phase 7) ──────────────────────────────────
+
+/**
+ * ROUTE 15: RESCHEDULE A BOOKING
+ */
+router.patch(
+  '/:id/reschedule',
+  authenticate,
+  bookingController.rescheduleBooking
+);
+
+// ─── STATUS HISTORY ROUTE (Phase 7) ────────────────────────────────
+
+/**
+ * ROUTE 16: GET BOOKING STATUS HISTORY
+ */
+router.get(
+  '/:id/history',
+  authenticate,
+  bookingController.getBookingStatusHistory
+);
+
+/**
+ * ROUTE 17: GET CANCELLATION POLICY FOR BOOKING
+ */
+router.get(
+  '/:id/cancellation-policy',
+  authenticate,
+  bookingController.getCancellationPolicy
+);
+
 module.exports = router;

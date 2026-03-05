@@ -48,8 +48,15 @@ axiosInstance.interceptors.response.use(
         localStorage.removeItem('user');
 
         // Only redirect to login if not on public routes
-        const publicPaths = ['/', '/login', '/register', '/register-worker', '/services'];
-        const isPublicPath = publicPaths.some((path) => window.location.pathname.startsWith(path));
+        const publicPaths = [
+          '/', '/login', '/register', '/forgot-password', '/reset-password',
+          '/verify-email', '/services', '/system-status', '/about', '/contact',
+          '/how-it-works', '/pricing', '/security', '/faq', '/privacy',
+          '/terms', '/cookies', '/blog', '/careers',
+        ];
+        const isPublicPath = publicPaths.some((path) =>
+          window.location.pathname === '/' ? path === '/' : window.location.pathname.startsWith(path)
+        );
 
         if (hadUser && !isPublicPath) {
           // Dispatch a custom event so AuthContext can handle navigation

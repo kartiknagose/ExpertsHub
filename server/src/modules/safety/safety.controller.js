@@ -1,4 +1,7 @@
 const asyncHandler = require('../../common/utils/asyncHandler');
+const parseId = require('../../common/utils/parseId');
+const parsePagination = require('../../common/utils/parsePagination');
+const AppError = require('../../common/errors/AppError');
 const safetyService = require('./safety.service');
 
 const triggerSOS = asyncHandler(async (req, res) => {
@@ -6,12 +9,10 @@ const triggerSOS = asyncHandler(async (req, res) => {
     const userId = req.user.id;
 
     if (!bookingId) {
-        res.status(400);
-        throw new Error('Booking ID is required to trigger SOS.');
+        throw new AppError(400, 'Booking ID is required to trigger SOS.');
     }
 
     const result = await safetyService.triggerSOS(userId, parseInt(bookingId), location);
-
     res.status(201).json(result);
 });
 
@@ -29,14 +30,42 @@ const addContact = asyncHandler(async (req, res) => {
 
 const deleteContact = asyncHandler(async (req, res) => {
     const userId = req.user.id;
-    const contactId = parseInt(req.params.id);
+    const contactId = parseId(req.params.id, 'Contact ID');
     await safetyService.deleteEmergencyContact(userId, contactId);
     res.status(200).json({ message: 'Emergency contact removed' });
+});
+
+// Admin: Get all active SOS alerts
+const getActiveSosAlerts = asyncHandler(async (req, res) => {
+    const { page, limit, skip } = parsePagination(req.query);
+    const { data: alerts, total } = await safetyService.getActiveSosAlerts({ skip, limit });
+    res.status(200).json({ alerts, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } });
+});
+
+// Admin: Acknowledge or resolve an SOS alert
+const updateSosAlertStatus = asyncHandler(async (req, res) => {
+    const alertId = parseId(req.params.id, 'Alert ID');
+    const { status } = req.body; // 'ACKNOWLEDGED' or 'RESOLVED'
+    if (!['ACKNOWLEDGED', 'RESOLVED'].includes(status)) {
+        throw new AppError(400, 'Status must be ACKNOWLEDGED or RESOLVED.');
+    }
+    const alert = await safetyService.updateSosAlertStatus(alertId, status);
+    res.status(200).json({ alert });
+});
+
+// User: Get their current active booking (for global SOS button)
+const getActiveBooking = asyncHandler(async (req, res) => {
+    const userId = req.user.id;
+    const booking = await safetyService.getActiveBookingForUser(userId);
+    res.status(200).json({ booking });
 });
 
 module.exports = {
     triggerSOS,
     getContacts,
     addContact,
-    deleteContact
+    deleteContact,
+    getActiveSosAlerts,
+    updateSosAlertStatus,
+    getActiveBooking,
 };

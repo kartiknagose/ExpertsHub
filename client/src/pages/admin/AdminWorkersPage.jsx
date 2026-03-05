@@ -1,22 +1,36 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Star, Search } from 'lucide-react';
 import { MainLayout } from '../../components/layout/MainLayout';
-import { Card, CardHeader, CardTitle, CardDescription } from '../../components/common';
-import { Badge, AsyncState } from '../../components/common';
-import { useTheme } from '../../context/ThemeContext';
+import { Card, CardHeader, CardTitle, CardDescription, Input } from '../../components/common';
+import { Badge, AsyncState, PageHeader } from '../../components/common';
 import { getAdminWorkers } from '../../api/admin';
+import { getPageLayout } from '../../constants/layout';
+import { queryKeys } from '../../utils/queryKeys';
+import { useSocketEvent } from '../../hooks/useSocket';
 
 export function AdminWorkersPage() {
-  const { isDark } = useTheme();
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
 
   const { data, isLoading, isError, error, refetch } = useQuery({
-    queryKey: ['admin-workers'],
+    queryKey: queryKeys.admin.workers(),
     queryFn: getAdminWorkers,
   });
 
   const workers = data?.workers || [];
+
+  const refreshWorkers = () => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.workers() });
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.dashboard() });
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.verificationPreview() });
+    queryClient.invalidateQueries({ queryKey: queryKeys.verification.applications() });
+  };
+
+  useSocketEvent('verification:created', refreshWorkers);
+  useSocketEvent('verification:updated', refreshWorkers);
+  useSocketEvent('admin:workers_updated', refreshWorkers);
+  useSocketEvent('admin:users_updated', refreshWorkers);
 
   const filteredWorkers = workers.filter(worker =>
     (worker.user?.name && worker.user.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -25,26 +39,18 @@ export function AdminWorkersPage() {
 
   return (
     <MainLayout>
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        <div className="mb-8">
-          <h1 className={`text-4xl font-bold ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
-            Workers
-          </h1>
-          <p className={isDark ? 'text-gray-400 mt-2' : 'text-gray-600 mt-2'}>
-            Review worker profiles and services.
-          </p>
-        </div>
+      <div className={getPageLayout('default')}>
+        <PageHeader
+          title="Workers"
+          subtitle="Review worker profiles and services."
+        />
 
-        <div className="mb-6 relative max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-          <input
-            type="text"
+        <div className="mb-6 max-w-md">
+          <Input
+            icon={Search}
             placeholder="Search by name or email..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className={`w-full pl-10 pr-4 py-2.5 rounded-lg border outline-none transition-colors ${isDark
-              ? 'bg-dark-900 border-dark-700 text-white focus:border-brand-500'
-              : 'bg-white border-gray-200 text-gray-900 focus:border-brand-500'}`}
           />
         </div>
 
@@ -72,13 +78,13 @@ export function AdminWorkersPage() {
               <Card key={worker.id} className="p-6">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
-                    <p className={isDark ? 'text-gray-100 font-semibold' : 'text-gray-900 font-semibold'}>
+                    <p className="text-gray-900 dark:text-gray-100 font-semibold">
                       {worker.user?.name || 'Worker'}
                     </p>
-                    <p className={isDark ? 'text-gray-400 text-sm' : 'text-gray-600 text-sm'}>
+                    <p className="text-gray-600 dark:text-gray-400 text-sm">
                       {worker.user?.email || 'No email'}
                     </p>
-                    <p className={isDark ? 'text-gray-400 text-sm' : 'text-gray-600 text-sm'}>
+                    <p className="text-gray-600 dark:text-gray-400 text-sm">
                       {worker.bio || 'No bio yet'}
                     </p>
                   </div>

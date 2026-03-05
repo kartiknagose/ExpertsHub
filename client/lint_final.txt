@@ -1,9 +1,0 @@
-﻿
-D:\Pini-Mroject\UrbanPro V2\client\src\pages\customer\CustomerDashboardPage.jsx
-  47:37  error    'error' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                                                                                                            no-unused-vars
-  58:9   warning  The 'bookings' logical expression could make the dependencies of useMemo Hook (at line 63) change on every render. To fix this, wrap the initialization of 'bookings' in its own useMemo() Hook  react-hooks/exhaustive-deps
-  58:9   warning  The 'bookings' logical expression could make the dependencies of useMemo Hook (at line 74) change on every render. To fix this, wrap the initialization of 'bookings' in its own useMemo() Hook  react-hooks/exhaustive-deps
-  58:9   warning  The 'bookings' logical expression could make the dependencies of useMemo Hook (at line 80) change on every render. To fix this, wrap the initialization of 'bookings' in its own useMemo() Hook  react-hooks/exhaustive-deps
-
-Γ£û 4 problems (1 error, 3 warnings)
-

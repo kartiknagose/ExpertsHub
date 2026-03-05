@@ -6,6 +6,8 @@ import { AuthProvider } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext';
 import App from './App.jsx';
 import './index.css';
+import 'leaflet/dist/leaflet.css';
+import './utils/leafletSetup';
 
 /**
  * React Query Client Setup

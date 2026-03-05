@@ -60,25 +60,49 @@ const bookingPhotoStorage = multer.diskStorage({
   },
 });
 
-// Only allow image uploads (accept any image/* mime type)
+// ─── SECURITY: Safe image extensions whitelist ───
+// SVG files can contain <script> tags and JS event handlers.
+// Since uploads are served as static files, a malicious SVG would execute
+// JavaScript in any visitor's browser (Stored XSS). We reject SVGs AND
+// validate by extension (MIME types can be spoofed by the client).
+const SAFE_IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff']);
+
+// Only allow safe raster image uploads (NO SVG)
 const imageFileFilter = (_req, file, cb) => {
-  if (file.mimetype && file.mimetype.startsWith('image/')) {
-    cb(null, true);
-    return;
+  const ext = path.extname(file.originalname).toLowerCase();
+
+  // Check 1: MIME type must be image/* but NOT svg
+  if (!file.mimetype || !file.mimetype.startsWith('image/') || file.mimetype.includes('svg')) {
+    return cb(new Error('Only image files (JPG, PNG, GIF, WebP) are allowed. SVG is not permitted.'), false);
   }
-  cb(new Error('Only image files are allowed'), false);
+
+  // Check 2: Extension must be in the safe whitelist
+  if (!SAFE_IMAGE_EXTENSIONS.has(ext)) {
+    return cb(new Error(`File extension "${ext}" is not allowed. Use JPG, PNG, GIF, or WebP.`), false);
+  }
+
+  cb(null, true);
 };
 
-// Allow image and PDF uploads
+// Allow safe images and PDF uploads (NO SVG)
 const docFileFilter = (_req, file, cb) => {
-  if (
-    file.mimetype &&
-    (file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf')
-  ) {
-    cb(null, true);
-    return;
+  const ext = path.extname(file.originalname).toLowerCase();
+
+  // PDFs are allowed for verification documents
+  if (file.mimetype === 'application/pdf' && ext === '.pdf') {
+    return cb(null, true);
   }
-  cb(new Error('Only image and PDF files are allowed'), false);
+
+  // Same safe image check as above
+  if (!file.mimetype || !file.mimetype.startsWith('image/') || file.mimetype.includes('svg')) {
+    return cb(new Error('Only image files (JPG, PNG, GIF, WebP) or PDF are allowed. SVG is not permitted.'), false);
+  }
+
+  if (!SAFE_IMAGE_EXTENSIONS.has(ext)) {
+    return cb(new Error(`File extension "${ext}" is not allowed. Use JPG, PNG, GIF, WebP, or PDF.`), false);
+  }
+
+  cb(null, true);
 };
 
 const uploadProfile = multer({

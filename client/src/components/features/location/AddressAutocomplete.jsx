@@ -1,0 +1,204 @@
+import { useState, useEffect, useRef } from 'react';
+import { Search, MapPin, Loader2, X } from 'lucide-react';
+import axios from 'axios';
+
+/**
+ * AddressAutocomplete
+ * 
+ * A search input that provides address suggestions using OpenStreetMap Nominatim.
+ * Returns the selected address string and its coordinates (lat, lng).
+ */
+export function AddressAutocomplete({ value, onChange, placeholder = "Search for your address...", className = "" }) {
+    const [query, setQuery] = useState(value || '');
+    const [suggestions, setSuggestions] = useState([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [showDropdown, setShowDropdown] = useState(false);
+    const dropdownRef = useRef(null);
+    const abortControllerRef = useRef(null);
+    const debounceTimeoutRef = useRef(null);
+
+    useEffect(() => {
+        setQuery(value || '');
+    }, [value]);
+
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+                setShowDropdown(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    useEffect(() => {
+        return () => {
+            if (debounceTimeoutRef.current) {
+                clearTimeout(debounceTimeoutRef.current);
+            }
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+            }
+        };
+    }, []);
+
+    const fetchSuggestions = async (searchQuery) => {
+        if (searchQuery.length < 3) {
+            setSuggestions([]);
+            return;
+        }
+
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+        }
+
+        abortControllerRef.current = new AbortController();
+        setIsLoading(true);
+
+        try {
+            const response = await axios.get(
+                `https://nominatim.openstreetmap.org/search`,
+                {
+                    params: {
+                        q: searchQuery,
+                        format: 'json',
+                        addressdetails: 1,
+                        limit: 5,
+                        countrycodes: 'in' // Target India for this app
+                    },
+                    signal: abortControllerRef.current.signal
+                }
+            );
+
+            const mapped = response.data.map(item => ({
+                display_name: item.display_name,
+                lat: parseFloat(item.lat),
+                lon: parseFloat(item.lon),
+                address: item.address
+            }));
+
+            setSuggestions(mapped);
+            setShowDropdown(true);
+        } catch (err) {
+            if (!axios.isCancel(err) && err.name !== 'CanceledError' && err.code !== 'ERR_CANCELED') {
+                console.error('Autocomplete error:', err);
+                setSuggestions([]);
+            }
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleInputChange = (e) => {
+        const val = e.target.value;
+        setQuery(val);
+    };
+
+    useEffect(() => {
+        if (debounceTimeoutRef.current) {
+            clearTimeout(debounceTimeoutRef.current);
+        }
+
+        if (query.length < 3) {
+            setSuggestions([]);
+            setShowDropdown(false);
+            return;
+        }
+
+        debounceTimeoutRef.current = setTimeout(() => {
+            fetchSuggestions(query);
+        }, 400);
+
+        return () => {
+            if (debounceTimeoutRef.current) {
+                clearTimeout(debounceTimeoutRef.current);
+            }
+        };
+    }, [query]);
+
+    const handleSelect = (item) => {
+        setQuery(item.display_name);
+        setShowDropdown(false);
+        onChange({
+            address: item.display_name,
+            lat: item.lat,
+            lng: item.lon,
+            details: item.address
+        });
+    };
+
+    const clearInput = () => {
+        setQuery('');
+        setSuggestions([]);
+        setShowDropdown(false);
+        onChange({ address: '', lat: null, lng: null });
+    };
+
+    return (
+        <div className={`relative ${className}`} ref={dropdownRef}>
+            <div className="relative group">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    {isLoading ? (
+                        <Loader2 className="text-brand-500 animate-spin" size={20} />
+                    ) : (
+                        <Search className="text-gray-400 group-focus-within:text-brand-500 transition-colors" size={20} />
+                    )}
+                </div>
+                <input
+                    type="text"
+                    value={query}
+                    onChange={handleInputChange}
+                    onFocus={() => query.length >= 3 && setShowDropdown(true)}
+                    placeholder={placeholder}
+                    className="w-full pl-12 pr-10 py-3.5 rounded-xl border text-base outline-none transition-all shadow-sm
+                            bg-gray-50 dark:bg-dark-900 border-gray-200 dark:border-dark-600 text-gray-900 dark:text-white focus:bg-white dark:focus:bg-dark-900 focus:border-brand-500 focus:ring-1 focus:ring-brand-500
+                        "
+                />
+                {query && (
+                    <button
+                        type="button"
+                        onClick={clearInput}
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+                    >
+                        <X size={18} />
+                    </button>
+                )}
+            </div>
+
+            {showDropdown && suggestions.length > 0 && (
+                <div
+                    className="absolute z-[100] mt-2 w-full rounded-2xl border shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 bg-white dark:bg-dark-800 border-gray-100 dark:border-dark-700
+                        "
+                >
+                    <div className="max-h-64 overflow-y-auto">
+                        {suggestions.map((item, index) => (
+                            <button
+                                key={index}
+                                type="button"
+                                onClick={() => handleSelect(item)}
+                                className={`w-full px-4 py-3 flex items-start gap-3 transition-colors text-left
+                                        hover:bg-gray-50 dark:hover:bg-dark-700
+                                    ${index !== suggestions.length - 1 ? 'border-b border-gray-50 dark:border-dark-700' : ''}`}
+                            >
+                                <div className="mt-0.5 p-1.5 rounded-lg bg-brand-50 dark:bg-dark-900">
+                                    <MapPin size={16} className="text-brand-500" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-semibold truncate text-gray-900 dark:text-gray-100">
+                                        {item.display_name.split(',')[0]}
+                                    </p>
+                                    <p className="text-xs truncate text-gray-500 dark:text-gray-400">
+                                        {item.display_name.split(',').slice(1).join(',').trim()}
+                                    </p>
+                                </div>
+                            </button>
+                        ))}
+                    </div>
+                    <div className="px-4 py-2 border-t text-[10px] text-gray-400 text-right bg-gray-50 dark:bg-dark-900/50 border-gray-100 dark:border-dark-700">
+                        Data by OpenStreetMap
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}

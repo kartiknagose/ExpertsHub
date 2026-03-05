@@ -1,9 +1,8 @@
 // Standard async state wrapper for loading, error, and empty states
 
-import { useTheme } from '../../context/ThemeContext';
-import { Card } from './Card';
-import { Spinner } from './Spinner';
-import { Button } from './Button';
+import { Card } from '../ui/Card';
+import { Spinner } from '../ui/Spinner';
+import { Button } from '../ui/Button';
 import { EmptyState } from './EmptyState';
 
 export function AsyncState({
@@ -21,8 +20,6 @@ export function AsyncState({
   emptyFallback,
   children,
 }) {
-  const { isDark } = useTheme();
-
   if (isLoading) {
     return loadingFallback || (
       <div className="flex items-center justify-center py-16">
@@ -66,7 +63,7 @@ export function AsyncState({
 
   if (!children) {
     return (
-      <p className={isDark ? 'text-gray-300' : 'text-gray-600'}>
+      <p className="text-gray-600 dark:text-gray-300">
         No content available.
       </p>
     );

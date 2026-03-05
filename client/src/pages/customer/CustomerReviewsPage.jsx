@@ -2,20 +2,22 @@
 // Customers can review workers for completed bookings
 
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Star, MessageSquare, Send, CheckCircle2, Sparkles } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion as Motion } from 'framer-motion';
 import { MainLayout } from '../../components/layout/MainLayout';
 import { Card, CardHeader, CardTitle, CardDescription, PageHeader } from '../../components/common';
 import { Badge, Button, AsyncState } from '../../components/common';
-import { useTheme } from '../../context/ThemeContext';
 import { createReview, getMyReviews, getPendingReviews } from '../../api/reviews';
 import { queryKeys } from '../../utils/queryKeys';
-import { StarRating, getRatingLabel } from '../../components/features/reviews/StarRating';
+import { StarRating } from '../../components/features/reviews/StarRating';
+import { getRatingLabel } from '../../utils/rating';
+import { getPageLayout } from '../../constants/layout';
 
 
 export function CustomerReviewsPage() {
-  const { isDark } = useTheme();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [drafts, setDrafts] = useState({});
   const [submitted, setSubmitted] = useState({});
@@ -38,7 +40,7 @@ export function CustomerReviewsPage() {
         queryClient.invalidateQueries({ queryKey: queryKeys.reviews.customerPending() });
         queryClient.invalidateQueries({ queryKey: queryKeys.reviews.customerWritten() });
         queryClient.invalidateQueries({ queryKey: queryKeys.bookings.customer() });
-        queryClient.invalidateQueries({ queryKey: ['profile'] });
+        queryClient.invalidateQueries({ queryKey: queryKeys.profile.current() });
       }, 1500);
     },
   });
@@ -72,7 +74,7 @@ export function CustomerReviewsPage() {
 
   return (
     <MainLayout>
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      <div className={getPageLayout('narrow')}>
         <PageHeader
           title="Reviews"
           subtitle="Share your experience to help the community make better choices."
@@ -89,7 +91,7 @@ export function CustomerReviewsPage() {
             <section>
               <div className="flex items-center gap-2 mb-5">
                 <Sparkles size={20} className="text-yellow-500" />
-                <h2 className={`text-xl font-bold ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
                   Pending Reviews ({pendingBookings.length})
                 </h2>
               </div>
@@ -97,7 +99,7 @@ export function CustomerReviewsPage() {
               {pendingBookings.length === 0 && (
                 <Card className="p-8 text-center">
                   <CheckCircle2 size={40} className="mx-auto text-green-500 mb-3" />
-                  <p className={isDark ? 'text-gray-300' : 'text-gray-600'}>
+                  <p className="text-gray-600 dark:text-gray-300">
                     All caught up! No bookings waiting for your review.
                   </p>
                 </Card>
@@ -109,7 +111,7 @@ export function CustomerReviewsPage() {
                   const isSubmitted = submitted[booking.id];
 
                   return (
-                    <motion.div
+                    <Motion.div
                       key={booking.id}
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -120,18 +122,15 @@ export function CustomerReviewsPage() {
                       <Card className={`overflow-hidden transition-all duration-300 ${isSubmitted ? 'ring-2 ring-green-500/50' : ''
                         }`}>
                         {/* Header Strip */}
-                        <div className={`px-6 py-3 flex items-center justify-between ${isDark
-                          ? 'bg-gradient-to-r from-brand-900/40 to-transparent border-b border-dark-600'
-                          : 'bg-gradient-to-r from-brand-50 to-transparent border-b border-gray-100'
-                          }`}>
+                        <div className="px-6 py-3 flex items-center justify-between bg-gradient-to-r from-brand-50 to-transparent border-b border-gray-100 dark:from-brand-900/40 dark:border-dark-600">
                           <div>
                             <p
-                              className={`font-black uppercase text-sm cursor-pointer hover:text-brand-500 transition-colors ${isDark ? 'text-gray-100' : 'text-gray-900'}`}
+                              className="font-black uppercase text-sm cursor-pointer hover:text-brand-500 transition-colors text-gray-900 dark:text-gray-100"
                               onClick={() => navigate(`/bookings/${booking.id}`)}
                             >
                               {booking.service?.name || `Service #${booking.serviceId}`}
                             </p>
-                            <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">
                               Worker: {booking.workerProfile?.user?.name || 'Worker'} · {new Date(booking.scheduledAt).toLocaleDateString()}
                             </p>
                           </div>
@@ -139,24 +138,24 @@ export function CustomerReviewsPage() {
                         </div>
 
                         {isSubmitted ? (
-                          <motion.div
+                          <Motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             className="p-8 text-center"
                           >
                             <CheckCircle2 size={48} className="mx-auto text-green-500 mb-3" />
-                            <p className={`font-semibold text-lg ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
+                            <p className="font-semibold text-lg text-gray-900 dark:text-gray-100">
                               Thank you for your review!
                             </p>
-                            <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">
                               Your feedback helps workers improve their service.
                             </p>
-                          </motion.div>
+                          </Motion.div>
                         ) : (
                           <div className="p-6 space-y-5">
                             {/* Star Rating */}
                             <div>
-                              <label className={`block text-sm font-medium mb-3 ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>
+                              <label className="block text-sm font-medium mb-3 text-gray-700 dark:text-gray-200">
                                 How was the service?
                               </label>
                               <div className="flex items-center gap-4">
@@ -175,7 +174,7 @@ export function CustomerReviewsPage() {
 
                             {/* Comment */}
                             <div>
-                              <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>
+                              <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-200">
                                 Share your experience (optional)
                               </label>
                               <textarea
@@ -183,10 +182,7 @@ export function CustomerReviewsPage() {
                                 value={draft.comment}
                                 onChange={(e) => updateDraft(booking.id, 'comment', e.target.value)}
                                 placeholder="What went well? Any suggestions for improvement?"
-                                className={`w-full px-4 py-3 rounded-xl border transition-all duration-200 focus:outline-none focus:ring-2 resize-none ${isDark
-                                  ? 'bg-dark-800 border-dark-600 text-gray-100 placeholder-gray-500 focus:border-brand-500 focus:ring-brand-500/30'
-                                  : 'bg-white border-gray-200 text-gray-900 placeholder-gray-400 focus:border-brand-500 focus:ring-brand-500/30'
-                                  }`}
+                                className="w-full px-4 py-3 rounded-xl border transition-all duration-200 focus:outline-none focus:ring-2 resize-none bg-white border-gray-200 text-gray-900 placeholder-gray-400 focus:border-brand-500 focus:ring-brand-500/30 dark:bg-dark-800 dark:border-dark-600 dark:text-gray-100 dark:placeholder-gray-500"
                               />
                             </div>
 
@@ -208,7 +204,7 @@ export function CustomerReviewsPage() {
                           </div>
                         )}
                       </Card>
-                    </motion.div>
+                    </Motion.div>
                   );
                 })}
               </AnimatePresence>
@@ -218,14 +214,14 @@ export function CustomerReviewsPage() {
             <section>
               <div className="flex items-center gap-2 mb-5">
                 <MessageSquare size={20} className="text-brand-500" />
-                <h2 className={`text-xl font-bold ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
                   Your Past Reviews ({reviews.length})
                 </h2>
               </div>
 
               {reviews.length === 0 && (
                 <Card className="p-6">
-                  <p className={isDark ? 'text-gray-300' : 'text-gray-600'}>
+                  <p className="text-gray-600 dark:text-gray-300">
                     You haven't submitted any reviews yet.
                   </p>
                 </Card>
@@ -233,7 +229,7 @@ export function CustomerReviewsPage() {
 
               <div className="space-y-4">
                 {reviews.map((review) => (
-                  <motion.div
+                  <Motion.div
                     key={review.id}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
@@ -242,10 +238,10 @@ export function CustomerReviewsPage() {
                       <div className="p-5">
                         <div className="flex items-start justify-between gap-3 mb-3">
                           <div>
-                            <p className={`font-semibold ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
+                            <p className="font-semibold text-gray-900 dark:text-gray-100">
                               {review.booking?.service?.name || 'Service'}
                             </p>
-                            <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">
                               To: {review.reviewee?.name || 'Worker'} · {new Date(review.createdAt).toLocaleDateString()}
                             </p>
                           </div>
@@ -261,13 +257,13 @@ export function CustomerReviewsPage() {
                         </div>
 
                         {review.comment && (
-                          <p className={`text-sm leading-relaxed ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
+                          <p className="text-sm leading-relaxed text-gray-600 dark:text-gray-300">
                             "{review.comment}"
                           </p>
                         )}
                       </div>
                     </Card>
-                  </motion.div>
+                  </Motion.div>
                 ))}
               </div>
             </section>

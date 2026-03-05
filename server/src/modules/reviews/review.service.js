@@ -6,6 +6,7 @@
  */
 
 const prisma = require('../../config/prisma');
+const AppError = require('../../common/errors/AppError');
 
 /**
  * CREATE A REVIEW (Two-Way)
@@ -26,11 +27,11 @@ async function createReview(userId, userRole, data) {
   });
 
   if (!booking) {
-    throw new Error('Booking not found.');
+    throw new AppError(404, 'Booking not found.');
   }
 
   if (booking.status !== 'COMPLETED') {
-    throw new Error('You can only review completed bookings.');
+    throw new AppError(400, 'You can only review completed bookings.');
   }
 
   // 2. Determine reviewer and reviewee
@@ -42,7 +43,7 @@ async function createReview(userId, userRole, data) {
     reviewerId = userId;
     revieweeId = booking.workerProfile?.userId;
     if (!revieweeId) {
-      throw new Error('Worker profile not found for this booking.');
+      throw new AppError(404, 'Worker profile not found for this booking.');
     }
   } else if (userRole === 'WORKER') {
     // Worker reviewing the customer
@@ -50,12 +51,12 @@ async function createReview(userId, userRole, data) {
       where: { userId },
     });
     if (!workerProfile || booking.workerProfileId !== workerProfile.id) {
-      throw new Error('You are not assigned to this booking.');
+      throw new AppError(403, 'You are not assigned to this booking.');
     }
     reviewerId = userId;
     revieweeId = booking.customerId;
   } else {
-    throw new Error('You are not involved in this booking.');
+    throw new AppError(403, 'You are not involved in this booking.');
   }
 
   // 3. Check if this user already reviewed this booking
@@ -69,56 +70,61 @@ async function createReview(userId, userRole, data) {
   });
 
   if (existingReview) {
-    throw new Error('You have already reviewed this booking.');
+    throw new AppError(409, 'You have already reviewed this booking.');
   }
 
-  // 4. Create the review
-  const review = await prisma.review.create({
-    data: {
-      bookingId,
-      reviewerId,
-      revieweeId,
-      rating,
-      comment,
-    },
-    include: {
-      booking: {
-        include: { service: { select: { id: true, name: true, category: true } } },
+  // 4-7. Create review + recalculate rating in a transaction for atomicity
+  const review = await prisma.$transaction(async (tx) => {
+    // 4. Create the review
+    const newReview = await tx.review.create({
+      data: {
+        bookingId,
+        reviewerId,
+        revieweeId,
+        rating,
+        comment,
       },
-      reviewer: { select: { id: true, name: true, email: true } },
-      reviewee: { select: { id: true, name: true, email: true } },
-    },
-  });
+      include: {
+        booking: {
+          include: { service: { select: { id: true, name: true, category: true } } },
+        },
+        reviewer: { select: { id: true, name: true, email: true } },
+        reviewee: { select: { id: true, name: true, email: true } },
+      },
+    });
 
-  // 5. Update aggregate rating for the reviewee (can be Customer or Worker)
-  const aggregate = await prisma.review.aggregate({
-    where: { revieweeId },
-    _avg: { rating: true },
-    _count: { rating: true },
-  });
+    // 5. Update aggregate rating for the reviewee (can be Customer or Worker)
+    const aggregate = await tx.review.aggregate({
+      where: { revieweeId },
+      _avg: { rating: true },
+      _count: { rating: true },
+    });
 
-  await prisma.user.update({
-    where: { id: revieweeId },
-    data: {
-      rating: aggregate._avg.rating || 0,
-      totalReviews: aggregate._count.rating || 0,
-    },
-  });
-
-  // 6. If reviewee is a worker, also sync to WorkerProfile for legacy compatibility/charts
-  const revieweeWorkerProfile = await prisma.workerProfile.findUnique({
-    where: { userId: revieweeId },
-  });
-
-  if (revieweeWorkerProfile) {
-    await prisma.workerProfile.update({
-      where: { userId: revieweeId },
+    await tx.user.update({
+      where: { id: revieweeId },
       data: {
         rating: aggregate._avg.rating || 0,
         totalReviews: aggregate._count.rating || 0,
       },
     });
-  }
+
+    // 6. If reviewee is a worker, also sync to WorkerProfile for legacy compatibility/charts
+    const revieweeWorkerProfile = await tx.workerProfile.findUnique({
+      where: { userId: revieweeId },
+    });
+
+    if (revieweeWorkerProfile) {
+      await tx.workerProfile.update({
+        where: { userId: revieweeId },
+        data: {
+          rating: aggregate._avg.rating || 0,
+          totalReviews: aggregate._count.rating || 0,
+        },
+      });
+    }
+
+    return newReview;
+  });
 
   return review;
 }
@@ -127,42 +133,59 @@ async function createReview(userId, userRole, data) {
  * GET REVIEWS WRITTEN BY A USER (My Reviews)
  * Shows reviews the logged-in user has written
  */
-async function getMyReviews(userId) {
-  return prisma.review.findMany({
-    where: { reviewerId: userId },
-    include: {
-      booking: {
-        include: { service: { select: { id: true, name: true, category: true } } },
+async function getMyReviews(userId, { skip = 0, limit = 20 } = {}) {
+  const where = { reviewerId: userId };
+  const [data, total] = await Promise.all([
+    prisma.review.findMany({
+      where,
+      include: {
+        booking: {
+          include: { service: { select: { id: true, name: true, category: true } } },
+        },
+        reviewee: { select: { id: true, name: true, email: true } },
       },
-      reviewee: { select: { id: true, name: true, email: true } },
-    },
-    orderBy: { createdAt: 'desc' },
-  });
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take: limit,
+    }),
+    prisma.review.count({ where }),
+  ]);
+  return { data, total };
 }
 
 /**
  * GET REVIEWS ABOUT A USER (Reviews Received)
  * Shows reviews others have written about the logged-in user
  */
-async function getReviewsAboutMe(userId) {
-  return prisma.review.findMany({
-    where: { revieweeId: userId },
-    include: {
-      booking: {
-        include: { service: { select: { id: true, name: true, category: true } } },
+async function getReviewsAboutMe(userId, { skip = 0, limit = 20 } = {}) {
+  const where = { revieweeId: userId };
+  const [data, total] = await Promise.all([
+    prisma.review.findMany({
+      where,
+      include: {
+        booking: {
+          include: { service: { select: { id: true, name: true, category: true } } },
+        },
+        reviewer: { select: { id: true, name: true, email: true } },
       },
-      reviewer: { select: { id: true, name: true, email: true } },
-    },
-    orderBy: { createdAt: 'desc' },
-  });
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take: limit,
+    }),
+    prisma.review.count({ where }),
+  ]);
+  return { data, total };
 }
 
 /**
  * GET BOOKINGS PENDING REVIEW
  * Returns completed bookings where the user has NOT yet left a review
  */
-async function getPendingReviews(userId, userRole) {
-  let whereClause = { status: 'COMPLETED' };
+async function getPendingReviews(userId, userRole, { skip = 0, limit = 20 } = {}) {
+  let whereClause = {
+    status: 'COMPLETED',
+    reviews: { none: { reviewerId: userId } },
+  };
 
   if (userRole === 'CUSTOMER') {
     whereClause.customerId = userId;
@@ -170,33 +193,35 @@ async function getPendingReviews(userId, userRole) {
     const workerProfile = await prisma.workerProfile.findUnique({
       where: { userId },
     });
-    if (!workerProfile) return [];
+    if (!workerProfile) return { data: [], total: 0 };
     whereClause.workerProfileId = workerProfile.id;
   }
 
-  const completedBookings = await prisma.booking.findMany({
-    where: whereClause,
-    include: {
-      service: { select: { id: true, name: true, category: true } },
-      workerProfile: {
-        select: {
-          id: true,
-          userId: true,
-          user: { select: { id: true, name: true, email: true } },
+  const [data, total] = await Promise.all([
+    prisma.booking.findMany({
+      where: whereClause,
+      include: {
+        service: { select: { id: true, name: true, category: true } },
+        workerProfile: {
+          select: {
+            id: true,
+            userId: true,
+            user: { select: { id: true, name: true, email: true } },
+          },
+        },
+        customer: { select: { id: true, name: true, email: true } },
+        reviews: {
+          select: { reviewerId: true },
         },
       },
-      customer: { select: { id: true, name: true, email: true } },
-      reviews: {
-        select: { reviewerId: true },
-      },
-    },
-    orderBy: { updatedAt: 'desc' },
-  });
+      orderBy: { updatedAt: 'desc' },
+      skip,
+      take: limit,
+    }),
+    prisma.booking.count({ where: whereClause }),
+  ]);
 
-  // Filter out bookings where this user already left a review
-  return completedBookings.filter(
-    (booking) => !booking.reviews.some((r) => r.reviewerId === userId)
-  );
+  return { data, total };
 }
 
 module.exports = {

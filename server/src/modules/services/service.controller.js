@@ -13,6 +13,8 @@
  */
 
 const asyncHandler = require('../../common/utils/asyncHandler');
+const AppError = require('../../common/errors/AppError');
+const parsePagination = require('../../common/utils/parsePagination');
 const { createService, listServices, getServiceById, getServiceWorkers, updateService, deleteService } = require('./service.service');
 
 /**
@@ -71,13 +73,13 @@ exports.create = asyncHandler(async (req, res) => {
 exports.list = asyncHandler(async (req, res) => {
   // Extract filters from query string (e.g., ?category=Plumbing&search=cleaning)
   const { category, search } = req.query;
+  const { page, limit, skip } = parsePagination(req.query);
 
-  // Call service function to fetch services (with optional filter)
-  const services = await listServices({ category, search });
+  // Call service function to fetch services (with optional filter + pagination)
+  const { data: services, total } = await listServices({ category, search, skip, limit });
 
   // Send services back to client
-  res.json({ services });
-  // Status 200 (default) means "OK" (request successful)
+  res.json({ services, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } });
 });
 
 /**
@@ -107,9 +109,7 @@ exports.getOne = asyncHandler(async (req, res) => {
 
   // Check if conversion was successful
   if (Number.isNaN(id)) {
-    // ID is not a valid number (e.g., /api/services/abc)
-    return res.status(400).json({ error: 'Invalid service id' });
-    // Status 400 means "Bad Request" (client sent wrong data)
+    throw new AppError(400, 'Invalid service id');
   }
 
   // Call service function to fetch the specific service
@@ -117,9 +117,7 @@ exports.getOne = asyncHandler(async (req, res) => {
 
   // Check if service was found
   if (!service) {
-    // Service doesn't exist in database
-    return res.status(404).json({ error: 'Service not found' });
-    // Status 404 means "Not Found"
+    throw new AppError(404, 'Service not found');
   }
 
   // Service found, send it back to client
@@ -141,23 +139,24 @@ exports.getWorkers = asyncHandler(async (req, res) => {
   const id = Number(req.params.id);
 
   if (Number.isNaN(id)) {
-    return res.status(400).json({ error: 'Invalid service id' });
+    throw new AppError(400, 'Invalid service id');
   }
 
-  const workers = await getServiceWorkers(id);
-  res.json({ workers });
+  const { page, limit, skip } = parsePagination(req.query);
+  const { data: workers, total } = await getServiceWorkers(id, { skip, limit });
+  res.json({ workers, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } });
 });
 
 exports.update = asyncHandler(async (req, res) => {
   const id = Number(req.params.id);
-  if (Number.isNaN(id)) return res.status(400).json({ error: 'Invalid ID' });
+  if (Number.isNaN(id)) throw new AppError(400, 'Invalid ID');
   const updated = await updateService(id, req.body);
   res.json({ service: updated });
 });
 
 exports.remove = asyncHandler(async (req, res) => {
   const id = Number(req.params.id);
-  if (Number.isNaN(id)) return res.status(400).json({ error: 'Invalid ID' });
+  if (Number.isNaN(id)) throw new AppError(400, 'Invalid ID');
   await deleteService(id);
   res.json({ message: 'Service deleted' });
 });

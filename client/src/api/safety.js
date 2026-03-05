@@ -1,11 +1,11 @@
-import axios from './axios';
+import axiosInstance from './axios';
 
 /**
  * TRIGGER SOS ALERT
  * @param {Object} data - { bookingId, location: { latitude, longitude } }
  */
 export const triggerSOS = async (data) => {
-    const response = await axios.post('/safety/sos', data);
+    const response = await axiosInstance.post('/safety/sos', data);
     return response.data;
 };
 
@@ -13,7 +13,7 @@ export const triggerSOS = async (data) => {
  * GET EMERGENCY CONTACTS
  */
 export const getEmergencyContacts = async () => {
-    const response = await axios.get('/safety/contacts');
+    const response = await axiosInstance.get('/safety/contacts');
     return response.data;
 };
 
@@ -22,7 +22,7 @@ export const getEmergencyContacts = async () => {
  * @param {Object} data - { name, phone, relation }
  */
 export const addEmergencyContact = async (data) => {
-    const response = await axios.post('/safety/contacts', data);
+    const response = await axiosInstance.post('/safety/contacts', data);
     return response.data;
 };
 
@@ -31,6 +31,33 @@ export const addEmergencyContact = async (data) => {
  * @param {number} contactId
  */
 export const deleteEmergencyContact = async (contactId) => {
-    const response = await axios.delete(`/safety/contacts/${contactId}`);
+    const response = await axiosInstance.delete(`/safety/contacts/${contactId}`);
+    return response.data;
+};
+
+/**
+ * GET CURRENT ACTIVE BOOKING (for global SOS button)
+ * Returns the most recent CONFIRMED or IN_PROGRESS booking for the user, or null.
+ */
+export const getActiveBooking = async () => {
+    const response = await axiosInstance.get('/safety/active-booking');
+    return response.data;
+};
+
+/**
+ * ADMIN: GET ALL ACTIVE SOS ALERTS
+ */
+export const getActiveSosAlerts = async () => {
+    const response = await axiosInstance.get('/safety/sos/alerts');
+    return response.data;
+};
+
+/**
+ * ADMIN: UPDATE SOS ALERT STATUS
+ * @param {number} alertId
+ * @param {string} status - 'ACKNOWLEDGED' | 'RESOLVED'
+ */
+export const updateSosAlertStatus = async (alertId, status) => {
+    const response = await axiosInstance.patch(`/safety/sos/alerts/${alertId}`, { status });
     return response.data;
 };

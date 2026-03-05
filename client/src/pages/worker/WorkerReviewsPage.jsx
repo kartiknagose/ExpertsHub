@@ -4,14 +4,15 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Star, MessageSquare, User, Send, CheckCircle2, Sparkles, TrendingUp } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion as Motion } from 'framer-motion';
 import { MainLayout } from '../../components/layout/MainLayout';
 import { Card, CardHeader, CardTitle, CardDescription, PageHeader } from '../../components/common';
-import { Badge, Button, AsyncState } from '../../components/common';
-import { useTheme } from '../../context/ThemeContext';
+import { Badge, Button, AsyncState, Textarea } from '../../components/common';
 import { createReview, getReviewsAboutMe, getMyReviews, getPendingReviews } from '../../api/reviews';
 import { queryKeys } from '../../utils/queryKeys';
-import { StarRating, getRatingLabel } from '../../components/features/reviews/StarRating';
+import { StarRating } from '../../components/features/reviews/StarRating';
+import { getRatingLabel } from '../../utils/rating';
+import { getPageLayout } from '../../constants/layout';
 
 
 const ratingVariant = (rating) => {
@@ -22,7 +23,6 @@ const ratingVariant = (rating) => {
 };
 
 export function WorkerReviewsPage() {
-  const { isDark } = useTheme();
   const queryClient = useQueryClient();
   const [drafts, setDrafts] = useState({});
   const [submitted, setSubmitted] = useState({});
@@ -55,7 +55,7 @@ export function WorkerReviewsPage() {
         queryClient.invalidateQueries({ queryKey: queryKeys.reviews.workerWritten() });
         queryClient.invalidateQueries({ queryKey: queryKeys.reviews.workerPending() });
         queryClient.invalidateQueries({ queryKey: queryKeys.bookings.worker() });
-        queryClient.invalidateQueries({ queryKey: ['worker-profile'] });
+        queryClient.invalidateQueries({ queryKey: queryKeys.worker.profile() });
       }, 1500);
     },
   });
@@ -101,7 +101,7 @@ export function WorkerReviewsPage() {
 
   return (
     <MainLayout>
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      <div className={getPageLayout('narrow')}>
         <PageHeader
           title="Reviews"
           subtitle="View customer feedback and share your experience with customers."
@@ -115,13 +115,10 @@ export function WorkerReviewsPage() {
           <div className="space-y-8">
 
             {/* Rating Summary Card */}
-            <div className={`rounded-2xl p-6 ${isDark
-              ? 'bg-gradient-to-br from-brand-900/40 via-dark-800 to-dark-900 border border-dark-600'
-              : 'bg-gradient-to-br from-brand-50 via-white to-yellow-50 border border-gray-100'
-              }`}>
+            <div className="rounded-2xl p-6 bg-gradient-to-br from-brand-50 via-white to-yellow-50 border border-gray-100 dark:from-brand-900/40 dark:via-dark-800 dark:to-dark-900 dark:border-dark-600">
               <div className="flex items-center gap-6">
                 <div className="text-center">
-                  <p className={`text-5xl font-bold ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
+                  <p className="text-5xl font-bold text-gray-900 dark:text-gray-100">
                     {avgRating}
                   </p>
                   <div className="flex items-center gap-0.5 mt-1 justify-center">
@@ -133,7 +130,7 @@ export function WorkerReviewsPage() {
                       />
                     ))}
                   </div>
-                  <p className={`text-sm mt-1 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                  <p className="text-sm mt-1 text-gray-500 dark:text-gray-400">
                     {receivedReviews.length} review{receivedReviews.length !== 1 ? 's' : ''}
                   </p>
                 </div>
@@ -144,17 +141,17 @@ export function WorkerReviewsPage() {
                     const pct = receivedReviews.length > 0 ? (count / receivedReviews.length) * 100 : 0;
                     return (
                       <div key={star} className="flex items-center gap-2 text-sm">
-                        <span className={`w-3 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{star}</span>
+                        <span className="w-3 text-gray-500 dark:text-gray-400">{star}</span>
                         <Star size={12} className="text-yellow-400 fill-yellow-400" />
-                        <div className={`flex-1 h-2 rounded-full overflow-hidden ${isDark ? 'bg-dark-600' : 'bg-gray-200'}`}>
-                          <motion.div
+                        <div className="flex-1 h-2 rounded-full overflow-hidden bg-gray-200 dark:bg-dark-600">
+                          <Motion.div
                             initial={{ width: 0 }}
                             animate={{ width: `${pct}%` }}
                             transition={{ duration: 0.8, delay: 0.1 * (5 - star) }}
                             className="h-full bg-yellow-400 rounded-full"
                           />
                         </div>
-                        <span className={`w-6 text-right ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{count}</span>
+                        <span className="w-6 text-right text-gray-500 dark:text-gray-400">{count}</span>
                       </div>
                     );
                   })}
@@ -163,25 +160,25 @@ export function WorkerReviewsPage() {
             </div>
 
             {/* Tab Navigation */}
-            <div className={`flex rounded-xl overflow-hidden border ${isDark ? 'border-dark-600' : 'border-gray-200'}`}>
+            <div role="tablist" aria-label="Review tabs" className="flex rounded-xl overflow-hidden border border-gray-200 dark:border-dark-600">
               {tabs.map((tab) => (
                 <button
                   key={tab.id}
+                  role="tab"
+                  aria-selected={activeTab === tab.id}
+                  aria-controls={`tabpanel-${tab.id}`}
+                  id={`tab-${tab.id}`}
                   onClick={() => setActiveTab(tab.id)}
                   className={`flex-1 px-4 py-3 text-sm font-medium transition-colors duration-200 flex items-center justify-center gap-2 ${activeTab === tab.id
-                    ? isDark
-                      ? 'bg-brand-600 text-white'
-                      : 'bg-brand-500 text-white'
-                    : isDark
-                      ? 'bg-dark-800 text-gray-300 hover:bg-dark-700'
-                      : 'bg-white text-gray-600 hover:bg-gray-50'
+                    ? 'bg-brand-500 text-white dark:bg-brand-600'
+                    : 'bg-white text-gray-600 hover:bg-gray-50 dark:bg-dark-800 dark:text-gray-300 dark:hover:bg-dark-700'
                     }`}
                 >
                   {tab.label}
                   {tab.count > 0 && (
                     <span className={`text-xs px-1.5 py-0.5 rounded-full ${activeTab === tab.id
                       ? 'bg-white/20 text-white'
-                      : isDark ? 'bg-dark-600 text-gray-400' : 'bg-gray-100 text-gray-500'
+                      : 'bg-gray-100 text-gray-500 dark:bg-dark-600 dark:text-gray-400'
                       }`}>
                       {tab.count}
                     </span>
@@ -194,8 +191,11 @@ export function WorkerReviewsPage() {
             <AnimatePresence mode="wait">
               {/* Tab: Received Reviews */}
               {activeTab === 'received' && (
-                <motion.div
+                <Motion.div
                   key="received"
+                  role="tabpanel"
+                  id="tabpanel-received"
+                  aria-labelledby="tab-received"
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 10 }}
@@ -204,7 +204,7 @@ export function WorkerReviewsPage() {
                   {receivedReviews.length === 0 && (
                     <Card className="p-8 text-center">
                       <TrendingUp size={40} className="mx-auto text-brand-500 mb-3" />
-                      <p className={isDark ? 'text-gray-300' : 'text-gray-600'}>
+                      <p className="text-gray-600 dark:text-gray-300">
                         No reviews received yet. Complete bookings to get customer feedback!
                       </p>
                     </Card>
@@ -215,15 +215,14 @@ export function WorkerReviewsPage() {
                       <div className="p-5">
                         <div className="flex items-start justify-between gap-3 mb-3">
                           <div className="flex items-start gap-3">
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${isDark ? 'bg-brand-900/50 text-brand-400' : 'bg-brand-50 text-brand-600'
-                              }`}>
+                            <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-brand-50 text-brand-600 dark:bg-brand-900/50 dark:text-brand-400">
                               <User size={18} />
                             </div>
                             <div>
-                              <p className={`font-semibold ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
+                              <p className="font-semibold text-gray-900 dark:text-gray-100">
                                 {review.reviewer?.name || 'Customer'}
                               </p>
-                              <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                              <p className="text-sm text-gray-500 dark:text-gray-400">
                                 {review.booking?.service?.name || 'Service'} · {new Date(review.createdAt).toLocaleDateString()}
                               </p>
                             </div>
@@ -237,20 +236,23 @@ export function WorkerReviewsPage() {
                         </div>
 
                         {review.comment && (
-                          <p className={`text-sm leading-relaxed ml-13 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
+                          <p className="text-sm leading-relaxed ml-13 text-gray-600 dark:text-gray-300">
                             "{review.comment}"
                           </p>
                         )}
                       </div>
                     </Card>
                   ))}
-                </motion.div>
+                </Motion.div>
               )}
 
               {/* Tab: Pending Reviews (Review Customers) */}
               {activeTab === 'pending' && (
-                <motion.div
+                <Motion.div
                   key="pending"
+                  role="tabpanel"
+                  id="tabpanel-pending"
+                  aria-labelledby="tab-pending"
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 10 }}
@@ -259,7 +261,7 @@ export function WorkerReviewsPage() {
                   {pendingBookings.length === 0 && (
                     <Card className="p-8 text-center">
                       <CheckCircle2 size={40} className="mx-auto text-green-500 mb-3" />
-                      <p className={isDark ? 'text-gray-300' : 'text-gray-600'}>
+                      <p className="text-gray-600 dark:text-gray-300">
                         All caught up! No customers waiting for your review.
                       </p>
                     </Card>
@@ -272,15 +274,12 @@ export function WorkerReviewsPage() {
                     return (
                       <Card key={booking.id} className={`overflow-hidden transition-all duration-300 ${isSubmitted ? 'ring-2 ring-green-500/50' : ''
                         }`}>
-                        <div className={`px-6 py-3 flex items-center justify-between ${isDark
-                          ? 'bg-gradient-to-r from-accent-900/30 to-transparent border-b border-dark-600'
-                          : 'bg-gradient-to-r from-accent-50 to-transparent border-b border-gray-100'
-                          }`}>
+                        <div className="px-6 py-3 flex items-center justify-between bg-gradient-to-r from-accent-50 to-transparent border-b border-gray-100 dark:from-accent-900/30 dark:border-dark-600">
                           <div>
-                            <p className={`font-semibold ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
+                            <p className="font-semibold text-gray-900 dark:text-gray-100">
                               {booking.service?.name || `Service #${booking.serviceId}`}
                             </p>
-                            <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">
                               Customer: {booking.customer?.name || 'Customer'} · {new Date(booking.scheduledAt).toLocaleDateString()}
                             </p>
                           </div>
@@ -288,20 +287,20 @@ export function WorkerReviewsPage() {
                         </div>
 
                         {isSubmitted ? (
-                          <motion.div
+                          <Motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             className="p-8 text-center"
                           >
                             <CheckCircle2 size={48} className="mx-auto text-green-500 mb-3" />
-                            <p className={`font-semibold text-lg ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
+                            <p className="font-semibold text-lg text-gray-900 dark:text-gray-100">
                               Thank you!
                             </p>
-                          </motion.div>
+                          </Motion.div>
                         ) : (
                           <div className="p-6 space-y-5">
                             <div>
-                              <label className={`block text-sm font-medium mb-3 ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>
+                              <label className="block text-sm font-medium mb-3 text-gray-700 dark:text-gray-200">
                                 How was working with this customer?
                               </label>
                               <div className="flex items-center gap-4">
@@ -319,18 +318,12 @@ export function WorkerReviewsPage() {
                             </div>
 
                             <div>
-                              <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>
-                                Comment (optional)
-                              </label>
-                              <textarea
+                              <Textarea
+                                label="Comment (optional)"
                                 rows={2}
                                 value={draft.comment}
                                 onChange={(e) => updateDraft(booking.id, 'comment', e.target.value)}
                                 placeholder="Was the customer polite? Was the address easy to find?"
-                                className={`w-full px-4 py-3 rounded-xl border transition-all duration-200 focus:outline-none focus:ring-2 resize-none ${isDark
-                                  ? 'bg-dark-800 border-dark-600 text-gray-100 placeholder-gray-500 focus:border-brand-500 focus:ring-brand-500/30'
-                                  : 'bg-white border-gray-200 text-gray-900 placeholder-gray-400 focus:border-brand-500 focus:ring-brand-500/30'
-                                  }`}
                               />
                             </div>
 
@@ -355,13 +348,16 @@ export function WorkerReviewsPage() {
                       </Card>
                     );
                   })}
-                </motion.div>
+                </Motion.div>
               )}
 
               {/* Tab: Reviews I've Written */}
               {activeTab === 'written' && (
-                <motion.div
+                <Motion.div
                   key="written"
+                  role="tabpanel"
+                  id="tabpanel-written"
+                  aria-labelledby="tab-written"
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 10 }}
@@ -369,7 +365,7 @@ export function WorkerReviewsPage() {
                 >
                   {writtenReviews.length === 0 && (
                     <Card className="p-6">
-                      <p className={isDark ? 'text-gray-300' : 'text-gray-600'}>
+                      <p className="text-gray-600 dark:text-gray-300">
                         You haven't submitted any reviews yet.
                       </p>
                     </Card>
@@ -380,10 +376,10 @@ export function WorkerReviewsPage() {
                       <div className="p-5">
                         <div className="flex items-start justify-between gap-3 mb-3">
                           <div>
-                            <p className={`font-semibold ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
+                            <p className="font-semibold text-gray-900 dark:text-gray-100">
                               {review.booking?.service?.name || 'Service'}
                             </p>
-                            <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">
                               Customer: {review.reviewee?.name || 'Customer'} · {new Date(review.createdAt).toLocaleDateString()}
                             </p>
                           </div>
@@ -399,14 +395,14 @@ export function WorkerReviewsPage() {
                         </div>
 
                         {review.comment && (
-                          <p className={`text-sm leading-relaxed ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
+                          <p className="text-sm leading-relaxed text-gray-600 dark:text-gray-300">
                             "{review.comment}"
                           </p>
                         )}
                       </div>
                     </Card>
                   ))}
-                </motion.div>
+                </Motion.div>
               )}
             </AnimatePresence>
           </div>

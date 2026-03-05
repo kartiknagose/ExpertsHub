@@ -2,7 +2,10 @@ import { useEffect } from 'react';
 import { BrowserRouter, useNavigate } from 'react-router-dom';
 import { AppRoutes } from './routes/AppRoutes';
 import { ThemeProvider } from './context/ThemeContext';
+import { SOSProvider } from './context/SOSContext';
+import { GlobalSOSButton } from './components/features/safety/GlobalSOSButton';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
+import { GlobalSocketListener } from './components/common/GlobalSocketListener';
 import { useAuth } from './hooks/useAuth';
 
 /**
@@ -35,16 +38,22 @@ function SessionExpiredHandler() {
  * 1. ErrorBoundary - catches runtime errors
  * 2. ThemeProvider - dark/light mode
  * 3. BrowserRouter - enables client-side routing
- * 4. SessionExpiredHandler - handles auth session expiry via React Router
- * 5. AppRoutes - all route definitions
+ * 4. SOSProvider - global active booking tracker for SOS button
+ * 5. GlobalSOSButton - floating SOS button (visible on all pages during active bookings)
+ * 6. SessionExpiredHandler - handles auth session expiry via React Router
+ * 7. AppRoutes - all route definitions
  */
 function App() {
   return (
     <ErrorBoundary>
       <ThemeProvider>
         <BrowserRouter>
-          <SessionExpiredHandler />
-          <AppRoutes />
+          <SOSProvider>
+            <SessionExpiredHandler />
+            <GlobalSocketListener />
+            <AppRoutes />
+            <GlobalSOSButton />
+          </SOSProvider>
         </BrowserRouter>
       </ThemeProvider>
     </ErrorBoundary>

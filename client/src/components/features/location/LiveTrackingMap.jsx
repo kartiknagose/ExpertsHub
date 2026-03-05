@@ -1,0 +1,329 @@
+import { useEffect, useState, useMemo, useRef } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline, Circle } from 'react-leaflet';
+import L from 'leaflet';
+import { Navigation, Compass, Target, Clock, Zap, Layers, Map as MapIcon, CheckCircle } from 'lucide-react';
+import { MAP_TILES } from '../../../utils/mapTiles';
+import './map-styles.css';
+
+// Professional Marker Icons
+// Professional Marker Icons (INTERCHANGED PER USER REQUEST)
+const workerIcon = new L.Icon({
+    iconUrl: 'https://cdn-icons-png.flaticon.com/512/2830/2830305.png', // Worker: Now SCOOTER
+    iconSize: [48, 48],
+    iconAnchor: [24, 48],
+    popupAnchor: [0, -48],
+});
+
+const customerIcon = new L.Icon({
+    iconUrl: 'https://cdn-icons-png.flaticon.com/512/149/149060.png', // Customer: Now BLUE PIN
+    iconSize: [42, 42],
+    iconAnchor: [21, 42],
+    popupAnchor: [0, -42],
+});
+
+// Calculate distance logic
+function calculateDistance(lat1, lon1, lat2, lon2) {
+    if (!lat1 || !lon1 || !lat2 || !lon2) return null;
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+}
+
+function MapController({ workerPos, customerLocation, triggerRecenter }) {
+    const map = useMap();
+    const isFirstLoad = useRef(true);
+
+    useEffect(() => {
+        if (!workerPos || !customerLocation) return;
+        if (isFirstLoad.current) {
+            const bounds = L.latLngBounds([
+                [customerLocation.lat, customerLocation.lng],
+                [workerPos.lat, workerPos.lng]
+            ]);
+            map.fitBounds(bounds, { padding: [60, 60], maxZoom: 16 });
+            isFirstLoad.current = false;
+        }
+    }, [workerPos, customerLocation, map]);
+
+    useEffect(() => {
+        if (triggerRecenter && workerPos) {
+            map.flyTo([workerPos.lat, workerPos.lng], 16, { animate: true, duration: 1.5 });
+        }
+    }, [triggerRecenter, workerPos, map]);
+
+    return null;
+}
+
+export function LiveTrackingMap({
+    workerId,
+    customerLocation,
+    initialWorkerLocation,
+    height = "400px"
+}) {
+    const [workerPos, setWorkerPos] = useState(initialWorkerLocation);
+    const [userLocation, setUserLocation] = useState(null); // Actual browser location of viewer
+    const [history, setHistory] = useState(initialWorkerLocation ? [[initialWorkerLocation.lat, initialWorkerLocation.lng]] : []);
+    const [lastUpdated, setLastUpdated] = useState(new Date());
+    const [recenterCount, setRecenterCount] = useState(0);
+    const [tileType, setTileType] = useState('streets'); // streets, satellite, dark, terrain
+    const [showTileMenu, setShowTileMenu] = useState(false);
+
+    const [lastInitial, setLastInitial] = useState(initialWorkerLocation);
+
+    // Sync prop to state if it changes (e.g. after parent fetch)
+    if (initialWorkerLocation && (
+        !lastInitial ||
+        initialWorkerLocation.lat !== lastInitial.lat ||
+        initialWorkerLocation.lng !== lastInitial.lng
+    )) {
+        setLastInitial(initialWorkerLocation);
+        setWorkerPos(initialWorkerLocation);
+        if (history.length === 0) {
+            setHistory([[initialWorkerLocation.lat, initialWorkerLocation.lng]]);
+        }
+    }
+
+    useEffect(() => {
+        // Get user's current live position to show their own "Blue Dot"
+        if ("geolocation" in navigator) {
+            const watchId = navigator.geolocation.watchPosition(
+                (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+                () => { },
+                { enableHighAccuracy: true }
+            );
+            return () => navigator.geolocation.clearWatch(watchId);
+        }
+    }, []);
+
+    useEffect(() => {
+        const handleLocationUpdate = (event) => {
+            const data = event.detail;
+            if (data.workerProfileId === workerId) {
+                const newPos = { lat: data.latitude, lng: data.longitude };
+                setWorkerPos(newPos);
+                setHistory(prev => {
+                    const next = [...prev, [data.latitude, data.longitude]];
+                    return next.slice(-50);
+                });
+                setLastUpdated(new Date());
+            }
+        };
+        window.addEventListener('upro:worker-location-updated', handleLocationUpdate);
+        return () => window.removeEventListener('upro:worker-location-updated', handleLocationUpdate);
+    }, [workerId]);
+
+    // Use live userLocation as site if testing on one machine
+    const effectiveSiteLocation = useMemo(() => {
+        if (userLocation && customerLocation) {
+            const distToCustomer = calculateDistance(userLocation.lat, userLocation.lng, customerLocation.lat, customerLocation.lng);
+            // If user is within 5km of the customer location, use userLocation to simulate being at the site.
+            // Otherwise, use the actual customerLocation.
+            if (distToCustomer !== null && distToCustomer < 5) { // 5 km threshold
+                return userLocation;
+            }
+        }
+        return customerLocation;
+    }, [userLocation, customerLocation]);
+
+    const distance = useMemo(() => {
+        if (!workerPos || !effectiveSiteLocation) return null;
+        return calculateDistance(workerPos.lat, workerPos.lng, effectiveSiteLocation.lat, effectiveSiteLocation.lng);
+    }, [workerPos, effectiveSiteLocation]);
+    const etaMins = distance ? Math.round((distance / 25) * 60 + 2) : null;
+    const hasArrived = distance !== null && distance < 0.05; // 50 meters
+
+    if (!customerLocation) return null;
+
+    return (
+        <div className="relative w-full rounded-3xl overflow-hidden shadow-2xl border border-black/5" style={{ height }}>
+
+            <MapContainer
+                center={[effectiveSiteLocation.lat, effectiveSiteLocation.lng]}
+                zoom={14}
+                style={{ height: '100%', width: '100%', zIndex: 1 }}
+                zoomControl={false}
+                attributionControl={false}
+                className="upro-engine-map"
+            >
+                <TileLayer url={MAP_TILES[tileType]} />
+
+                {/* Service Area */}
+                <Circle
+                    center={[effectiveSiteLocation.lat, effectiveSiteLocation.lng]}
+                    radius={120}
+                    pathOptions={{ color: '#6366f1', fillOpacity: 0.1, weight: 2, dashArray: '6, 6' }}
+                />
+
+                {/* Customer Presence (INTERCHANGED TO PIN) */}
+                <Marker position={[effectiveSiteLocation.lat, effectiveSiteLocation.lng]} icon={customerIcon}>
+                    <Popup className="upro-popup" autoPan={false}>
+                        <div className="p-3 text-center min-w-[120px]">
+                            <span className="text-[11px] font-black uppercase tracking-[0.2em] text-indigo-600 block mb-1">Customer Location</span>
+                            <div className="h-px w-full bg-gray-100 dark:bg-white/10 my-1.5" />
+                            <p className="text-[10px] text-gray-500 font-bold leading-tight">Service Site</p>
+                        </div>
+                    </Popup>
+                </Marker>
+
+                {/* Worker (INTERCHANGED TO SCOOTER) */}
+                {workerPos && (
+                    <Marker position={[workerPos.lat, workerPos.lng]} icon={workerIcon}>
+                        <Popup className="upro-popup" autoPan={false}>
+                            <div className="p-3 text-center min-w-[120px]">
+                                <span className="text-[11px] font-black uppercase tracking-[0.2em] text-emerald-600 block mb-1">Professional</span>
+                                <div className="h-px w-full bg-gray-100 dark:bg-white/10 my-1.5" />
+                                <div className="flex items-center justify-center gap-1.5 mt-1">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                    <p className="text-[10px] text-gray-500 font-bold">On the move</p>
+                                </div>
+                            </div>
+                        </Popup>
+                    </Marker>
+                )}
+
+                {/* User's Actual Presence (Mirror dot for same-machine testing) */}
+                {userLocation && (
+                    <>
+                        <Circle
+                            center={[userLocation.lat, userLocation.lng]}
+                            radius={20}
+                            pathOptions={{ fillColor: '#3b82f6', fillOpacity: 0.2, color: '#3b82f6', weight: 1 }}
+                        />
+                        <Marker
+                            position={[userLocation.lat, userLocation.lng]}
+                            icon={new L.DivIcon({
+                                className: 'upro-user-presence',
+                                html: `<div class="w-4 h-4 bg-blue-500 rounded-full border-2 border-white shadow-lg animate-pulse"></div>`,
+                                iconSize: [16, 16],
+                                iconAnchor: [8, 8]
+                            })}
+                        />
+                    </>
+                )}
+
+                <MapController workerPos={workerPos} customerLocation={customerLocation} triggerRecenter={recenterCount} />
+            </MapContainer>
+
+            {/* Top Toolbar */}
+            <div className="absolute top-4 left-4 right-4 z-[400] flex justify-between gap-2 pointer-events-none">
+                <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-full backdrop-blur-md bg-white/90 dark:bg-dark-900/90 shadow-lg border border-white/20 pointer-events-auto">
+                        <div className="relative flex h-2 w-2">
+                            <span className="animate-ping absolute h-full w-full rounded-full bg-green-500 opacity-75"></span>
+                            <span className="h-2 w-2 rounded-full bg-green-500"></span>
+                        </div>
+                        <span className="text-[9px] font-black uppercase tracking-widest text-gray-900 dark:text-white">Live</span>
+                    </div>
+
+                    {/* Waiting for Worker Overlay */}
+                    {!workerPos && (
+                        <div className="absolute inset-x-6 top-1/2 -translate-y-1/2 z-[401] flex flex-col items-center justify-center pointer-events-none">
+                            <div className="bg-white/80 dark:bg-dark-900/80 backdrop-blur-md px-8 py-6 rounded-[2.5rem] border border-white/20 shadow-2xl flex flex-col items-center gap-4 animate-in zoom-in duration-500 pointer-events-auto">
+                                <div className="p-4 bg-brand-500/10 rounded-2xl relative">
+                                    <Navigation className="text-brand-500 animate-pulse" size={28} />
+                                    <div className="absolute -top-1 -right-1 flex h-3 w-3">
+                                        <span className="animate-ping absolute h-full w-full rounded-full bg-brand-500 opacity-75"></span>
+                                        <span className="h-3 w-3 rounded-full bg-brand-500"></span>
+                                    </div>
+                                </div>
+                                <div className="text-center">
+                                    <p className="text-base font-black tracking-tight text-gray-900 dark:text-white">Professional not tracking yet</p>
+                                    <p className="text-[11px] text-gray-400 font-bold max-w-[200px] mt-1 line-clamp-2 leading-relaxed uppercase tracking-tighter">
+                                        Tracking will become live as soon as the professional begins their journey.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Top Toolbar: Live Badge + Tile Switcher */}
+                    <div className="relative pointer-events-auto">
+                        <button
+                            onClick={() => setShowTileMenu(!showTileMenu)}
+                            className="p-2 rounded-full backdrop-blur-md bg-white/90 dark:bg-dark-900/90 shadow-lg border border-white/20 transition-all hover:bg-brand-500 hover:text-white"
+                        >
+                            <Layers size={14} />
+                        </button>
+
+                        {showTileMenu && (
+                            <div className="absolute top-10 left-0 p-1.5 rounded-2xl backdrop-blur-xl bg-white/95 dark:bg-dark-900/95 shadow-2xl border border-white/10 flex flex-col gap-1 min-w-[120px]">
+                                {Object.keys(MAP_TILES).map(type => (
+                                    <button
+                                        key={type}
+                                        onClick={() => { setTileType(type); setShowTileMenu(false); }}
+                                        className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest text-left transition-colors ${tileType === type ? 'bg-brand-500 text-white' : 'hover:bg-black/5 dark:hover:bg-white/5 opacity-60'}`}
+                                    >
+                                        {type}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                <button
+                    onClick={() => setRecenterCount(c => c + 1)}
+                    className="p-2.5 rounded-full backdrop-blur-md bg-white/90 dark:bg-dark-900/90 shadow-lg border border-white/20 pointer-events-auto active:scale-90 transition-all hover:bg-brand-500 hover:text-white"
+                >
+                    <Target size={16} />
+                </button>
+            </div>
+
+            {/* Bottom Logistics Card (Refined Approach) */}
+            <div className="absolute bottom-6 left-6 right-6 z-[400] pointer-events-none group/logistics">
+                <div className={`backdrop-blur-2xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.3)] rounded-3xl border p-5 pointer-events-auto flex items-center justify-between gap-8 transition-all duration-500 group-hover/logistics:translate-y-[-4px] ${hasArrived ? 'bg-emerald-500/10 border-emerald-500/50 dark:bg-emerald-900/20' : 'bg-white/95 dark:bg-dark-950/90 border-white/20'
+                    }`}>
+                    <div className="flex-1 flex items-center gap-5">
+                        <div className={`p-3.5 rounded-2xl shadow-inner ${hasArrived ? 'bg-emerald-500 text-white' : 'bg-indigo-500/10 text-indigo-500'}`}>
+                            {hasArrived ? <CheckCircle size={22} /> : <Navigation size={22} className="animate-pulse" />}
+                        </div>
+                        <div className="flex flex-col">
+                            {hasArrived ? (
+                                <p className="text-2xl font-black tracking-tighter leading-none text-emerald-600 dark:text-emerald-400 uppercase">Arrived</p>
+                            ) : (
+                                <p className="text-3xl font-black tracking-tighter leading-none bg-gradient-to-br from-gray-900 to-gray-500 dark:from-white dark:to-gray-400 bg-clip-text text-transparent">
+                                    {etaMins ? `${etaMins}m` : '--'}
+                                </p>
+                            )}
+                            <p className="text-[10px] font-black opacity-30 uppercase tracking-[0.2em] mt-1.5 ml-0.5">
+                                {hasArrived ? 'On-site Now' : 'Arrival Estimate'}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="w-px h-12 bg-black/5 dark:bg-white/10" />
+
+                    <div className="flex-1 flex items-center justify-end gap-5">
+                        <div className="flex flex-col items-end">
+                            <p className={`text-2xl font-black tracking-tighter leading-none ${hasArrived ? 'text-emerald-500' : 'text-brand-500'}`}>
+                                {distance !== null ? (distance < 0.1 ? 'Nearby' : `${distance.toFixed(1)}k`) : '--'}
+                            </p>
+                            <p className="text-[10px] font-black opacity-30 uppercase tracking-[0.2em] mt-1.5 mr-0.5">Distance Left</p>
+                        </div>
+                        <div className={`p-3.5 rounded-2xl shadow-inner ${hasArrived ? 'bg-emerald-500/10 text-emerald-500' : 'bg-emerald-500/10 text-emerald-500'}`}>
+                            <Compass size={22} />
+                        </div>
+                    </div>
+                </div>
+
+                {/* Latency/Security Footer */}
+                <div className="flex items-center justify-between px-6 mt-3">
+                    <div className="flex items-center gap-1.5 opacity-30">
+                        <Clock size={10} />
+                        <span className="text-[8px] font-bold uppercase tracking-widest">Feed Update: {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+                    </div>
+                    <div className="flex items-center gap-1 opacity-40">
+                        <Zap size={9} className="text-brand-500" />
+                        <span className="text-[8px] font-black uppercase text-brand-500 tracking-tighter">Verified Stream</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}

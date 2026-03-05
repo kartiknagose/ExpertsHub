@@ -38,7 +38,7 @@ module.exports = (err, _req, res, _next) => {
   // Send error response to client
   res.status(status).json({
     error: message,
-    // Include status in response (sometimes clients expect it)
+    statusCode: status,
     ...(isDevelopment && { stack: err.stack }),
   });
 };

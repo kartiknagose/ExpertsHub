@@ -1,5 +1,4 @@
 import { Star, Phone, Mail, User } from 'lucide-react';
-import { useTheme } from '../../../context/ThemeContext';
 import { resolveProfilePhotoUrl } from '../../../utils/profilePhoto';
 
 /**
@@ -10,9 +9,7 @@ import { resolveProfilePhotoUrl } from '../../../utils/profilePhoto';
  * @param {string} label - e.g., "Assigned Worker" or "Customer"
  * @param {boolean} showContact - Whether to show mobile/email
  */
-export function UserMiniProfile({ user, label, showContact = false }) {
-    const { isDark } = useTheme();
-
+export function UserMiniProfile({ user, label, showContact = false, onClick }) {
     if (!user) return null;
 
     const profilePhotoUrl = resolveProfilePhotoUrl(user.profilePhotoUrl);
@@ -21,8 +18,11 @@ export function UserMiniProfile({ user, label, showContact = false }) {
     const totalReviews = user.totalReviews || 0;
 
     return (
-        <div className={`p-3 rounded-xl border transition-all ${isDark ? 'bg-dark-800/30 border-dark-700/50' : 'bg-gray-50/30 border-gray-100'
-            }`}>
+        <div
+            onClick={onClick}
+            className={`p-3 rounded-xl border transition-all ${onClick ? 'cursor-pointer' : ''} bg-gray-50/30 dark:bg-dark-800/30 border-gray-100 dark:border-dark-700/50 hover:border-brand-200 dark:hover:border-brand-500/30
+                `}
+        >
             <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3 min-w-0">
                     {/* Avatar */}
@@ -42,18 +42,18 @@ export function UserMiniProfile({ user, label, showContact = false }) {
 
                     {/* Info */}
                     <div className="min-w-0">
-                        <p className={`text-[10px] font-black uppercase tracking-widest leading-none mb-1 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                        <p className="text-[10px] font-black uppercase tracking-widest leading-none mb-1 text-gray-400 dark:text-gray-500">
                             {label}
                         </p>
-                        <h4 className={`font-bold text-sm truncate leading-tight ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
+                        <h4 className="font-bold text-sm truncate leading-tight text-gray-900 dark:text-gray-100">
                             {user.name}
                         </h4>
                         <div className="flex items-center gap-1.5 mt-0.5">
                             <Star size={10} className="fill-yellow-400 text-yellow-400 shrink-0" />
-                            <span className={`text-[11px] font-black ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                            <span className="text-[11px] font-black text-gray-700 dark:text-gray-300">
                                 {rating}
                             </span>
-                            <span className={`text-[10px] font-medium ${isDark ? 'text-gray-550' : 'text-gray-400'}`}>
+                            <span className="text-[10px] font-medium text-gray-400 dark:text-gray-550">
                                 ({totalReviews})
                             </span>
                         </div>
@@ -65,14 +65,14 @@ export function UserMiniProfile({ user, label, showContact = false }) {
                         <a
                             href={`tel:${user.mobile}`}
                             title={`Call ${user.name}`}
-                            className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${isDark ? 'bg-brand-900/30 text-brand-400 hover:bg-brand-900/50' : 'bg-brand-50 text-brand-600 hover:bg-brand-100'}`}
+                            className="w-8 h-8 rounded-lg flex items-center justify-center transition-all bg-brand-50 dark:bg-brand-900/30 text-brand-600 dark:text-brand-400 hover:bg-brand-100 dark:hover:bg-brand-900/50"
                         >
                             <Phone size={14} />
                         </a>
                         <a
                             href={`mailto:${user.email}`}
                             title={`Email ${user.name}`}
-                            className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${isDark ? 'bg-accent-900/30 text-accent-400 hover:bg-accent-900/50' : 'bg-accent-50 text-accent-600 hover:bg-accent-100'}`}
+                            className="w-8 h-8 rounded-lg flex items-center justify-center transition-all bg-accent-50 dark:bg-accent-900/30 text-accent-600 dark:text-accent-400 hover:bg-accent-100 dark:hover:bg-accent-900/50"
                         >
                             <Mail size={14} />
                         </a>

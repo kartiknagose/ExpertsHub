@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { PublicRoute, WorkerRoute, CustomerRoute, AdminRoute } from './ProtectedRoute';
+import { PublicRoute, WorkerRoute, CustomerRoute, AdminRoute, ProtectedRoute } from './ProtectedRoute';
 import { LoadingOverlay } from '../components/common';
 
 // Lazy load all pages for better performance (Code Splitting)
@@ -36,6 +36,7 @@ const CustomerDashboardPage = lazy(() => import('../pages/customer/CustomerDashb
 const CustomerBookingsPage = lazy(() => import('../pages/customer/CustomerBookingsPage').then(m => ({ default: m.CustomerBookingsPage })));
 const CustomerBookingDetailPage = lazy(() => import('../pages/customer/CustomerBookingDetailPage').then(m => ({ default: m.CustomerBookingDetailPage })));
 const CustomerReviewsPage = lazy(() => import('../pages/customer/CustomerReviewsPage').then(m => ({ default: m.CustomerReviewsPage })));
+const MessagesPage = lazy(() => import('../pages/profile/MessagesPage').then(m => ({ default: m.MessagesPage })));
 
 // Worker
 const WorkerProfilePage = lazy(() => import('../pages/profile/WorkerProfilePage').then(m => ({ default: m.WorkerProfilePage })));
@@ -46,6 +47,10 @@ const WorkerBookingDetailPage = lazy(() => import('../pages/worker/WorkerBooking
 const WorkerAvailabilityPage = lazy(() => import('../pages/worker/WorkerAvailabilityPage').then(m => ({ default: m.WorkerAvailabilityPage })));
 const WorkerVerificationPage = lazy(() => import('../pages/worker/WorkerVerificationPage').then(m => ({ default: m.WorkerVerificationPage })));
 const WorkerReviewsPage = lazy(() => import('../pages/worker/WorkerReviewsPage').then(m => ({ default: m.WorkerReviewsPage })));
+const WorkerEarningsPage = lazy(() => import('../pages/worker/WorkerEarningsPage').then(m => ({ default: m.WorkerEarningsPage })));
+
+// Safety
+const EmergencyContactsPage = lazy(() => import('../pages/safety/EmergencyContactsPage').then(m => ({ default: m.EmergencyContactsPage })));
 
 // Admin
 const AdminDashboardPage = lazy(() => import('../pages/admin/AdminDashboardPage').then(m => ({ default: m.AdminDashboardPage })));
@@ -54,6 +59,7 @@ const AdminWorkersPage = lazy(() => import('../pages/admin/AdminWorkersPage').th
 const AdminBookingsPage = lazy(() => import('../pages/admin/AdminBookingsPage').then(m => ({ default: m.AdminBookingsPage })));
 const AdminUsersPage = lazy(() => import('../pages/admin/AdminUsersPage').then(m => ({ default: m.AdminUsersPage })));
 const AdminVerificationPage = lazy(() => import('../pages/admin/AdminVerificationPage').then(m => ({ default: m.AdminVerificationPage })));
+const AdminSOSAlertsPage = lazy(() => import('../pages/admin/AdminSOSAlertsPage').then(m => ({ default: m.AdminSOSAlertsPage })));
 
 /**
  * AppRoutes Component
@@ -93,16 +99,15 @@ export function AppRoutes() {
 
         {/* Customer Routes */}
         <Route path="/profile" element={<CustomerRoute><CustomerProfilePage /></CustomerRoute>} />
-        <Route path="/profile/setup" element={<Navigate to="/profile" replace />} />
         <Route path="/bookings" element={<CustomerRoute><CustomerBookingsPage /></CustomerRoute>} />
         <Route path="/bookings/:id" element={<CustomerRoute><CustomerBookingDetailPage /></CustomerRoute>} />
         <Route path="/reviews" element={<CustomerRoute><CustomerReviewsPage /></CustomerRoute>} />
         <Route path="/dashboard" element={<CustomerRoute><CustomerDashboardPage /></CustomerRoute>} />
+        <Route path="/safety/contacts" element={<CustomerRoute><EmergencyContactsPage /></CustomerRoute>} />
+        <Route path="/messages" element={<ProtectedRoute><MessagesPage /></ProtectedRoute>} />
 
         {/* Worker Routes */}
         <Route path="/worker/profile" element={<WorkerRoute><WorkerProfilePage /></WorkerRoute>} />
-        <Route path="/worker/profile/setup" element={<Navigate to="/worker/profile" replace />} />
-        <Route path="/worker/setup-profile" element={<Navigate to="/worker/profile" replace />} />
         <Route path="/worker/dashboard" element={<WorkerRoute><WorkerDashboardPage /></WorkerRoute>} />
         <Route path="/worker/services" element={<WorkerRoute><WorkerServicesPage /></WorkerRoute>} />
         <Route path="/worker/bookings" element={<WorkerRoute><WorkerBookingsPage /></WorkerRoute>} />
@@ -110,13 +115,17 @@ export function AppRoutes() {
         <Route path="/worker/availability" element={<WorkerRoute><WorkerAvailabilityPage /></WorkerRoute>} />
         <Route path="/worker/verification" element={<WorkerRoute><WorkerVerificationPage /></WorkerRoute>} />
         <Route path="/worker/reviews" element={<WorkerRoute><WorkerReviewsPage /></WorkerRoute>} />
+        <Route path="/worker/earnings" element={<WorkerRoute><WorkerEarningsPage /></WorkerRoute>} />
+        <Route path="/worker/safety/contacts" element={<WorkerRoute><EmergencyContactsPage /></WorkerRoute>} />
 
         {/* Admin Routes */}
         <Route path="/admin/dashboard" element={<AdminRoute><AdminDashboardPage /></AdminRoute>} />
         <Route path="/admin/services" element={<AdminRoute><AdminServicesPage /></AdminRoute>} />
         <Route path="/admin/bookings" element={<AdminRoute><AdminBookingsPage /></AdminRoute>} />
         <Route path="/admin/users" element={<AdminRoute><AdminUsersPage /></AdminRoute>} />
+        <Route path="/admin/workers" element={<AdminRoute><AdminWorkersPage /></AdminRoute>} />
         <Route path="/admin/verification" element={<AdminRoute><AdminVerificationPage /></AdminRoute>} />
+        <Route path="/admin/sos-alerts" element={<AdminRoute><AdminSOSAlertsPage /></AdminRoute>} />
 
         {/* 404 - Wildcard */}
         <Route path="*" element={<NotFoundPage />} />

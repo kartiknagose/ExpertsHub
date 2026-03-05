@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Users,
   Briefcase,
@@ -12,43 +12,58 @@ import {
   UserCog,
   ShieldCheck
 } from 'lucide-react';
-import { MainLayout } from '../../components/layout/MainLayout';
-import { PageHeader, Card, CardHeader, CardTitle, CardDescription, Button, Badge, Spinner, StatCard, Skeleton, SimpleBarChart, SimpleDonutChart, AsyncState } from '../../components/common';
-import { useTheme } from '../../context/ThemeContext';
+import { PageHeader, Card, CardHeader, CardTitle, CardDescription, Button, Badge, Spinner, StatCard, Skeleton, SimpleBarChart, SimpleDonutChart, AsyncState, StatGridSkeleton } from '../../components/common';
+import { useSocketEvent } from '../../hooks/useSocket';
 import { getAdminUsers, getAdminDashboard } from '../../api/admin';
 import { getAllBookings } from '../../api/bookings';
 import { getVerificationApplications } from '../../api/verification';
+import { MainLayout } from '../../components/layout/MainLayout';
+import { getPageLayout } from '../../constants/layout';
+import { queryKeys } from '../../utils/queryKeys';
 
 export function AdminDashboardPage() {
-  const { isDark } = useTheme();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const { data, isLoading, isError, error, refetch } = useQuery({
-    queryKey: ['admin-dashboard'],
+    queryKey: queryKeys.admin.dashboard(),
     queryFn: getAdminDashboard,
   });
 
   const bookingsQuery = useQuery({
-    queryKey: ['admin-bookings-preview'],
+    queryKey: queryKeys.admin.bookingsPreview(),
     queryFn: getAllBookings,
   });
 
   const usersQuery = useQuery({
-    queryKey: ['admin-users-preview'],
+    queryKey: queryKeys.admin.usersPreview(),
     queryFn: () => getAdminUsers(),
   });
 
   const stats = data?.stats;
-  const bookings = bookingsQuery.data?.bookings || [];
-  const users = usersQuery.data?.users || [];
+  const bookings = useMemo(() => bookingsQuery.data?.bookings || [], [bookingsQuery.data?.bookings]);
+  const users = useMemo(() => usersQuery.data?.users || [], [usersQuery.data?.users]);
 
   const verificationQuery = useQuery({
-    queryKey: ['admin-verification-preview'],
+    queryKey: queryKeys.admin.verificationPreview(),
     queryFn: getVerificationApplications,
   });
 
   const applications = verificationQuery.data?.applications || [];
   const pendingApplications = applications.filter(app => app.status === 'PENDING');
+
+  const refreshDashboardData = () => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.dashboard() });
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.bookingsPreview() });
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.verificationPreview() });
+  };
+
+  useSocketEvent('booking:created', refreshDashboardData);
+  useSocketEvent('booking:status_updated', refreshDashboardData);
+  useSocketEvent('verification:updated', refreshDashboardData);
+  useSocketEvent('verification:created', refreshDashboardData);
+  useSocketEvent('admin:users_updated', refreshDashboardData);
+  useSocketEvent('admin:workers_updated', refreshDashboardData);
 
   const chartData = useMemo(() => {
     // User Growth (Last 7 Days)
@@ -81,7 +96,7 @@ export function AdminDashboardPage() {
 
   return (
     <MainLayout>
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      <div className={getPageLayout('default')}>
         <PageHeader
           title="Admin Dashboard"
           subtitle="Monitor marketplace activity and system health."
@@ -92,19 +107,7 @@ export function AdminDashboardPage() {
           isError={isError}
           error={error}
           onRetry={refetch}
-          loadingFallback={
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-              {[...Array(4)].map((_, i) => (
-                <Card key={i} className="h-32 flex flex-col justify-between">
-                  <Skeleton className="h-4 w-24 mb-4" />
-                  <Skeleton className="h-8 w-16" />
-                  <div className="flex justify-end">
-                    <Skeleton className="h-10 w-10 rounded-xl" />
-                  </div>
-                </Card>
-              ))}
-            </div>
-          }
+          loadingFallback={<StatGridSkeleton />}
           errorFallback={
             <Card className="p-6">
               <p className="text-error-500 mb-3">
@@ -188,7 +191,7 @@ export function AdminDashboardPage() {
                   )}
 
                   {!bookingsQuery.isLoading && bookings.length === 0 && (
-                    <p className={isDark ? 'text-gray-300' : 'text-gray-600'}>
+                    <p className="text-gray-600 dark:text-gray-300">
                       No bookings yet.
                     </p>
                   )}
@@ -198,10 +201,10 @@ export function AdminDashboardPage() {
                       {bookings.slice(0, 5).map((booking) => (
                         <div key={booking.id} className="flex items-center justify-between">
                           <div>
-                            <p className={isDark ? 'text-gray-100' : 'text-gray-900'}>
+                            <p className="text-gray-900 dark:text-gray-100">
                               {booking.service?.name || `Booking #${booking.id}`}
                             </p>
-                            <p className={isDark ? 'text-gray-400 text-sm' : 'text-gray-600 text-sm'}>
+                            <p className="text-gray-600 text-sm dark:text-gray-400">
                               {new Date(booking.scheduledAt || booking.scheduledDate).toLocaleString()}
                             </p>
                           </div>
@@ -233,7 +236,7 @@ export function AdminDashboardPage() {
                   )}
 
                   {!usersQuery.isLoading && users.length === 0 && (
-                    <p className={isDark ? 'text-gray-300' : 'text-gray-600'}>
+                    <p className="text-gray-600 dark:text-gray-300">
                       No users yet.
                     </p>
                   )}
@@ -243,8 +246,8 @@ export function AdminDashboardPage() {
                       {users.slice(0, 5).map((user) => (
                         <div key={user.id} className="flex items-center justify-between">
                           <div>
-                            <p className={isDark ? 'text-gray-100' : 'text-gray-900'}>{user.name}</p>
-                            <p className={isDark ? 'text-gray-400 text-sm' : 'text-gray-600 text-sm'}>{user.email}</p>
+                            <p className="text-gray-900 dark:text-gray-100">{user.name}</p>
+                            <p className="text-gray-600 text-sm dark:text-gray-400">{user.email}</p>
                           </div>
                           <Badge variant={user.role === 'ADMIN' ? 'info' : user.role === 'WORKER' ? 'warning' : 'default'}>
                             {user.role}
@@ -275,7 +278,7 @@ export function AdminDashboardPage() {
 
                   {!verificationQuery.isLoading && pendingApplications.length === 0 && (
                     <div className="px-6 pb-6">
-                      <p className={isDark ? 'text-gray-300' : 'text-gray-600'}>
+                      <p className="text-gray-600 dark:text-gray-300">
                         No pending applications.
                       </p>
                     </div>
@@ -286,10 +289,10 @@ export function AdminDashboardPage() {
                       {pendingApplications.slice(0, 5).map((app) => (
                         <div key={app.id} className="flex items-center justify-between">
                           <div>
-                            <p className={`font-medium ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
+                            <p className="font-medium text-gray-900 dark:text-gray-100">
                               {app.user?.name || 'Worker'}
                             </p>
-                            <p className={isDark ? 'text-gray-400 text-sm' : 'text-gray-600 text-sm'}>
+                            <p className="text-gray-600 text-sm dark:text-gray-400">
                               Applied: {new Date(app.submittedAt).toLocaleDateString()}
                             </p>
                           </div>

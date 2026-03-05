@@ -10,7 +10,6 @@ import { Lock, Save } from 'lucide-react';
 import { MainLayout } from '../../components/layout/MainLayout';
 import { Card, CardHeader, CardTitle, CardDescription } from '../../components/common';
 import { Input, Button } from '../../components/common';
-import { useTheme } from '../../context/ThemeContext';
 import { resetPassword } from '../../api/auth';
 
 const resetPasswordSchema = z.object({
@@ -22,7 +21,6 @@ const resetPasswordSchema = z.object({
 });
 
 export function ResetPasswordPage() {
-  const { isDark } = useTheme();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [serverError, setServerError] = useState('');
@@ -91,7 +89,7 @@ export function ResetPasswordPage() {
             )}
 
             {successMessage && (
-              <p className={isDark ? 'text-sm text-success-400' : 'text-sm text-success-600'}>
+              <p className="text-sm text-success-600 dark:text-success-400">
                 {successMessage}
               </p>
             )}
@@ -107,7 +105,7 @@ export function ResetPasswordPage() {
             </Button>
 
             <div className="text-center text-sm">
-              <p className={isDark ? 'text-gray-400' : 'text-gray-600'}>
+              <p className="text-gray-600 dark:text-gray-400">
                 Go back to{' '}
                 <button
                   type="button"

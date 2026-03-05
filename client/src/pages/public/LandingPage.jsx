@@ -1,8 +1,8 @@
 // Landing page - First page users see
 // Shows app benefits, features, and CTA for registration
 
-import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import { motion as Motion } from 'framer-motion';
 import {
   Zap,
   Shield,
@@ -18,8 +18,8 @@ import {
 } from 'lucide-react';
 import { Button } from '../../components/common';
 import { MainLayout } from '../../components/layout/MainLayout';
-import { useTheme } from '../../context/ThemeContext';
 import { IMAGES, getServiceImage } from '../../constants/images';
+import { getPageLayout } from '../../constants/layout';
 
 /**
  * Landing Page Component
@@ -27,7 +27,6 @@ import { IMAGES, getServiceImage } from '../../constants/images';
  */
 export function LandingPage() {
   const navigate = useNavigate();
-  const { isDark } = useTheme();
 
   // Feature cards data
   const features = [
@@ -84,18 +83,18 @@ export function LandingPage() {
   return (
     <MainLayout>
       {/* Hero Section */}
-      <section className={`relative min-h-[90vh] flex items-center pt-20 overflow-hidden ${isDark ? 'bg-dark-950' : 'bg-white'}`}>
+      <section className="relative min-h-[90vh] flex items-center pt-20 overflow-hidden bg-white dark:bg-dark-950">
         {/* Animated Background Elements */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          <div className={`absolute top-0 right-[-10%] w-[50%] h-[50%] rounded-full blur-[120px] opacity-30 animate-pulse ${isDark ? 'bg-brand-500' : 'bg-brand-300'}`} />
-          <div className={`absolute bottom-0 left-[-10%] w-[50%] h-[50%] rounded-full blur-[120px] opacity-20 animate-pulse delay-1000 ${isDark ? 'bg-accent-500' : 'bg-accent-300'}`} />
+          <div className="absolute top-0 right-[-10%] w-[50%] h-[50%] rounded-full blur-[120px] opacity-30 animate-pulse bg-brand-300 dark:bg-brand-500" />
+          <div className="absolute bottom-0 left-[-10%] w-[50%] h-[50%] rounded-full blur-[120px] opacity-20 animate-pulse delay-1000 bg-accent-300 dark:bg-accent-500" />
         </div>
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 w-full">
+        <div className={`${getPageLayout('wide')} relative z-10 w-full`}>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
 
             {/* Left Column: Content */}
-            <motion.div
+            <Motion.div
               initial={{ opacity: 0, x: -30 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.8, ease: "easeOut" }}
@@ -103,8 +102,8 @@ export function LandingPage() {
             >
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full backdrop-blur-md border mb-8 animate-fade-in-up"
                 style={{
-                  backgroundColor: isDark ? 'rgba(59, 130, 246, 0.1)' : 'rgba(59, 130, 246, 0.1)',
-                  borderColor: isDark ? 'rgba(59, 130, 246, 0.2)' : 'rgba(59, 130, 246, 0.2)'
+                  backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                  borderColor: 'rgba(59, 130, 246, 0.2)'
                 }}>
                 <span className="relative flex h-2.5 w-2.5">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-400 opacity-75"></span>
@@ -115,14 +114,14 @@ export function LandingPage() {
                 </span>
               </div>
 
-              <h1 className={`text-5xl md:text-6xl lg:text-7xl font-extrabold mb-6 tracking-tight leading-[1.1] ${isDark ? 'text-white' : 'text-gray-900'}`}>
+              <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold mb-6 tracking-tight leading-[1.1] text-gray-900 dark:text-white">
                 Expert hands for <br />
                 <span className="bg-clip-text text-transparent bg-gradient-to-r from-brand-600 to-accent-500">
                   every home task
                 </span>
               </h1>
 
-              <p className={`text-xl md:text-2xl mb-10 max-w-2xl mx-auto lg:mx-0 leading-relaxed opacity-90 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
+              <p className="text-xl md:text-2xl mb-10 max-w-2xl mx-auto lg:mx-0 leading-relaxed opacity-90 text-gray-600 dark:text-gray-300">
                 The smartest way to book local professionals. Verified, insured, and ready to help you today.
               </p>
 
@@ -151,19 +150,19 @@ export function LandingPage() {
                   <div className="bg-green-500/20 p-1 rounded-full">
                     <CheckCircle className="text-green-500" size={16} strokeWidth={3} />
                   </div>
-                  <span className={`font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Verified Pros</span>
+                  <span className="font-medium text-gray-700 dark:text-gray-300">Verified Pros</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="bg-purple-500/20 p-1 rounded-full">
                     <Shield className="text-purple-500" size={16} strokeWidth={3} />
                   </div>
-                  <span className={`font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Insured Work</span>
+                  <span className="font-medium text-gray-700 dark:text-gray-300">Insured Work</span>
                 </div>
               </div>
-            </motion.div>
+            </Motion.div>
 
             {/* Right Column: Visual Composition */}
-            <motion.div
+            <Motion.div
               initial={{ opacity: 0, scale: 0.9, x: 50 }}
               animate={{ opacity: 1, scale: 1, x: 0 }}
               transition={{ duration: 0.8, delay: 0.2 }}
@@ -172,31 +171,31 @@ export function LandingPage() {
               <div className="grid grid-cols-2 gap-4 h-full relative z-10">
                 {/* Card 1 */}
                 <div className="space-y-4 pt-10">
-                  <motion.div
+                  <Motion.div
                     animate={{ y: [0, -10, 0] }}
                     transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-                    className={`p-6 rounded-3xl border shadow-xl backdrop-blur-xl ${isDark ? 'bg-dark-800/80 border-dark-700' : 'bg-white/90 border-gray-100'}`}
+                    className="p-6 rounded-3xl border shadow-xl backdrop-blur-xl bg-white/90 border-gray-100 dark:bg-dark-800/80 dark:border-dark-700"
                   >
                     <div className="flex items-center gap-3 mb-3">
                       <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
                         <Briefcase size={20} className="text-blue-600" />
                       </div>
                       <div>
-                        <h4 className={`font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Plumbing</h4>
+                        <h4 className="font-bold text-gray-900 dark:text-white">Plumbing</h4>
                         <p className="text-xs text-gray-500">Booked 2m ago</p>
                       </div>
                     </div>
                     <div className="h-2 bg-gray-200 dark:bg-dark-700 rounded-full w-full mb-2"></div>
                     <div className="h-2 bg-gray-200 dark:bg-dark-700 rounded-full w-2/3"></div>
-                  </motion.div>
+                  </Motion.div>
 
-                  <motion.div
+                  <Motion.div
                     animate={{ y: [0, 8, 0] }}
                     transition={{ duration: 5, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-                    className={`p-6 rounded-3xl border shadow-xl backdrop-blur-xl ${isDark ? 'bg-dark-800/80 border-dark-700' : 'bg-white/90 border-gray-100'}`}
+                    className="p-6 rounded-3xl border shadow-xl backdrop-blur-xl bg-white/90 border-gray-100 dark:bg-dark-800/80 dark:border-dark-700"
                   >
                     <div className="flex items-center justify-between mb-4">
-                      <h4 className={`font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Top Rated</h4>
+                      <h4 className="font-bold text-gray-900 dark:text-white">Top Rated</h4>
                       <span className="px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700 text-xs font-bold">4.9 ★</span>
                     </div>
                     <div className="flex gap-2">
@@ -205,15 +204,15 @@ export function LandingPage() {
                       <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-xs font-bold text-gray-500 border-2 border-white dark:border-dark-800">+5</div>
                     </div>
 
-                  </motion.div>
+                  </Motion.div>
                 </div>
 
                 {/* Card 2 */}
                 <div className="space-y-4">
-                  <motion.div
+                  <Motion.div
                     animate={{ y: [0, -15, 0] }}
                     transition={{ duration: 6, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
-                    className={`h-[300px] p-6 rounded-3xl border shadow-xl backdrop-blur-xl flex flex-col justify-end relative overflow-hidden ${isDark ? 'bg-brand-900/40 border-brand-800' : 'bg-brand-600 text-white border-brand-500'}`}
+                    className="h-[300px] p-6 rounded-3xl border shadow-xl backdrop-blur-xl flex flex-col justify-end relative overflow-hidden bg-brand-600 text-white border-brand-500 dark:bg-brand-900/40 dark:border-brand-800"
                   >
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent z-0"></div>
                     <img src={IMAGES.HERO_LANDING} alt="Worker" className="absolute inset-0 w-full h-full object-cover -z-10" />
@@ -225,55 +224,54 @@ export function LandingPage() {
                         <p className="text-white/80 text-sm">Professional Cleaner</p>
                       </div>
                     </div>
-                  </motion.div>
+                  </Motion.div>
                 </div>
               </div>
-            </motion.div>
+            </Motion.div>
 
           </div>
         </div>
       </section>
 
       {/* Benefits Section */}
-      <section className={`py-20 px-4 sm:px-6 lg:px-8 ${isDark ? 'bg-dark-900' : 'bg-gray-50'}`}>
-        <div className="max-w-7xl mx-auto">
-          <motion.div
+      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gray-50 dark:bg-dark-900">
+        <div className={getPageLayout('wide')}>
+          <Motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             className="text-center mb-16"
           >
-            <h2 className={`text-3xl md:text-4xl font-bold mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4 text-gray-900 dark:text-white">
               Why Millions Choose UrbanPro
             </h2>
-            <p className={`text-lg max-w-2xl mx-auto ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+            <p className="text-lg max-w-2xl mx-auto text-gray-600 dark:text-gray-400">
               We've re-imagined the home service experience to be seamless, safe, and superior.
             </p>
-          </motion.div>
+          </Motion.div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             {features.map((feature, index) => {
               const Icon = feature.icon;
               return (
-                <motion.div
+                <Motion.div
                   key={feature.title}
                   initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ delay: index * 0.1 }}
-                  className={`p-8 rounded-3xl border transition-all duration-300 hover:shadow-xl hover:-translate-y-1 ${isDark ? 'bg-dark-800 border-dark-700 hover:bg-dark-800/80' : 'bg-white border-gray-100 hover:border-brand-200'
-                    }`}
+                  className="p-8 rounded-3xl border transition-all duration-300 hover:shadow-xl hover:-translate-y-1 bg-white border-gray-100 hover:border-brand-200 dark:bg-dark-800 dark:border-dark-700 dark:hover:bg-dark-800/80"
                 >
                   <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 text-2xl ${feature.color} ${feature.bg}`}>
                     <Icon size={28} />
                   </div>
-                  <h3 className={`text-xl font-bold mb-3 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                  <h3 className="text-xl font-bold mb-3 text-gray-900 dark:text-white">
                     {feature.title}
                   </h3>
-                  <p className={`leading-relaxed ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                  <p className="leading-relaxed text-gray-600 dark:text-gray-400">
                     {feature.description}
                   </p>
-                </motion.div>
+                </Motion.div>
               );
             })}
           </div>
@@ -282,11 +280,11 @@ export function LandingPage() {
 
       {/* Services Section */}
       <section className="py-20 px-4 sm:px-6 lg:px-8 overflow-hidden">
-        <div className="max-w-7xl mx-auto">
+        <div className={getPageLayout('wide')}>
           <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-6">
             <div>
-              <h2 className={`text-3xl font-bold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>Popular Services</h2>
-              <p className={isDark ? 'text-gray-400' : 'text-gray-600'}>Most booked services in your area this week</p>
+              <h2 className="text-3xl font-bold mb-2 text-gray-900 dark:text-white">Popular Services</h2>
+              <p className="text-gray-600 dark:text-gray-400">Most booked services in your area this week</p>
             </div>
             <Button variant="ghost" onClick={() => navigate('/services')} className="group">
               View All Services <ArrowRight size={16} className="ml-2 group-hover:translate-x-1 transition-transform" />
@@ -295,7 +293,7 @@ export function LandingPage() {
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-4">
             {categories.map((category, index) => (
-              <motion.button
+              <Motion.button
                 key={category.name}
                 initial={{ opacity: 0, scale: 0.9 }}
                 whileInView={{ opacity: 1, scale: 1 }}
@@ -304,10 +302,7 @@ export function LandingPage() {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => navigate('/services')}
-                className={`group relative flex flex-col items-center justify-end p-4 h-32 rounded-2xl border overflow-hidden transition-all duration-200 shadow-md hover:shadow-xl ${isDark
-                    ? 'border-dark-700 hover:border-brand-500'
-                    : 'border-gray-100 hover:border-brand-400'
-                  }`}
+                className="group relative flex flex-col items-center justify-end p-4 h-32 rounded-2xl border overflow-hidden transition-all duration-200 shadow-md hover:shadow-xl border-gray-100 hover:border-brand-400 dark:border-dark-700 dark:hover:border-brand-500"
               >
                 {/* Background Image */}
                 <img
@@ -317,21 +312,21 @@ export function LandingPage() {
                 />
 
                 {/* Overlay */}
-                <div className={`absolute inset-0 bg-gradient-to-t ${isDark ? 'from-black/90 via-black/50 to-transparent' : 'from-black/80 via-black/40 to-transparent'}`}></div>
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent dark:from-black/90 dark:via-black/50"></div>
 
                 {/* Content */}
                 <div className="relative z-10 flex flex-col items-center">
                   <span className="text-xl mb-1 drop-shadow-md">{category.icon}</span>
                   <span className="text-xs font-bold text-center leading-tight text-white drop-shadow-md">{category.name}</span>
                 </div>
-              </motion.button>
+              </Motion.button>
             ))}
           </div>
         </div>
       </section>
 
       {/* Stats/Proof Section */}
-      <section className={`py-16 ${isDark ? 'bg-brand-900/20' : 'bg-brand-50'}`}>
+      <section className="py-16 bg-brand-50 dark:bg-brand-900/20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 divide-x divide-gray-200 dark:divide-gray-800">
             {stats.map((stat) => (
@@ -339,7 +334,7 @@ export function LandingPage() {
                 <div className={`text-4xl md:text-5xl font-extrabold mb-1 bg-gradient-to-r from-brand-600 to-brand-400 bg-clip-text text-transparent`}>
                   {stat.value}
                 </div>
-                <div className={`text-sm font-medium uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                <div className="text-sm font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                   {stat.label}
                 </div>
               </div>
@@ -350,11 +345,8 @@ export function LandingPage() {
 
       {/* CTA Section */}
       <section className="py-24 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-5xl mx-auto">
-          <div className={`relative rounded-[2.5rem] p-12 lg:p-16 text-center overflow-hidden isolate ${isDark
-            ? 'bg-gradient-to-br from-brand-900 to-dark-900'
-            : 'bg-gradient-to-br from-brand-600 to-brand-800'
-            } text-white shadow-2xl shadow-brand-900/20`}>
+        <div className={getPageLayout('narrow')}>
+          <div className="relative rounded-[2.5rem] p-12 lg:p-16 text-center overflow-hidden isolate bg-gradient-to-br from-brand-600 to-brand-800 dark:from-brand-900 dark:to-dark-900 text-white shadow-2xl shadow-brand-900/20">
 
             {/* Background Decor */}
             <div className="absolute top-0 left-0 w-full h-full overflow-hidden -z-10">

@@ -5,11 +5,10 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Mail, Lock, User, Briefcase, ArrowRight, CheckCircle } from 'lucide-react';
 import { MainLayout } from '../../components/layout/MainLayout';
 import { Input, Button, Badge } from '../../components/common';
-import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../hooks/useAuth';
 import { IMAGES } from '../../constants/images';
 
@@ -18,18 +17,18 @@ const registerSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
   email: z.string().email('Please enter a valid email'),
   mobile: z.string().min(10, 'Mobile must be at least 10 digits').regex(/^[0-9]+$/, 'Must be only digits'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
-  confirmPassword: z.string().min(6, 'Please confirm your password'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+  confirmPassword: z.string().min(8, 'Please confirm your password'),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ['confirmPassword'],
 });
 
 export function RegisterPage() {
-  const { isDark } = useTheme();
   const { register: registerUser, registerAsWorker, error: authError, clearError } = useAuth();
   const navigate = useNavigate();
-  const searchParams = new URLSearchParams(location.search);
+  const routerLocation = useLocation();
+  const searchParams = new URLSearchParams(routerLocation.search);
   const initialRole = searchParams.get('role') === 'worker' ? 'WORKER' : 'CUSTOMER';
   const [role, setRole] = useState(initialRole);
   const [serverError, setServerError] = useState('');
@@ -42,7 +41,6 @@ export function RegisterPage() {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-    reset,
   } = useForm({
     resolver: zodResolver(registerSchema),
   });
@@ -93,54 +91,94 @@ export function RegisterPage() {
 
   return (
     <MainLayout>
-      <div className={`min-h-[calc(100vh-64px)] flex ${isDark ? 'bg-dark-950' : 'bg-gray-50'}`}>
+<div className="min-h-[calc(100vh-64px)] flex bg-gray-50 dark:bg-dark-950">
 
         {/* Left Side - Visual Branding (Hidden on mobile) */}
-        <div className="hidden lg:flex flex-1 relative overflow-hidden bg-brand-600 items-center justify-center p-12">
-          <div className="absolute inset-0 bg-gradient-to-tr from-brand-500 to-accent-600 z-0"></div>
-          <div className="absolute inset-0 bg-cover bg-center opacity-20 z-0 mix-blend-overlay" style={{ backgroundImage: `url(${IMAGES.AUTH_REGISTER_BG})` }}></div>
+        <div className="hidden lg:flex flex-1 relative overflow-hidden items-center justify-center p-12">
+          {/* Gradient mesh background */}
+          <div className="absolute inset-0 bg-gradient-to-tr from-brand-600 via-accent-600 to-brand-700" />
+          <div className="absolute inset-0 opacity-25" style={{ backgroundImage: 'radial-gradient(circle at 20% 80%, rgba(255,255,255,0.2) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(255,255,255,0.1) 0%, transparent 40%)' }} />
+          {/* Decorative circles */}
+          <div className="absolute -top-20 -right-20 w-64 h-64 rounded-full border border-white/10" />
+          <div className="absolute -bottom-20 -left-20 w-80 h-80 rounded-full border border-white/10" />
 
+          <div className="relative z-10 max-w-lg text-white">
+            {/* Logo */}
+            <div className="flex items-center gap-3 mb-10">
+              <div className="w-10 h-10 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center">
+                <span className="text-white font-black text-xl">U</span>
+              </div>
+              <span className="text-2xl font-bold">UrbanPro</span>
+            </div>
 
-          <div className="relative z-10 max-w-lg text-white space-y-8">
-            <h1 className="text-5xl font-extrabold leading-tight">Join the {role === 'WORKER' ? 'Professional' : 'Customer'} Community</h1>
-            <p className="text-xl text-brand-100">
+            <h1 className="text-4xl xl:text-5xl font-extrabold mb-5 leading-tight">
+              Join the{' '}
+              <span className="text-white/80">
+                {role === 'WORKER' ? 'Professional' : 'Customer'}
+              </span>{' '}
+              Community
+            </h1>
+            <p className="text-lg text-brand-100 mb-10 leading-relaxed">
               {role === 'WORKER'
                 ? 'Expand your business, find new clients, and manage your schedule effortlessly.'
                 : 'Get access to top-rated professionals for all your home service needs.'}
             </p>
 
-            <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="bg-white p-1 rounded-full text-brand-600"><CheckCircle size={16} /></div>
-                <span className="font-medium text-lg">Verified & Secure Platform</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="bg-white p-1 rounded-full text-brand-600"><CheckCircle size={16} /></div>
-                <span className="font-medium text-lg">{role === 'WORKER' ? 'Guaranteed Payments' : 'Quality Assurance'}</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="bg-white p-1 rounded-full text-brand-600"><CheckCircle size={16} /></div>
-                <span className="font-medium text-lg">24/7 dedicated support</span>
-              </div>
+            {/* Benefits */}
+            <div className="space-y-4 mb-10">
+              {[
+                'Verified & Secure Platform',
+                role === 'WORKER' ? 'Guaranteed Payments' : 'Quality Assurance',
+                '24/7 Dedicated Support',
+              ].map((benefit) => (
+                <div key={benefit} className="flex items-center gap-3">
+                  <div className="w-6 h-6 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center shrink-0">
+                    <CheckCircle size={14} className="text-white" />
+                  </div>
+                  <span className="font-medium text-base">{benefit}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Stats cards */}
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { value: role === 'WORKER' ? '8K+' : '50K+', label: role === 'WORKER' ? 'Professionals' : 'Customers' },
+                { value: '120+', label: 'Cities' },
+                { value: '4.9★', label: 'Rating' },
+              ].map((stat) => (
+                <div key={stat.label} className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-4 text-center">
+                  <div className="text-xl font-black mb-0.5">{stat.value}</div>
+                  <div className="text-xs text-brand-200">{stat.label}</div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
 
         {/* Right Side - Register Form OR Success Message */}
-        <div className="flex-1 flex items-center justify-center p-6 sm:p-12 lg:p-24 relative overflow-y-auto">
+        <div className="flex-1 flex items-center justify-center p-6 sm:p-12 relative overflow-y-auto bg-white dark:bg-dark-950">
           <div className={`max-w-md w-full my-auto transition-all duration-300`}>
+
+            {/* Mobile Logo */}
+            <div className="flex lg:hidden items-center gap-2.5 mb-8">
+              <div className="w-8 h-8 bg-gradient-to-br from-brand-500 to-accent-500 rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold">U</span>
+              </div>
+              <span className="text-xl font-bold bg-gradient-to-r from-brand-500 to-accent-500 bg-clip-text text-transparent">UrbanPro</span>
+            </div>
 
             {isSuccess ? (
               <div className="text-center animate-fadeIn">
                 <div className="w-20 h-20 bg-success-100 text-success-600 rounded-full flex items-center justify-center mx-auto mb-6">
                   <Mail size={40} />
                 </div>
-                <h2 className={`text-3xl font-bold mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>Check your inbox</h2>
-                <p className={`text-lg mb-8 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
-                  We've sent a verification link to {submittedEmail || 'your email address'}. Please click the link to verify your account.
+                <h2 className="text-3xl font-bold mb-4 text-gray-900 dark:text-white">Check your inbox</h2>
+                <p className="text-lg mb-8 text-gray-600 dark:text-gray-300">
+                  We&apos;ve sent a verification link to {submittedEmail || 'your email address'}. Please click the link to verify your account.
                 </p>
                 <div className="p-4 bg-brand-50 dark:bg-brand-900/20 rounded-lg border border-brand-100 dark:border-brand-800 text-sm text-brand-700 dark:text-brand-300 mb-8">
-                  <strong>Tip:</strong> If you don't see the email, check your spam folder.
+                  <strong>Tip:</strong> If you don&apos;t see the email, check your spam folder.
                 </div>
                 <Button
                   fullWidth
@@ -152,9 +190,9 @@ export function RegisterPage() {
               </div>
             ) : (
               <>
-                <div className="text-center mb-8">
-                  <h2 className={`text-3xl font-bold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>Create Account</h2>
-                  <p className={isDark ? 'text-gray-400' : 'text-gray-600'}>Sign up to get started</p>
+                <div className="mb-8">
+                  <h2 className="text-3xl font-bold mb-2 text-gray-900 dark:text-white">Create Account</h2>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Sign up to get started for free</p>
                 </div>
 
                 {/* Role Switcher */}
@@ -249,7 +287,7 @@ export function RegisterPage() {
                   </Button>
 
                   <div className="mt-8 text-center border-t border-gray-200 dark:border-gray-800 pt-6">
-                    <p className={isDark ? 'text-gray-400' : 'text-gray-600'}>
+                    <p className="text-gray-600 dark:text-gray-400">
                       Already have an account?{' '}
                       <button
                         type="button"

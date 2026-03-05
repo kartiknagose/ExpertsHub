@@ -10,7 +10,6 @@ import { Mail, ArrowRight } from 'lucide-react';
 import { MainLayout } from '../../components/layout/MainLayout';
 import { Card, CardHeader, CardTitle, CardDescription } from '../../components/common';
 import { Input, Button } from '../../components/common';
-import { useTheme } from '../../context/ThemeContext';
 import { requestPasswordReset } from '../../api/auth';
 
 const forgotPasswordSchema = z.object({
@@ -18,7 +17,6 @@ const forgotPasswordSchema = z.object({
 });
 
 export function ForgotPasswordPage() {
-  const { isDark } = useTheme();
   const navigate = useNavigate();
   const [serverError, setServerError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
@@ -75,13 +73,13 @@ export function ForgotPasswordPage() {
             )}
 
             {successMessage && (
-              <p className={isDark ? 'text-sm text-success-400' : 'text-sm text-success-600'}>
+              <p className="text-sm text-success-600 dark:text-success-400">
                 {successMessage}
               </p>
             )}
 
             {resetLink && (
-              <div className={isDark ? 'text-sm text-gray-300' : 'text-sm text-gray-700'}>
+              <div className="text-sm text-gray-700 dark:text-gray-300">
                 <p>Reset link (dev):</p>
                 <button
                   type="button"
@@ -110,7 +108,7 @@ export function ForgotPasswordPage() {
             </Button>
 
             <div className="text-center text-sm">
-              <p className={isDark ? 'text-gray-400' : 'text-gray-600'}>
+              <p className="text-gray-600 dark:text-gray-400">
                 Remembered your password?{' '}
                 <button
                   type="button"

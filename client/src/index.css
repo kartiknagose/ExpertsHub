@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -15,9 +15,11 @@
     /* Slightly off-white background improves separation in light mode */
     @apply bg-neutral-50 text-neutral-900 antialiased;
     /* Subtle background accents to create depth in light mode */
-    background-image: radial-gradient(circle at 10% 10%, rgba(62,143,255,0.03), transparent 12%), radial-gradient(circle at 90% 80%, rgba(232,31,255,0.02), transparent 12%);
+    background-image: 
+      radial-gradient(circle at 10% 10%, rgba(62,143,255,0.04) 0%, transparent 40%),
+      radial-gradient(circle at 90% 80%, rgba(232,31,255,0.03) 0%, transparent 40%);
     font-feature-settings: 'cv11', 'ss01';
-    font-family: 'Space Grotesk', system-ui, -apple-system, sans-serif;
+    font-family: 'Space Grotesk', 'Inter', system-ui, -apple-system, sans-serif;
   }
 
   /* Hide native password reveal icons (Edge/Chrome) */
@@ -35,6 +37,9 @@
   /* Dark mode */
   .dark body {
     @apply bg-neutral-950 text-neutral-50;
+    background-image:
+      radial-gradient(circle at 15% 15%, rgba(62,143,255,0.06) 0%, transparent 40%),
+      radial-gradient(circle at 85% 75%, rgba(232,31,255,0.05) 0%, transparent 40%);
   }
 
   /* Focus styles */
@@ -170,16 +175,48 @@
 
   /* Custom Scrollbar */
   .scrollbar-thin::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
   }
 
   .scrollbar-thin::-webkit-scrollbar-track {
-    @apply bg-dark-100 rounded-full;
+    @apply bg-neutral-100 dark:bg-neutral-800 rounded-full;
   }
 
   .scrollbar-thin::-webkit-scrollbar-thumb {
-    @apply bg-dark-300 rounded-full hover:bg-dark-400;
+    @apply bg-neutral-300 dark:bg-neutral-600 rounded-full hover:bg-neutral-400 dark:hover:bg-neutral-500;
+  }
+
+  /* Glassmorphism utility */
+  .glass {
+    @apply backdrop-blur-md bg-white/80 dark:bg-dark-900/80 border border-white/20 dark:border-white/10;
+  }
+
+  .glass-strong {
+    @apply backdrop-blur-xl bg-white/90 dark:bg-dark-900/90 border border-white/30 dark:border-white/10;
+  }
+
+  /* Gradient text utility */
+  .gradient-text {
+    @apply bg-gradient-to-r from-brand-500 to-accent-500 bg-clip-text text-transparent;
+  }
+
+  /* Section padding */
+  .section-padding {
+    @apply py-16 px-4 sm:px-6 lg:px-8;
+  }
+
+  /* Animate fade in up */
+  .animate-fade-in-up {
+    animation: fadeInUp 0.6s ease-out both;
+  }
+
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+
+  .animate-float-delayed {
+    animation: float 6s ease-in-out 2s infinite;
   }
 }
 
@@ -191,4 +228,52 @@ html {
 /* Selection Style */
 ::selection {
   @apply bg-brand-200 text-brand-900;
+}
+
+/* Keyframe Animations */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-12px);
+  }
+}
+
+/* Card gradient borders */
+.card-gradient-border {
+  position: relative;
+  background: white;
+  border-radius: 1rem;
+  background-clip: padding-box;
+  border: 1px solid transparent;
+}
+
+.dark .card-gradient-border {
+  background: #1a1a1a;
+}
+
+.card-gradient-border::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, #3e8fff33, #e81fff33);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
 }

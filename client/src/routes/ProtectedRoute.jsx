@@ -1,5 +1,6 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth, useAuthStatus } from '../hooks/useAuth';
+import { FullPageSpinner } from '../components/ui/Spinner';
 
 /**
  * ProtectedRoute Component
@@ -19,16 +20,7 @@ export function ProtectedRoute({ children }) {
   const { isAuthenticated, isLoading } = useAuthStatus();
 
   // Step 1: Still checking if user is logged in
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-dark-900">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-500 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
-        </div>
-      </div>
-    );
-  }
+  if (isLoading) return <FullPageSpinner />;
 
   // Step 2: User is not logged in → redirect to login
   if (!isAuthenticated) {
@@ -53,16 +45,7 @@ export function ProtectedRoute({ children }) {
 export function AdminRoute({ children }) {
   const { isAuthenticated, isLoading, user } = useAuth();
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-dark-900">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-500 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
-        </div>
-      </div>
-    );
-  }
+  if (isLoading) return <FullPageSpinner />;
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
@@ -95,16 +78,7 @@ export function PublicRoute({ children }) {
   const allowPublic = new URLSearchParams(location.search).get('force') === 'true';
 
   // Step 1: Still checking
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-dark-900">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-500 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
-        </div>
-      </div>
-    );
-  }
+  if (isLoading) return <FullPageSpinner />;
 
   if (allowPublic) {
     return children;
@@ -128,48 +102,6 @@ export function PublicRoute({ children }) {
 }
 
 /**
- * AdminPublicRoute Component
- *
- * Public-only route for admin login
- * Redirects admin users to admin dashboard
- * Redirects non-admin logged-in users to their dashboard
- *
- * @param {Object} props
- * @param {React.ReactNode} props.children - Page component to show
- * @returns {React.ReactNode} Page or redirect
- */
-export function AdminPublicRoute({ children }) {
-  const { isAuthenticated, isLoading, user } = useAuth();
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-dark-900">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-500 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // If already logged in as admin, go to admin dashboard
-  if (isAuthenticated && user?.role === 'ADMIN') {
-    return <Navigate to="/admin/dashboard" replace />;
-  }
-
-  // If logged in but not admin, go to their dashboard
-  if (isAuthenticated && user?.role !== 'ADMIN') {
-    if (user?.role === 'WORKER') {
-      return <Navigate to="/worker/dashboard" replace />;
-    }
-    return <Navigate to="/dashboard" replace />;
-  }
-
-  // Not logged in, show admin login page
-  return children;
-}
-
-/**
  * WorkerRoute Component
  *
  * Wrapper for pages that require WORKER role
@@ -183,21 +115,7 @@ export function AdminPublicRoute({ children }) {
 export function WorkerRoute({ children }) {
   const { isAuthenticated, isLoading, user } = useAuth();
 
-  // Allow viewing UI without auth if explicitly enabled
-  if (import.meta.env.VITE_UI_PREVIEW_MODE === 'true') {
-    return children;
-  }
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-dark-900">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-500 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
-        </div>
-      </div>
-    );
-  }
+  if (isLoading) return <FullPageSpinner />;
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
@@ -228,21 +146,7 @@ export function WorkerRoute({ children }) {
 export function CustomerRoute({ children }) {
   const { isAuthenticated, isLoading, user } = useAuth();
 
-  // Allow viewing UI without auth if explicitly enabled
-  if (import.meta.env.VITE_UI_PREVIEW_MODE === 'true') {
-    return children;
-  }
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-dark-900">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-500 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
-        </div>
-      </div>
-    );
-  }
+  if (isLoading) return <FullPageSpinner />;
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;

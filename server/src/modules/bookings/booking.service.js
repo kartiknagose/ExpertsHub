@@ -17,9 +17,38 @@
  */
 
 const prisma = require('../../config/prisma'); // Our database connection
+const { randomInt } = require('crypto');
+const AppError = require('../../common/errors/AppError');
 
-// Helper to generate 4-digit OTP
-const generateOTP = () => Math.floor(1000 + Math.random() * 9000).toString();
+// Helper to generate 4-digit OTP (1000–9999)
+// Uses crypto.randomInt() — cryptographically secure, unlike Math.random().
+const generateOTP = () => randomInt(1000, 10000).toString();
+
+/**
+ * Fetch worker profile by userId. Throws AppError if not found.
+ * @param {number} userId
+ * @param {string} [errorMessage='Worker profile not found.']
+ * @param {number} [statusCode=404]
+ * @param {object} [include] - Optional Prisma include clause
+ * @returns {Promise<object>} workerProfile
+ */
+async function requireWorkerProfile(userId, errorMessage = 'Worker profile not found.', statusCode = 404, include) {
+  const profile = await prisma.workerProfile.findUnique({
+    where: { userId },
+    ...(include && { include }),
+  });
+  if (!profile) throw new AppError(statusCode, errorMessage);
+  return profile;
+}
+
+/**
+ * Check if a userId is the assigned worker for a booking.
+ * Returns true/false without throwing.
+ */
+async function isWorkerForBooking(userId, booking) {
+  const profile = await prisma.workerProfile.findUnique({ where: { userId } });
+  return !!(profile && booking.workerProfileId === profile.id);
+}
 
 
 /**
@@ -37,29 +66,82 @@ const generateOTP = () => Math.floor(1000 + Math.random() * 9000).toString();
  * @returns {Promise<object>} - The newly created booking
  * @throws {Error} - If validation fails (worker not found, service not offered, etc.)
  */
-// HELPER: Check if worker is available (2-hour buffer)
-async function isWorkerAvailable(workerId, date) {
-  const start = new Date(date);
-  const end = new Date(start.getTime() + 2 * 60 * 60 * 1000); // 2 hours later
+// HELPER: Check if worker is available for a given time slot.
+// Uses estimatedDuration (minutes) from existing bookings and the new booking
+// to detect true overlaps instead of a hardcoded 2-hour window.
+// Accepts optional `client` param to run inside a transaction (defaults to global prisma).
+const DEFAULT_DURATION_MINUTES = 120; // Fallback when estimatedDuration is not set
 
-  // Check for overlapping bookings
-  // A booking overlaps if it starts before our end AND ends after our start
-  // We check for any booking that starts within a +/- 2 hour window of the requested time
+async function isWorkerAvailable(workerId, date, client = prisma, durationMinutes = DEFAULT_DURATION_MINUTES) {
+  const newStart = new Date(date);
+  const newEnd = new Date(newStart.getTime() + durationMinutes * 60 * 1000);
 
-  const conflictingBooking = await prisma.booking.findFirst({
+  // 1. Check PENDING / CONFIRMED bookings — standard overlap on scheduledAt
+  const pendingConfirmed = await client.booking.findMany({
     where: {
       workerProfileId: workerId,
-      // PENDING direct requests also block the slot to prevent double-booking 
-      // while the worker is deciding.
-      status: { in: ['PENDING', 'CONFIRMED', 'IN_PROGRESS'] },
+      status: { in: ['PENDING', 'CONFIRMED'] },
       scheduledAt: {
-        gte: new Date(start.getTime() - 119 * 60 * 1000), // Check ~2 hours before
-        lt: end // Check up until our end time
-      }
-    }
+        gte: new Date(newStart.getTime() - 480 * 60 * 1000),
+        lt: new Date(newEnd.getTime() + 480 * 60 * 1000),
+      },
+    },
+    select: { scheduledAt: true, estimatedDuration: true },
   });
 
-  return !conflictingBooking;
+  const hasPendingConflict = pendingConfirmed.some((b) => {
+    const existStart = new Date(b.scheduledAt);
+    const existDur = b.estimatedDuration || DEFAULT_DURATION_MINUTES;
+    const existEnd = new Date(existStart.getTime() + existDur * 60 * 1000);
+    return existStart < newEnd && existEnd > newStart;
+  });
+
+  if (hasPendingConflict) return false;
+
+  // 2. Session-aware check for IN_PROGRESS bookings.
+  //    Worker is only blocked if:
+  //    a) There is a currently-active session (isActive=true), OR
+  //    b) There is a scheduled (future) session whose date overlaps the requested slot
+  const inProgressBookings = await client.booking.findMany({
+    where: {
+      workerProfileId: workerId,
+      status: 'IN_PROGRESS',
+    },
+    select: {
+      id: true,
+      scheduledAt: true,
+      estimatedDuration: true,
+      sessions: {
+        select: { sessionDate: true, isActive: true, endTime: true },
+      },
+    },
+  });
+
+  for (const booking of inProgressBookings) {
+    // If booking has no sessions, fall back to original overlap on scheduledAt
+    if (!booking.sessions || booking.sessions.length === 0) {
+      const existStart = new Date(booking.scheduledAt);
+      const existDur = booking.estimatedDuration || DEFAULT_DURATION_MINUTES;
+      const existEnd = new Date(existStart.getTime() + existDur * 60 * 1000);
+      if (existStart < newEnd && existEnd > newStart) return false;
+      continue;
+    }
+
+    for (const session of booking.sessions) {
+      // Active session = worker is on-site right now → block
+      if (session.isActive) return false;
+
+      // Scheduled future session (not yet ended) — check overlap
+      if (!session.endTime) {
+        const sessStart = new Date(session.sessionDate);
+        const sessDur = booking.estimatedDuration || DEFAULT_DURATION_MINUTES;
+        const sessEnd = new Date(sessStart.getTime() + sessDur * 60 * 1000);
+        if (sessStart < newEnd && sessEnd > newStart) return false;
+      }
+    }
+  }
+
+  return true;
 }
 
 // HELPER: Check if address is in worker's service area
@@ -73,7 +155,7 @@ function isLocationMatch(workerServiceAreas, address) {
 }
 
 async function createBooking(customerId, bookingData) {
-  const { workerProfileId, serviceId, scheduledDate, addressDetails, estimatedPrice, notes } = bookingData;
+  const { workerProfileId, serviceId, scheduledDate, addressDetails, latitude, longitude, estimatedPrice, notes, estimatedDuration } = bookingData;
 
   // LOGIC BRANCH: Is this a Direct Booking (worker selected) or Open Booking (no worker)?
   const isDirectBooking = !!workerProfileId;
@@ -84,112 +166,186 @@ async function createBooking(customerId, bookingData) {
   const oneHourLater = new Date(now.getTime() + 60 * 60 * 1000);
 
   if (scheduledDateObj <= now) {
-    throw new Error('Booking date must be in the future.');
+    throw new AppError(400, 'Booking date must be in the future.');
   }
 
   if (scheduledDateObj < oneHourLater) {
-    throw new Error('Bookings must be scheduled at least 1 hour in advance.');
+    throw new AppError(400, 'Bookings must be scheduled at least 1 hour in advance.');
   }
 
   // VALIDATE: Customer cannot book themselves as a worker (implicit check - they shouldn't be a worker)
-  const customer = await prisma.user.findUnique({ where: { id: customerId } });
   // Removed restriction: Workers can now book services too.
   /* if (customer.role === 'WORKER') {
     throw new Error('Workers cannot book services (use customer account instead).');
   } */
 
-  // VALIDATE: Worker specific checks (ONLY IF WORKER IS SELECTED)
-  if (isDirectBooking) {
-    // Verify the worker exists and has a worker profile
-    const workerProfile = await prisma.workerProfile.findUnique({
-      where: { id: workerProfileId },
-    });
-
-    if (!workerProfile) {
-      throw new Error('Worker not found. Please select a valid worker.');
-    }
-
-    // CHECK 1: LOCATION
-    if (!isLocationMatch(workerProfile.serviceAreas, addressDetails)) {
-      throw new Error(`This worker only accepts jobs in: ${workerProfile.serviceAreas?.join(', ') || 'their local area'}. Address provided: ${addressDetails}`);
-    }
-
-    // CHECK 2: AVAILABILITY
-    if (!(await isWorkerAvailable(workerProfileId, scheduledDateObj))) {
-      throw new Error('Worker is already booked for this time slot. Please choose another time.');
-    }
-  }
-
-  // VALIDATE: Verify the service exists
-  const service = await prisma.service.findUnique({
-    where: { id: serviceId },
-  });
-
-  if (!service) {
-    throw new Error('Service not found. Please select a valid service.');
-  }
-
-  // VALIDATE: Verify the worker actually offers this service (ONLY IF WORKER IS SELECTED)
-  if (isDirectBooking) {
-    const workerOffersService = await prisma.workerService.findUnique({
-      where: {
-        workerId_serviceId: {
-          workerId: workerProfileId,
-          serviceId: serviceId,
-        },
-      },
-    });
-
-    if (!workerOffersService) {
-      throw new Error('This worker does not offer the selected service. Please choose another worker or service.');
-    }
-  }
-
-  // VALIDATE: Address must be at least 10 characters
-  if (!addressDetails || addressDetails.length < 10) {
-    throw new Error('Address must be at least 10 characters long.');
+  // VALIDATE: Address must be valid
+  if (!addressDetails || addressDetails.length < 5) {
+    throw new AppError(400, 'Please provide a valid address or select one on the map.');
   }
 
   // VALIDATE: Price must be positive (if provided)
   if (estimatedPrice !== undefined && (isNaN(estimatedPrice) || estimatedPrice < 0)) {
-    throw new Error('Estimated price must be a positive number.');
+    throw new AppError(400, 'Estimated price must be a positive number.');
   }
 
   // VALIDATE: Price cannot exceed reasonable limit (e.g., $100,000)
   if (estimatedPrice !== undefined && estimatedPrice > 100000) {
-    throw new Error('Estimated price seems too high. Please check and try again.');
+    throw new AppError(400, 'Estimated price seems too high. Please check and try again.');
   }
 
-  // Create booking with transaction to ensure atomicity
-  const newBooking = await prisma.booking.create({
-    data: {
-      customerId: customerId,
+  // VALIDATE: Worker specific checks (ONLY IF WORKER IS SELECTED)
+  // All DB reads + the booking create are wrapped in a transaction to prevent
+  // race conditions (two customers booking the same worker/slot simultaneously).
+  const newBooking = await prisma.$transaction(async (tx) => {
+    if (isDirectBooking) {
+      // Verify the worker exists and has a worker profile
+      const workerProfile = await tx.workerProfile.findUnique({
+        where: { id: workerProfileId },
+      });
 
-      workerProfileId: isDirectBooking ? workerProfileId : null, // Null for Open Booking
-      serviceId: serviceId,
-      scheduledAt: scheduledDateObj,
-      address: addressDetails,
-      totalPrice: estimatedPrice,
-      notes: notes,
-      status: 'PENDING',
-    },
-    include: {
-      service: {
-        select: { id: true, name: true, category: true },
+      if (!workerProfile) {
+        throw new AppError(404, 'Worker not found. Please select a valid worker.');
+      }
+
+      // CHECK 1: LOCATION
+      if (!isLocationMatch(workerProfile.serviceAreas, addressDetails)) {
+        throw new AppError(400, `This worker only accepts jobs in: ${workerProfile.serviceAreas?.join(', ') || 'their local area'}. Address provided: ${addressDetails}`);
+      }
+
+      // CHECK 2: AVAILABILITY (uses tx to read within the same transaction)
+      if (!(await isWorkerAvailable(workerProfileId, scheduledDateObj, tx, estimatedDuration || DEFAULT_DURATION_MINUTES))) {
+        throw new AppError(409, 'Worker is already booked for this time slot. Please choose another time.');
+      }
+    }
+
+    // VALIDATE: Verify the service exists
+    const service = await tx.service.findUnique({
+      where: { id: serviceId },
+    });
+
+    if (!service) {
+      throw new AppError(404, 'Service not found. Please select a valid service.');
+    }
+
+    // VALIDATE: Verify the worker actually offers this service (ONLY IF WORKER IS SELECTED)
+    if (isDirectBooking) {
+      const workerOffersService = await tx.workerService.findUnique({
+        where: {
+          workerId_serviceId: {
+            workerId: workerProfileId,
+            serviceId: serviceId,
+          },
+        },
+      });
+
+      if (!workerOffersService) {
+        throw new AppError(400, 'This worker does not offer the selected service. Please choose another worker or service.');
+      }
+    }
+
+    // Create the booking
+    return await tx.booking.create({
+      data: {
+        customerId: customerId,
+        workerProfileId: isDirectBooking ? workerProfileId : null,
+        serviceId: serviceId,
+        scheduledAt: scheduledDateObj,
+        address: addressDetails,
+        latitude: latitude ? Number(latitude) : null,
+        longitude: longitude ? Number(longitude) : null,
+        totalPrice: estimatedPrice,
+        notes: notes,
+        estimatedDuration: estimatedDuration || null,
+        status: 'PENDING',
       },
-      reviews: true,
-      workerProfile: {
-        select: {
-          id: true,
-          userId: true,
-          user: { select: { id: true, name: true, email: true, mobile: true, profilePhotoUrl: true, rating: true, totalReviews: true } },
+      include: {
+        service: {
+          select: { id: true, name: true, category: true },
+        },
+        reviews: true,
+        workerProfile: {
+          select: {
+            id: true,
+            userId: true,
+            user: { select: { id: true, name: true, email: true, mobile: true, profilePhotoUrl: true, rating: true, totalReviews: true } },
+          },
+        },
+        customer: {
+          select: { id: true, name: true, email: true, mobile: true, profilePhotoUrl: true, rating: true, totalReviews: true },
         },
       },
-      customer: {
-        select: { id: true, name: true, email: true, mobile: true, profilePhotoUrl: true, rating: true, totalReviews: true },
-      },
-    },
+    });
   });
+
+  // 5. If it's an OPEN booking (no worker selected), broadcast to matching workers
+  if (!isDirectBooking && latitude && longitude) {
+    // INTEGRATED PHASE 2.3: Intelligent Live Matching
+    // 1. Find workers who are ONLINE and near the job
+    const workersWithLiveLocation = await prisma.workerLocation.findMany({
+      where: {
+        isOnline: true,
+        workerProfile: {
+          services: { some: { serviceId } }
+        }
+      },
+      include: {
+        workerProfile: {
+          include: {
+            user: { select: { id: true, name: true } }
+          }
+        }
+      }
+    });
+
+    // 2. Identify and Score Eligible Workers
+    const eligibleWorkers = workersWithLiveLocation.map(loc => {
+      const distance = Math.sqrt(
+        Math.pow((loc.latitude - latitude) * 111, 2) +
+        Math.pow((loc.longitude - longitude) * 111, 2)
+      );
+
+      // Simple Scoring Algorithm
+      // Base: Distance (max 50 points, 0 if distance > 10km)
+      const distanceScore = Math.max(0, 50 - (distance * 5));
+      // Multiplier: Trust/Verification (max 50 points)
+      const trustScore = (loc.workerProfile.verificationScore || 0) / 2;
+      const levelBonus = loc.workerProfile.verificationLevel === 'PREMIUM' ? 20 :
+        loc.workerProfile.verificationLevel === 'VERIFIED' ? 10 : 0;
+
+      const totalScore = distanceScore + trustScore + levelBonus;
+
+      return {
+        ...loc.workerProfile,
+        distance,
+        matchScore: totalScore
+      };
+    }).filter(w => w.distance <= (w.serviceRadius || 10))
+      .sort((a, b) => b.matchScore - a.matchScore);
+
+    // 3. Notify Online Pros via Socket.io
+    // Workers with higher scores get notified first or more prominently
+    try {
+      const { getIo } = require('../../socket');
+      const io = getIo();
+      if (io) {
+        eligibleWorkers.forEach((worker, _index) => {
+          // In a high-traffic app, we might delay notification for lower scores
+          // For now, we broadcast to all within radius, but could include the score
+          io.to(`user:${worker.userId}`).emit('booking:available', {
+            bookingId: newBooking.id,
+            serviceName: newBooking.service.name,
+            address: addressDetails,
+            scheduledAt: scheduledDateObj,
+            matchScore: Math.round(worker.matchScore),
+            distance: worker.distance.toFixed(1)
+          });
+        });
+      }
+    } catch (err) {
+      console.warn('Socket broadcast failed:', err.message);
+    }
+  }
 
   return newBooking;
 }
@@ -211,48 +367,47 @@ async function createBooking(customerId, bookingData) {
  * @param {string} role - The user's role (CUSTOMER, WORKER, or ADMIN)
  * @returns {Promise<array>} - List of bookings for this user
  */
-async function getBookingsByUser(userId, role) {
+async function getBookingsByUser(userId, role, { skip = 0, limit = 20 } = {}) {
   let whereClause = {};
 
   if (role === 'CUSTOMER') {
     whereClause = { customerId: userId };
   } else if (role === 'WORKER') {
-    const workerProfile = await prisma.workerProfile.findUnique({
-      where: { userId },
-    });
-    if (workerProfile) {
-      whereClause = { workerProfileId: workerProfile.id };
-    } else {
-      whereClause = { workerProfileId: -1 };
-    }
+    const workerProfile = await prisma.workerProfile.findUnique({ where: { userId } });
+    whereClause = { workerProfileId: workerProfile ? workerProfile.id : -1 };
   }
 
-  const bookings = await prisma.booking.findMany({
-    where: whereClause,
-    include: {
-      service: {
-        select: { id: true, name: true, category: true },
-      },
-      reviews: {
-        select: { id: true, reviewerId: true, rating: true },
-      },
-      workerProfile: {
-        select: {
-          id: true,
-          userId: true,
-          user: { select: { id: true, name: true, email: true, mobile: true, profilePhotoUrl: true, rating: true, totalReviews: true } },
+  const [data, total] = await Promise.all([
+    prisma.booking.findMany({
+      where: whereClause,
+      include: {
+        service: {
+          select: { id: true, name: true, category: true },
+        },
+        reviews: {
+          select: { id: true, reviewerId: true, rating: true },
+        },
+        workerProfile: {
+          select: {
+            id: true,
+            userId: true,
+            user: { select: { id: true, name: true, email: true, mobile: true, profilePhotoUrl: true, rating: true, totalReviews: true } },
+          },
+        },
+        customer: {
+          select: { id: true, name: true, email: true, mobile: true, profilePhotoUrl: true, rating: true, totalReviews: true },
         },
       },
-      customer: {
-        select: { id: true, name: true, email: true, mobile: true, profilePhotoUrl: true, rating: true, totalReviews: true },
+      orderBy: {
+        createdAt: 'desc',
       },
-    },
-    orderBy: {
-      createdAt: 'desc',
-    },
-  });
+      skip,
+      take: limit,
+    }),
+    prisma.booking.count({ where: whereClause }),
+  ]);
 
-  return bookings;
+  return { data, total };
 }
 
 /**
@@ -282,6 +437,7 @@ async function getBookingById(bookingId, userId, role) {
         select: {
           id: true,
           userId: true,
+          location: true,
           user: { select: { id: true, name: true, email: true, mobile: true, profilePhotoUrl: true, rating: true, totalReviews: true } }
         },
       },
@@ -292,21 +448,15 @@ async function getBookingById(bookingId, userId, role) {
   });
 
   if (!booking) {
-    throw new Error('Booking not found.');
+    throw new AppError(404, 'Booking not found.');
   }
 
   const isCustomer = booking.customerId === userId;
-  let isWorker = false;
-  if (role === 'WORKER') {
-    const workerProfile = await prisma.workerProfile.findUnique({
-      where: { userId },
-    });
-    isWorker = workerProfile && booking.workerProfileId === workerProfile.id;
-  }
+  const isWorker = role === 'WORKER' ? await isWorkerForBooking(userId, booking) : false;
   const isAdmin = role === 'ADMIN';
 
   if (!isCustomer && !isWorker && !isAdmin) {
-    throw new Error('You do not have permission to view this booking.');
+    throw new AppError(403, 'You do not have permission to view this booking.');
   }
 
   return booking;
@@ -339,20 +489,14 @@ async function updateBookingStatus(bookingId, newStatus, userId, role) {
   });
 
   if (!booking) {
-    throw new Error('Booking not found.');
+    throw new AppError(404, 'Booking not found.');
   }
 
-  let isWorker = false;
-  if (role === 'WORKER') {
-    const workerProfile = await prisma.workerProfile.findUnique({
-      where: { userId },
-    });
-    isWorker = workerProfile && booking.workerProfileId === workerProfile.id;
-  }
+  const isWorker = role === 'WORKER' ? await isWorkerForBooking(userId, booking) : false;
   const isAdmin = role === 'ADMIN';
 
   if (!isWorker && !isAdmin) {
-    throw new Error('Only the assigned worker or admin can update booking status.');
+    throw new AppError(403, 'Only the assigned worker or admin can update booking status.');
   }
 
   // Use transaction to prevent race conditions where two workers update simultaneously
@@ -372,11 +516,11 @@ async function updateBookingStatus(bookingId, newStatus, userId, role) {
     };
 
     if (!validTransitions[currentBooking.status].includes(newStatus)) {
-      throw new Error(`Cannot transition from ${currentBooking.status} to ${newStatus}`);
+      throw new AppError(400, `Cannot transition from ${currentBooking.status} to ${newStatus}`);
     }
 
     // Update the booking
-    return await tx.booking.update({
+    const updated = await tx.booking.update({
       where: { id: bookingId },
       data: {
         status: newStatus,
@@ -405,6 +549,11 @@ async function updateBookingStatus(bookingId, newStatus, userId, role) {
         customer: { select: { id: true, name: true, email: true, mobile: true, profilePhotoUrl: true, rating: true, totalReviews: true } },
       },
     });
+
+    // Record audit trail
+    await recordStatusChange(bookingId, currentBooking.status, newStatus, userId, null, tx);
+
+    return updated;
   });
 
   return updatedBooking;
@@ -432,50 +581,57 @@ async function cancelBooking(bookingId, userId, role, cancellationReason) {
   });
 
   if (!booking) {
-    throw new Error('Booking not found.');
+    throw new AppError(404, 'Booking not found.');
   }
 
   if (booking.status === 'CANCELLED') {
-    throw new Error('This booking is already cancelled.');
+    throw new AppError(400, 'This booking is already cancelled.');
   }
 
   if (booking.status === 'COMPLETED') {
-    throw new Error('Cannot cancel a completed booking.');
+    throw new AppError(400, 'Cannot cancel a completed booking.');
   }
 
   const isCustomer = booking.customerId === userId;
-  let isWorker = false;
-  if (role === 'WORKER') {
-    const workerProfile = await prisma.workerProfile.findUnique({
-      where: { userId },
-    });
-    isWorker = workerProfile && booking.workerProfileId === workerProfile.id;
-  }
+  const isWorker = role === 'WORKER' ? await isWorkerForBooking(userId, booking) : false;
   const isAdmin = role === 'ADMIN';
 
   if (!isCustomer && !isWorker && !isAdmin) {
-    throw new Error('You do not have permission to cancel this booking.');
+    throw new AppError(403, 'You do not have permission to cancel this booking.');
   }
 
-  const cancelledBooking = await prisma.booking.update({
-    where: { id: bookingId },
-    data: {
-      status: 'CANCELLED',
-      cancellationReason: cancellationReason || 'No reason provided',
-      updatedAt: new Date(),
-    },
-    include: {
-      service: { select: { id: true, name: true, category: true } },
-      reviews: true,
-      workerProfile: {
-        select: {
-          id: true,
-          userId: true,
-          user: { select: { id: true, name: true, email: true } },
-        },
+  // Enforce cancellation policy (admins bypass penalties)
+  const policy = getCancellationPolicy(booking);
+  if (!policy.allowed) {
+    throw new AppError(400, policy.reason);
+  }
+
+  const cancelledBooking = await prisma.$transaction(async (tx) => {
+    const updated = await tx.booking.update({
+      where: { id: bookingId },
+      data: {
+        status: 'CANCELLED',
+        cancellationReason: cancellationReason || 'No reason provided',
+        cancellationPenaltyPercent: isAdmin ? 0 : policy.penaltyPercent,
+        updatedAt: new Date(),
       },
-      customer: { select: { id: true, name: true, email: true } },
-    },
+      include: {
+        service: { select: { id: true, name: true, category: true } },
+        reviews: true,
+        workerProfile: {
+          select: {
+            id: true,
+            userId: true,
+            user: { select: { id: true, name: true, email: true } },
+          },
+        },
+        customer: { select: { id: true, name: true, email: true } },
+      },
+    });
+
+    await recordStatusChange(bookingId, booking.status, 'CANCELLED', userId, cancellationReason, tx);
+
+    return updated;
   });
 
   return cancelledBooking;
@@ -496,19 +652,19 @@ async function payBooking(bookingId, userId, userRole, paymentReference) {
   });
 
   if (!booking) {
-    throw new Error('Booking not found.');
+    throw new AppError(404, 'Booking not found.');
   }
 
   if (userRole !== 'CUSTOMER' || booking.customerId !== userId) {
-    throw new Error('Only the booking customer can pay for this booking.');
+    throw new AppError(403, 'Only the booking customer can pay for this booking.');
   }
 
   if (booking.status === 'CANCELLED') {
-    throw new Error('Cannot pay for a cancelled booking.');
+    throw new AppError(400, 'Cannot pay for a cancelled booking.');
   }
 
   if (booking.paymentStatus === 'PAID') {
-    throw new Error('Booking is already paid.');
+    throw new AppError(400, 'Booking is already paid.');
   }
 
   const reference = paymentReference || `manual-${Date.now()}`;
@@ -550,47 +706,45 @@ async function payBooking(bookingId, userId, userRole, paymentReference) {
  * - Worker sees jobs in their AREA (if we had location filtering)
  * - Only shows PENDING jobs with NO assigned worker
  */
-async function getOpenBookingsForWorker(userId) {
+async function getOpenBookingsForWorker(userId, { skip = 0, limit = 20 } = {}) {
   // 1. Get the worker's profile and their services
-  const worker = await prisma.workerProfile.findUnique({
-    where: { userId },
-    include: {
-      services: {
-        select: { serviceId: true }
-      }
-    }
+  const worker = await requireWorkerProfile(userId, 'Worker profile not found.', 404, {
+    services: { select: { serviceId: true } }
   });
-
-  if (!worker) {
-    throw new Error('Worker profile not found.');
-  }
 
   const workerServiceIds = worker.services.map(s => s.serviceId);
 
+  const where = {
+    status: 'PENDING',
+    workerProfileId: null, // Open booking
+    serviceId: { in: workerServiceIds } // Matches worker's skills
+  };
+
   // 2. Find PENDING bookings with NO worker assigned, matching their services
-  const openBookings = await prisma.booking.findMany({
-    where: {
-      status: 'PENDING',
-      workerProfileId: null, // Open booking
-      serviceId: { in: workerServiceIds } // Matches worker's skills
-    },
-    include: {
-      service: { select: { id: true, name: true, category: true, basePrice: true } },
-      customer: {
-        select: {
-          id: true,
-          name: true,
-          addresses: {
-            take: 1,
-            select: { city: true }
+  const [openBookings, total] = await Promise.all([
+    prisma.booking.findMany({
+      where,
+      include: {
+        service: { select: { id: true, name: true, category: true, basePrice: true } },
+        customer: {
+          select: {
+            id: true,
+            name: true,
+            addresses: {
+              take: 1,
+              select: { city: true }
+            }
           }
         }
-      }
-    },
-    orderBy: {
-      scheduledAt: 'asc' // Show urgent jobs first
-    }
-  });
+      },
+      orderBy: {
+        scheduledAt: 'asc' // Show urgent jobs first
+      },
+      skip,
+      take: limit,
+    }),
+    prisma.booking.count({ where }),
+  ]);
 
   // 3. Filter by Location (Service Area)
   // Only show jobs where the job address matches one of the worker's service areas
@@ -599,13 +753,16 @@ async function getOpenBookingsForWorker(userId) {
   });
 
   // Map to flatten city for frontend convenience
-  return relevantBookings.map(booking => ({
-    ...booking,
-    customer: {
-      ...booking.customer,
-      city: booking.customer.addresses?.[0]?.city || 'Local Area'
-    }
-  }));
+  return {
+    data: relevantBookings.map(booking => ({
+      ...booking,
+      customer: {
+        ...booking.customer,
+        city: booking.customer.addresses?.[0]?.city || 'Local Area'
+      }
+    })),
+    total,
+  };
 }
 
 /**
@@ -617,13 +774,7 @@ async function getOpenBookingsForWorker(userId) {
  * - Worker ID is assigned to the booking
  */
 async function acceptBooking(bookingId, userId) {
-  const worker = await prisma.workerProfile.findUnique({
-    where: { userId }
-  });
-
-  if (!worker) {
-    throw new Error('Only registered workers can accept bookings.');
-  }
+  const worker = await requireWorkerProfile(userId, 'Only registered workers can accept bookings.', 403);
 
   // Transaction to ensure no two workers accept the same job at the exact same millisecond
   return prisma.$transaction(async (tx) => {
@@ -631,19 +782,20 @@ async function acceptBooking(bookingId, userId) {
       where: { id: bookingId }
     });
 
-    if (!booking) throw new Error('Booking not found.');
+    if (!booking) throw new AppError(404, 'Booking not found.');
 
-    if (booking.workerProfileId !== null) {
-      throw new Error('This booking has already been accepted by another worker.');
+    // For direct bookings: only the assigned worker can accept
+    if (booking.workerProfileId !== null && booking.workerProfileId !== worker.id) {
+      throw new AppError(409, 'This booking has already been accepted by another worker.');
     }
 
     if (booking.status !== 'PENDING') {
-      throw new Error('Booking is no longer available.');
+      throw new AppError(409, 'Booking is no longer available.');
     }
 
-    // CHECK AVAILABILITY: Prevents double booking
-    if (!(await isWorkerAvailable(worker.id, booking.scheduledAt))) {
-      throw new Error('You cannot accept this job because you have another booking scheduled near this time.');
+    // CHECK AVAILABILITY: Prevents double booking (uses booking's estimatedDuration)
+    if (!(await isWorkerAvailable(worker.id, booking.scheduledAt, tx, booking.estimatedDuration || DEFAULT_DURATION_MINUTES))) {
+      throw new AppError(409, 'You cannot accept this job because you have another booking scheduled near this time.');
     }
 
     // Assign to worker and confirm, generating Start OTP
@@ -663,7 +815,9 @@ async function acceptBooking(bookingId, userId) {
       }
     });
 
-    return updated; // In real app, SMS/Email this OTP to customer
+    await recordStatusChange(bookingId, 'PENDING', 'CONFIRMED', userId, 'Worker accepted booking', tx);
+
+    return updated;
   });
 
 }
@@ -673,29 +827,48 @@ async function acceptBooking(bookingId, userId) {
  * Worker enters OTP provided by Customer
  */
 async function verifyBookingStart(bookingId, otp, userId) {
-  const worker = await prisma.workerProfile.findUnique({ where: { userId } });
-  if (!worker) throw new Error('Only workers can start jobs.');
+  const worker = await requireWorkerProfile(userId, 'Only workers can start jobs.', 403);
 
   const booking = await prisma.booking.findUnique({ where: { id: bookingId } });
 
-  if (!booking) throw new Error('Booking not found.');
-  if (booking.workerProfileId !== worker.id) throw new Error('You are not assigned to this job.');
-  if (booking.status !== 'CONFIRMED') throw new Error('Job must be CONFIRMED before starting.');
+  if (!booking) throw new AppError(404, 'Booking not found.');
+  if (booking.workerProfileId !== worker.id) throw new AppError(403, 'You are not assigned to this job.');
+  if (booking.status !== 'CONFIRMED') throw new AppError(400, 'Job must be CONFIRMED before starting.');
 
   if (booking.startOtp !== otp) {
-    throw new Error('Invalid Start OTP.');
+    throw new AppError(400, 'Invalid Start OTP.');
   }
 
   // OTP Valid -> Start Job and generate Completion OTP
-  return prisma.booking.update({
-    where: { id: bookingId },
-    data: {
-      status: 'IN_PROGRESS',
-      startedAt: new Date(),
-      completionOtp: generateOTP(), // Generate completion OTP now
-      otpGeneratedAt: new Date(),
-      updatedAt: new Date()
-    }
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.booking.update({
+      where: { id: bookingId },
+      data: {
+        status: 'IN_PROGRESS',
+        startedAt: new Date(),
+        completionOtp: generateOTP(),
+        otpGeneratedAt: new Date(),
+        updatedAt: new Date()
+      },
+      include: {
+        service: { select: { id: true, name: true, category: true } },
+        reviews: true,
+        workerProfile: {
+          select: {
+            id: true,
+            userId: true,
+            user: { select: { id: true, name: true, email: true, mobile: true, profilePhotoUrl: true, rating: true, totalReviews: true } },
+          },
+        },
+        customer: {
+          select: { id: true, name: true, email: true, mobile: true, profilePhotoUrl: true, rating: true, totalReviews: true },
+        },
+      },
+    });
+
+    await recordStatusChange(bookingId, 'CONFIRMED', 'IN_PROGRESS', userId, 'OTP verified — job started', tx);
+
+    return updated;
   });
 }
 
@@ -704,27 +877,46 @@ async function verifyBookingStart(bookingId, otp, userId) {
  * Worker enters OTP provided by Customer
  */
 async function verifyBookingCompletion(bookingId, otp, userId) {
-  const worker = await prisma.workerProfile.findUnique({ where: { userId } });
-  if (!worker) throw new Error('Only workers can complete jobs.');
+  const worker = await requireWorkerProfile(userId, 'Only workers can complete jobs.', 403);
 
   const booking = await prisma.booking.findUnique({ where: { id: bookingId } });
 
-  if (!booking) throw new Error('Booking not found.');
-  if (booking.workerProfileId !== worker.id) throw new Error('You are not assigned to this job.');
-  if (booking.status !== 'IN_PROGRESS') throw new Error('Job must be IN_PROGRESS before completing.');
+  if (!booking) throw new AppError(404, 'Booking not found.');
+  if (booking.workerProfileId !== worker.id) throw new AppError(403, 'You are not assigned to this job.');
+  if (booking.status !== 'IN_PROGRESS') throw new AppError(400, 'Job must be IN_PROGRESS before completing.');
 
   if (booking.completionOtp !== otp) {
-    throw new Error('Invalid Completion OTP.');
+    throw new AppError(400, 'Invalid Completion OTP.');
   }
 
   // OTP Valid -> Complete Job
-  return prisma.booking.update({
-    where: { id: bookingId },
-    data: {
-      status: 'COMPLETED',
-      completedAt: new Date(),
-      updatedAt: new Date()
-    }
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.booking.update({
+      where: { id: bookingId },
+      data: {
+        status: 'COMPLETED',
+        completedAt: new Date(),
+        updatedAt: new Date()
+      },
+      include: {
+        service: { select: { id: true, name: true, category: true } },
+        reviews: true,
+        workerProfile: {
+          select: {
+            id: true,
+            userId: true,
+            user: { select: { id: true, name: true, email: true, mobile: true, profilePhotoUrl: true, rating: true, totalReviews: true } },
+          },
+        },
+        customer: {
+          select: { id: true, name: true, email: true, mobile: true, profilePhotoUrl: true, rating: true, totalReviews: true },
+        },
+      },
+    });
+
+    await recordStatusChange(bookingId, 'IN_PROGRESS', 'COMPLETED', userId, 'OTP verified — job completed', tx);
+
+    return updated;
   });
 }
 
@@ -739,5 +931,344 @@ module.exports = {
   getOpenBookingsForWorker,
   acceptBooking,
   verifyBookingStart,
-  verifyBookingCompletion
+  verifyBookingCompletion,
+  // Session management (Phase 7)
+  getBookingSessions,
+  createSession,
+  startSession,
+  endSession,
+  // Audit trail (Phase 7)
+  recordStatusChange,
+  // Booking lifecycle (Phase 7)
+  rescheduleBooking,
+  expirePendingBookings,
+  // Overrun detection & Cancellation policy (Phase 7)
+  detectOverrunSessions,
+  getCancellationPolicy,
 };
+
+// ─── SESSION MANAGEMENT (Phase 7) ──────────────────────────────────
+
+/**
+ * Get all sessions for a booking.
+ */
+async function getBookingSessions(bookingId, userId, role) {
+  const booking = await prisma.booking.findUnique({ where: { id: bookingId } });
+  if (!booking) throw new AppError(404, 'Booking not found.');
+
+  // Auth check: customer, assigned worker, or admin
+  const isCustomer = booking.customerId === userId;
+  const isWorker = role === 'WORKER' ? await isWorkerForBooking(userId, booking) : false;
+  const isAdmin = role === 'ADMIN';
+  if (!isCustomer && !isWorker && !isAdmin) {
+    throw new AppError(403, 'You do not have permission to view sessions for this booking.');
+  }
+
+  return prisma.bookingSession.findMany({
+    where: { bookingId },
+    orderBy: { sessionDate: 'asc' },
+  });
+}
+
+/**
+ * Create a follow-up session for a multi-day booking.
+ * Only the assigned worker can schedule a next visit.
+ * Booking must be IN_PROGRESS.
+ */
+async function createSession(bookingId, userId, { sessionDate, notes }) {
+  const worker = await requireWorkerProfile(userId, 'Only workers can schedule sessions.', 403);
+
+  const booking = await prisma.booking.findUnique({ where: { id: bookingId } });
+  if (!booking) throw new AppError(404, 'Booking not found.');
+  if (booking.workerProfileId !== worker.id) throw new AppError(403, 'You are not assigned to this booking.');
+  if (booking.status !== 'IN_PROGRESS') throw new AppError(400, 'Booking must be IN_PROGRESS to schedule a session.');
+
+  const sessionDateObj = new Date(sessionDate);
+  if (sessionDateObj <= new Date()) {
+    throw new AppError(400, 'Session date must be in the future.');
+  }
+
+  // Ensure no overlapping active session
+  const activeSession = await prisma.bookingSession.findFirst({
+    where: { bookingId, isActive: true },
+  });
+  if (activeSession) {
+    throw new AppError(409, 'There is already an active session. End it before scheduling the next one.');
+  }
+
+  // Generate OTP for this session's start verification
+  const otp = generateOTP();
+
+  return prisma.bookingSession.create({
+    data: {
+      bookingId,
+      sessionDate: sessionDateObj,
+      startOtp: otp,
+      notes: notes || null,
+    },
+  });
+}
+
+/**
+ * Start a session (worker verifies the session OTP).
+ * Sets isActive=true, startTime=now, otpVerified=true.
+ */
+async function startSession(sessionId, otp, userId) {
+  const worker = await requireWorkerProfile(userId, 'Only workers can start sessions.', 403);
+
+  const session = await prisma.bookingSession.findUnique({
+    where: { id: sessionId },
+    include: { booking: true },
+  });
+
+  if (!session) throw new AppError(404, 'Session not found.');
+  if (session.booking.workerProfileId !== worker.id) throw new AppError(403, 'You are not assigned to this booking.');
+  if (session.isActive) throw new AppError(400, 'Session is already active.');
+  if (session.endTime) throw new AppError(400, 'Session has already ended.');
+
+  if (session.startOtp !== otp) {
+    throw new AppError(400, 'Invalid session OTP.');
+  }
+
+  return prisma.bookingSession.update({
+    where: { id: sessionId },
+    data: {
+      isActive: true,
+      startTime: new Date(),
+      otpVerified: true,
+    },
+  });
+}
+
+/**
+ * End an active session.
+ * Sets isActive=false, endTime=now.
+ */
+async function endSession(sessionId, userId, { notes } = {}) {
+  const worker = await requireWorkerProfile(userId, 'Only workers can end sessions.', 403);
+
+  const session = await prisma.bookingSession.findUnique({
+    where: { id: sessionId },
+    include: { booking: true },
+  });
+
+  if (!session) throw new AppError(404, 'Session not found.');
+  if (session.booking.workerProfileId !== worker.id) throw new AppError(403, 'You are not assigned to this booking.');
+  if (!session.isActive) throw new AppError(400, 'Session is not currently active.');
+
+  return prisma.bookingSession.update({
+    where: { id: sessionId },
+    data: {
+      isActive: false,
+      endTime: new Date(),
+      ...(notes && { notes }),
+    },
+  });
+}
+
+// ─── AUDIT TRAIL (Phase 7) ─────────────────────────────────────────
+
+/**
+ * Record a status change in the audit trail.
+ */
+async function recordStatusChange(bookingId, fromStatus, toStatus, changedBy, reason, client = prisma) {
+  return client.bookingStatusHistory.create({
+    data: {
+      bookingId,
+      fromStatus,
+      toStatus,
+      changedBy,
+      reason: reason || null,
+    },
+  });
+}
+
+// ─── RESCHEDULING (Phase 7) ────────────────────────────────────────
+
+/**
+ * Reschedule a booking to a new date/time.
+ * Preserves worker assignment. Only PENDING or CONFIRMED bookings can be rescheduled.
+ */
+async function rescheduleBooking(bookingId, userId, role, { newScheduledDate }) {
+  const booking = await prisma.booking.findUnique({ where: { id: bookingId } });
+  if (!booking) throw new AppError(404, 'Booking not found.');
+
+  // Only customer, assigned worker, or admin can reschedule
+  const isCustomer = booking.customerId === userId;
+  const isWorker = role === 'WORKER' ? await isWorkerForBooking(userId, booking) : false;
+  const isAdmin = role === 'ADMIN';
+  if (!isCustomer && !isWorker && !isAdmin) {
+    throw new AppError(403, 'You do not have permission to reschedule this booking.');
+  }
+
+  if (!['PENDING', 'CONFIRMED'].includes(booking.status)) {
+    throw new AppError(400, 'Only PENDING or CONFIRMED bookings can be rescheduled.');
+  }
+
+  const newDate = new Date(newScheduledDate);
+  const oneHourLater = new Date(Date.now() + 60 * 60 * 1000);
+  if (newDate < oneHourLater) {
+    throw new AppError(400, 'New date must be at least 1 hour in the future.');
+  }
+
+  // If worker is assigned, check their availability at the new time
+  if (booking.workerProfileId) {
+    const available = await isWorkerAvailable(
+      booking.workerProfileId,
+      newDate,
+      prisma,
+      booking.estimatedDuration || DEFAULT_DURATION_MINUTES
+    );
+    if (!available) {
+      throw new AppError(409, 'Worker is not available at the new time. Please choose another time.');
+    }
+  }
+
+  const oldDate = booking.scheduledAt;
+  const updated = await prisma.booking.update({
+    where: { id: bookingId },
+    data: { scheduledAt: newDate },
+    include: {
+      service: { select: { id: true, name: true, category: true } },
+      workerProfile: {
+        select: {
+          id: true, userId: true,
+          user: { select: { id: true, name: true, email: true, mobile: true, profilePhotoUrl: true, rating: true, totalReviews: true } },
+        },
+      },
+      customer: { select: { id: true, name: true, email: true, mobile: true, profilePhotoUrl: true, rating: true, totalReviews: true } },
+    },
+  });
+
+  await recordStatusChange(bookingId, booking.status, booking.status, userId,
+    `Rescheduled from ${oldDate.toISOString()} to ${newDate.toISOString()}`);
+
+  return updated;
+}
+
+// ─── BOOKING TIMEOUT / AUTO-EXPIRY (Phase 7) ──────────────────────
+
+/**
+ * Expire PENDING bookings older than the given threshold.
+ * Called by a scheduled job (cron). Returns count of expired bookings.
+ */
+async function expirePendingBookings(hoursThreshold = 24) {
+  const cutoff = new Date(Date.now() - hoursThreshold * 60 * 60 * 1000);
+
+  const expired = await prisma.booking.findMany({
+    where: {
+      status: 'PENDING',
+      createdAt: { lt: cutoff },
+    },
+    select: { id: true, status: true },
+  });
+
+  if (expired.length === 0) return 0;
+
+  await prisma.$transaction(async (tx) => {
+    await tx.booking.updateMany({
+      where: { id: { in: expired.map(b => b.id) } },
+      data: { status: 'CANCELLED', cancellationReason: 'Auto-expired: no worker accepted within the time limit.' },
+    });
+
+    // Record audit trail for each
+    for (const b of expired) {
+      await tx.bookingStatusHistory.create({
+        data: {
+          bookingId: b.id,
+          fromStatus: b.status,
+          toStatus: 'CANCELLED',
+          changedBy: null, // System-initiated
+          reason: 'Auto-expired: no worker accepted within the time limit.',
+        },
+      });
+    }
+  });
+
+  return expired.length;
+}
+
+// ─── OVERRUN DETECTION (Phase 7) ──────────────────────────────────
+
+/**
+ * Detect active sessions that have exceeded the booking's estimated duration.
+ * Returns list of overrun sessions with booking/customer info for notification.
+ * Called by a scheduled job (e.g., every 15 minutes).
+ */
+async function detectOverrunSessions() {
+  const activeSessions = await prisma.bookingSession.findMany({
+    where: { isActive: true, startTime: { not: null } },
+    include: {
+      booking: {
+        select: {
+          id: true,
+          estimatedDuration: true,
+          customerId: true,
+          service: { select: { name: true } },
+          workerProfile: {
+            select: { user: { select: { name: true } } },
+          },
+        },
+      },
+    },
+  });
+
+  const now = new Date();
+  const overruns = [];
+
+  for (const session of activeSessions) {
+    const durationMs = now.getTime() - session.startTime.getTime();
+    const expectedMs = (session.booking.estimatedDuration || DEFAULT_DURATION_MINUTES) * 60 * 1000;
+
+    if (durationMs > expectedMs) {
+      const overrunMinutes = Math.round((durationMs - expectedMs) / 60000);
+      overruns.push({
+        sessionId: session.id,
+        bookingId: session.booking.id,
+        customerId: session.booking.customerId,
+        serviceName: session.booking.service?.name,
+        workerName: session.booking.workerProfile?.user?.name,
+        overrunMinutes,
+        startTime: session.startTime,
+      });
+    }
+  }
+
+  return overruns;
+}
+
+// ─── CANCELLATION POLICY (Phase 7) ────────────────────────────────
+
+/**
+ * Calculate cancellation penalty based on timing.
+ * Returns: { allowed, penaltyPercent, reason }
+ *
+ * Policy:
+ * - > 24h before: free cancellation (0%)
+ * - 12–24h before: 25% penalty
+ * - 2–12h before: 50% penalty
+ * - < 2h before: 100% penalty (no refund)
+ * - IN_PROGRESS: 100% penalty
+ */
+function getCancellationPolicy(booking) {
+  if (booking.status === 'IN_PROGRESS') {
+    return { allowed: true, penaltyPercent: 100, reason: 'Job is already in progress — full charge applies.' };
+  }
+
+  if (booking.status === 'COMPLETED' || booking.status === 'CANCELLED') {
+    return { allowed: false, penaltyPercent: 0, reason: `Cannot cancel a ${booking.status.toLowerCase()} booking.` };
+  }
+
+  const hoursUntil = (new Date(booking.scheduledAt).getTime() - Date.now()) / (1000 * 60 * 60);
+
+  if (hoursUntil > 24) {
+    return { allowed: true, penaltyPercent: 0, reason: 'Free cancellation (more than 24 hours before scheduled time).' };
+  }
+  if (hoursUntil > 12) {
+    return { allowed: true, penaltyPercent: 25, reason: '25% cancellation fee (12–24 hours before scheduled time).' };
+  }
+  if (hoursUntil > 2) {
+    return { allowed: true, penaltyPercent: 50, reason: '50% cancellation fee (2–12 hours before scheduled time).' };
+  }
+  return { allowed: true, penaltyPercent: 100, reason: 'Full charge — cancellation less than 2 hours before scheduled time.' };
+}

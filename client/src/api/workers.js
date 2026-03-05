@@ -11,6 +11,17 @@ const WORKERS_ENDPOINTS = {
   ADD_SERVICE: '/workers/services',
   WORKER_SERVICES: (workerId) => `/workers/${workerId}/services`,
   DELETE_SERVICE: (serviceId) => `/workers/services/${serviceId}`,
+  PUBLIC_PROFILE: (workerId) => `/workers/${workerId}`,
+};
+
+/**
+ * Get public profile of a worker
+ * @param {number} workerId - Worker's profile ID
+ * @returns {Promise} Response with worker profile and their services
+ */
+export const getWorkerPublicProfile = async (workerId) => {
+  const response = await axiosInstance.get(WORKERS_ENDPOINTS.PUBLIC_PROFILE(workerId));
+  return response.data;
 };
 
 /**

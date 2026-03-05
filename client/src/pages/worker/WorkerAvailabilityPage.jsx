@@ -3,14 +3,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Clock, PlusCircle, Trash2 } from 'lucide-react';
 import { MainLayout } from '../../components/layout/MainLayout';
 import { Card, CardHeader, CardTitle, CardDescription } from '../../components/common';
-import { Button, Badge, AsyncState } from '../../components/common';
-import { useTheme } from '../../context/ThemeContext';
+import { Button, Badge, AsyncState, PageHeader, Select, Input } from '../../components/common';
 import { createAvailability, deleteAvailability, getMyAvailability } from '../../api/availability';
+import { getPageLayout } from '../../constants/layout';
+import { queryKeys } from '../../utils/queryKeys';
 
 const dayLabels = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 export function WorkerAvailabilityPage() {
-  const { isDark } = useTheme();
   const queryClient = useQueryClient();
   const [formState, setFormState] = useState({
     dayOfWeek: String(new Date().getDay()),
@@ -20,14 +20,14 @@ export function WorkerAvailabilityPage() {
   const [formError, setFormError] = useState('');
 
   const availabilityQuery = useQuery({
-    queryKey: ['availability'],
+    queryKey: queryKeys.worker.availability(),
     queryFn: getMyAvailability,
   });
 
   const createMutation = useMutation({
     mutationFn: (payload) => createAvailability(payload),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['availability'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.worker.availability() });
       setFormError('');
       // Reset time but keep day for easier multiple entries
       setFormState(prev => ({ ...prev, startTime: '09:00', endTime: '17:00' }));
@@ -37,11 +37,11 @@ export function WorkerAvailabilityPage() {
   const deleteMutation = useMutation({
     mutationFn: (availabilityId) => deleteAvailability(availabilityId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['availability'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.worker.availability() });
     },
   });
 
-  const availability = availabilityQuery.data?.availability || [];
+  const availability = useMemo(() => availabilityQuery.data?.availability || [], [availabilityQuery.data?.availability]);
 
   const grouped = useMemo(() => {
     const initial = dayLabels.map(() => []);
@@ -73,15 +73,11 @@ export function WorkerAvailabilityPage() {
 
   return (
     <MainLayout>
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        <div className="mb-8">
-          <h1 className={`text-4xl font-bold ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
-            Availability
-          </h1>
-          <p className={isDark ? 'text-gray-400 mt-2' : 'text-gray-600 mt-2'}>
-            Add time slots so customers know when you are available.
-          </p>
-        </div>
+      <div className={getPageLayout('default')}>
+        <PageHeader
+          title="Availability"
+          subtitle="Add time slots so customers know when you are available."
+        />
 
         <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-6">
           <Card>
@@ -91,59 +87,43 @@ export function WorkerAvailabilityPage() {
             </CardHeader>
 
             <form onSubmit={handleSubmit} className="space-y-4 px-6 pb-6">
-              <div>
-                <label className={isDark ? 'block text-sm font-medium text-gray-200 mb-2' : 'block text-sm font-medium text-gray-700 mb-2'}>
-                  Day of Week
-                </label>
-                <select
-                  className={`w-full px-4 py-2.5 rounded-lg border transition-colors duration-200 focus:outline-none focus:ring-2 ${isDark
-                    ? 'bg-dark-800 border-dark-600 text-gray-100 focus:border-brand-500 focus:ring-brand-500/50'
-                    : 'bg-white border-gray-300 text-gray-900 focus:border-brand-600 focus:ring-brand-600/50'
-                    }`}
-                  value={formState.dayOfWeek}
-                  onChange={(event) => handleChange('dayOfWeek', event.target.value)}
-                >
-                  {dayLabels.map((label, index) => (
-                    <option key={label} value={index}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <Select
+                label="Day of Week"
+                value={formState.dayOfWeek}
+                onChange={(event) => handleChange('dayOfWeek', event.target.value)}
+              >
+                {dayLabels.map((label, index) => (
+                  <option key={label} value={index}>
+                    {label}
+                  </option>
+                ))}
+              </Select>
 
-              <div>
-                <label className={isDark ? 'block text-sm font-medium text-gray-200 mb-2' : 'block text-sm font-medium text-gray-700 mb-2'}>
-                  Start Time
-                </label>
-                <input
-                  type="time"
-                  value={formState.startTime}
-                  onChange={(event) => handleChange('startTime', event.target.value)}
-                  className={`w-full px-4 py-2.5 rounded-lg border transition-colors duration-200 focus:outline-none focus:ring-2 ${isDark
-                    ? 'bg-dark-800 border-dark-600 text-gray-100 focus:border-brand-500 focus:ring-brand-500/50'
-                    : 'bg-white border-gray-300 text-gray-900 focus:border-brand-600 focus:ring-brand-600/50'
-                    }`}
-                />
-              </div>
+              <Input
+                type="time"
+                label="Start Time"
+                icon={Clock}
+                value={formState.startTime}
+                onChange={(event) => handleChange('startTime', event.target.value)}
+              />
 
-              <div>
-                <label className={isDark ? 'block text-sm font-medium text-gray-200 mb-2' : 'block text-sm font-medium text-gray-700 mb-2'}>
-                  End Time
-                </label>
-                <input
-                  type="time"
-                  value={formState.endTime}
-                  onChange={(event) => handleChange('endTime', event.target.value)}
-                  className={`w-full px-4 py-2.5 rounded-lg border transition-colors duration-200 focus:outline-none focus:ring-2 ${isDark
-                    ? 'bg-dark-800 border-dark-600 text-gray-100 focus:border-brand-500 focus:ring-brand-500/50'
-                    : 'bg-white border-gray-300 text-gray-900 focus:border-brand-600 focus:ring-brand-600/50'
-                    }`}
-                />
-              </div>
+              <Input
+                type="time"
+                label="End Time"
+                icon={Clock}
+                value={formState.endTime}
+                onChange={(event) => handleChange('endTime', event.target.value)}
+              />
 
               {createMutation.isError && (
                 <p className="text-sm text-error-500">
                   {createMutation.error?.response?.data?.error || createMutation.error?.message || 'Failed to add availability.'}
+                </p>
+              )}
+
+              {formError && (
+                <p className="text-sm text-error-500">
+                  {formError}
                 </p>
               )}
 
@@ -183,7 +163,7 @@ export function WorkerAvailabilityPage() {
                   <div key={dayLabels[index]}>
                     <div className="flex items-center gap-2 mb-2">
                       <Clock size={16} className="text-brand-500" />
-                      <span className={isDark ? 'text-gray-200 font-medium' : 'text-gray-800 font-medium'}>
+                      <span className="text-gray-800 dark:text-gray-200 font-medium">
                         {dayLabels[index]}
                       </span>
                       <Badge variant={slots.length > 0 ? 'info' : 'default'}>
@@ -192,7 +172,7 @@ export function WorkerAvailabilityPage() {
                     </div>
 
                     {slots.length === 0 && (
-                      <p className={isDark ? 'text-gray-400 text-sm' : 'text-gray-600 text-sm'}>
+                      <p className="text-gray-600 dark:text-gray-400 text-sm">
                         No slots for this day.
                       </p>
                     )}
@@ -201,7 +181,7 @@ export function WorkerAvailabilityPage() {
                       <div className="space-y-2">
                         {slots.map((slot) => (
                           <div key={slot.id} className="flex items-center justify-between rounded-lg border px-4 py-2">
-                            <span className={isDark ? 'text-gray-200' : 'text-gray-800'}>
+                            <span className="text-gray-800 dark:text-gray-200">
                               {slot.startTime} - {slot.endTime}
                             </span>
                             <Button

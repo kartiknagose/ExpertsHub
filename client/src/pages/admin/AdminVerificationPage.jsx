@@ -5,31 +5,39 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ShieldCheck, XCircle, AlertTriangle, FileText, ExternalLink } from 'lucide-react';
 import { MainLayout } from '../../components/layout/MainLayout';
-import { Card, CardHeader, CardTitle, CardDescription } from '../../components/common';
-import { Badge, Button, AsyncState } from '../../components/common';
-import { useTheme } from '../../context/ThemeContext';
+import { Card, CardHeader, CardTitle, CardDescription, Input } from '../../components/common';
+import { Badge, Button, AsyncState, PageHeader, VerificationStatusBadge } from '../../components/common';
 import { getVerificationApplications, reviewVerificationApplication } from '../../api/verification';
-import { getVerificationStatusVariant } from '../../utils/statusHelpers';
 import { resolveProfilePhotoUrl } from '../../utils/profilePhoto';
-
+import { getPageLayout } from '../../constants/layout';
+import { queryKeys } from '../../utils/queryKeys';
+import { useSocketEvent } from '../../hooks/useSocket';
 export function AdminVerificationPage() {
-  const { isDark } = useTheme();
   const queryClient = useQueryClient();
   const [notes, setNotes] = useState({});
 
   const { data, isLoading, isError, error, refetch } = useQuery({
-    queryKey: ['verification-applications'],
+    queryKey: queryKeys.verification.applications(),
     queryFn: getVerificationApplications,
   });
 
   const reviewMutation = useMutation({
     mutationFn: ({ id, payload }) => reviewVerificationApplication(id, payload),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['verification-applications'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.verification.applications() });
     },
   });
 
   const applications = data?.applications || [];
+
+  const refreshVerificationData = () => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.verification.applications() });
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.verificationPreview() });
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.dashboard() });
+  };
+
+  useSocketEvent('verification:created', refreshVerificationData);
+  useSocketEvent('verification:updated', refreshVerificationData);
 
   const handleReview = (id, status) => {
     reviewMutation.mutate({
@@ -43,15 +51,11 @@ export function AdminVerificationPage() {
 
   return (
     <MainLayout>
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        <div className="mb-8">
-          <h1 className={`text-4xl font-bold ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
-            Verification Requests
-          </h1>
-          <p className={isDark ? 'text-gray-400 mt-2' : 'text-gray-600 mt-2'}>
-            Review worker verification applications and update status.
-          </p>
-        </div>
+      <div className={getPageLayout('default')}>
+        <PageHeader
+          title="Verification Requests"
+          subtitle="Review worker verification applications and update status."
+        />
 
         <AsyncState
           isLoading={isLoading}
@@ -89,15 +93,13 @@ export function AdminVerificationPage() {
                         Submitted: {new Date(application.submittedAt).toLocaleString()}
                       </CardDescription>
                     </div>
-                    <Badge variant={getVerificationStatusVariant(application.status)}>
-                      {application.status}
-                    </Badge>
+                    <VerificationStatusBadge status={application.status} />
                   </div>
                 </CardHeader>
 
                 <div className="px-6 pb-6 space-y-6">
                   {/* User Details */}
-                  <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 text-sm ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600 dark:text-gray-300">
                     <div>
                       <span className="font-semibold block text-xs uppercase tracking-wider mb-1 opacity-70">Contact Info</span>
                       <p>Email: {application.user?.email || 'N/A'}</p>
@@ -113,7 +115,7 @@ export function AdminVerificationPage() {
                   {/* Documents Section */}
                   {application.documents && application.documents.length > 0 && (
                     <div>
-                      <h4 className={`text-sm font-semibold mb-3 ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>Submitted Documents</h4>
+                      <h4 className="text-sm font-semibold mb-3 text-gray-800 dark:text-gray-200">Submitted Documents</h4>
                       <div className="flex flex-wrap gap-4">
                         {application.documents.map((doc) => {
                           const docUrl = resolveProfilePhotoUrl(doc.url);
@@ -124,7 +126,7 @@ export function AdminVerificationPage() {
                                 href={docUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className={`block w-32 h-32 rounded-lg border overflow-hidden relative ${isDark ? 'border-dark-600 bg-dark-800' : 'border-gray-200 bg-gray-50'}`}
+                                className="block w-32 h-32 rounded-lg border overflow-hidden relative border-gray-200 bg-gray-50 dark:border-dark-600 dark:bg-dark-800"
                                 onClick={(e) => {
                                   if (!docUrl) e.preventDefault();
                                 }}
@@ -145,7 +147,7 @@ export function AdminVerificationPage() {
                                   <ExternalLink size={20} className="text-white drop-shadow-md" />
                                 </div>
                               </a>
-                              <p className={`text-xs mt-1.5 font-medium truncate w-32 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                              <p className="text-xs mt-1.5 font-medium truncate w-32 text-gray-600 dark:text-gray-400">
                                 {doc.type.replace('_', ' ')}
                               </p>
                             </div>
@@ -157,7 +159,7 @@ export function AdminVerificationPage() {
 
                   {/* Worker Notes */}
                   {application.notes && (
-                    <div className={`p-4 rounded-lg text-sm ${isDark ? 'bg-dark-800 text-gray-300' : 'bg-gray-50 text-gray-600'}`}>
+                    <div className="p-4 rounded-lg text-sm bg-gray-50 text-gray-600 dark:bg-dark-800 dark:text-gray-300">
                       <span className="font-semibold block mb-1 text-xs uppercase opacity-70">Worker Note</span>
                       {application.notes}
                     </div>
@@ -165,19 +167,16 @@ export function AdminVerificationPage() {
 
                   {/* Admin Action Area */}
                   {application.status !== 'APPROVED' && application.status !== 'REJECTED' && (
-                    <div className={`pt-4 border-t ${isDark ? 'border-dark-700' : 'border-gray-100'}`}>
-                      <label className={isDark ? 'block text-sm font-medium text-gray-200 mb-2' : 'block text-sm font-medium text-gray-700 mb-2'}>
+                    <div className="pt-4 border-t border-gray-100 dark:border-dark-700">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
                         Review Notes / Rejection Reason
                       </label>
                       <div className="flex gap-4 items-start">
-                        <input
+                        <Input
                           value={notes[application.id] || ''}
                           onChange={(event) => setNotes((prev) => ({ ...prev, [application.id]: event.target.value }))}
                           placeholder="Enter feedback..."
-                          className={`flex-1 px-4 py-2.5 rounded-lg border transition-colors duration-200 focus:outline-none focus:ring-2 ${isDark
-                            ? 'bg-dark-800 border-dark-600 text-gray-100 placeholder-gray-500 focus:border-brand-500 focus:ring-brand-500/50'
-                            : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400 focus:border-brand-600 focus:ring-brand-600/50'
-                            }`}
+                          className="flex-1"
                         />
                       </div>
                       <div className="flex flex-wrap gap-3 mt-4">

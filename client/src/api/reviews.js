@@ -34,6 +34,4 @@ export const getPendingReviews = async () => {
   return response.data;
 };
 
-// Legacy exports for backward compatibility
-export const getCustomerReviews = getMyReviews;
-export const getWorkerReviews = getReviewsAboutMe;
+

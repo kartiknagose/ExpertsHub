@@ -1,4 +1,5 @@
-import { useReducer, useCallback, useEffect } from 'react';
+import { useReducer, useCallback, useEffect, useMemo } from 'react';
+import useSocket from '../hooks/useSocket';
 import { login as apiLogin, registerCustomer, registerWorker, logout as apiLogout, getCurrentUser } from '../api';
 import { resolveProfilePhotoUrl } from '../utils/profilePhoto';
 import { AuthContext } from './AuthContextBase';
@@ -134,7 +135,8 @@ export function AuthProvider({ children }) {
           type: ACTIONS.LOGIN_SUCCESS,
           payload: user,
         });
-      } catch (_error) {
+      } catch {
+        // Ignored
         // Session missing/expired or network error - clear auth state
         localStorage.removeItem('user');
         dispatch({ type: ACTIONS.LOGOUT });
@@ -145,14 +147,6 @@ export function AuthProvider({ children }) {
     };
 
     checkExistingSession();
-  }, []);
-
-  /**
-   * Set loading state
-   * Called when checking if user is already logged in
-   */
-  const setLoading = useCallback((loading) => {
-    dispatch({ type: ACTIONS.SET_LOADING, payload: loading });
   }, []);
 
   /**
@@ -171,7 +165,7 @@ export function AuthProvider({ children }) {
     try {
       // Call logout API to clear server cookie
       await apiLogout();
-    } catch (_error) {
+    } catch {
       console.error('Logout error');
     } finally {
       // Clear auth state and cached user
@@ -239,7 +233,7 @@ export function AuthProvider({ children }) {
       // dispatch({ type: ACTIONS.SET_LOADING, payload: true });
 
       // Call register API
-      const response = await registerCustomer(data);
+      await registerCustomer(data);
       // User must verify email before logging in.
 
       // dispatch({ type: ACTIONS.SET_LOADING, payload: false }); // Not needed as we didn't set it to true
@@ -264,7 +258,7 @@ export function AuthProvider({ children }) {
       // dispatch({ type: ACTIONS.SET_LOADING, payload: true });
 
       // Call worker register API
-      const response = await registerWorker(data);
+      await registerWorker(data);
 
       // dispatch({ type: ACTIONS.SET_LOADING, payload: false });
       return { success: true };
@@ -289,8 +283,9 @@ export function AuthProvider({ children }) {
   /**
    * Value object passed to all children
    * This is what useAuth() hook returns
+   * Memoized to prevent unnecessary re-renders of consumers
    */
-  const value = {
+  const value = useMemo(() => ({
     // State (read-only)
     user: state.user, // Current user object or null
     isAuthenticated: state.isAuthenticated, // Boolean
@@ -302,10 +297,12 @@ export function AuthProvider({ children }) {
     register, // Register new customer
     registerAsWorker, // Register new worker
     setUser, // Update user after login
-    setLoading, // Update loading state
     logout, // Clear user on logout
     clearError, // Clear error message
-  };
+  }), [state.user, state.isAuthenticated, state.isLoading, state.error, login, register, registerAsWorker, setUser, logout, clearError]);
+
+  // Initialize socket and auto-join rooms for the current user (if any)
+  useSocket(state.user);
 
   return (
     <AuthContext.Provider value={value}>

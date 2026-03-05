@@ -1,7 +1,6 @@
-import { useRef } from 'react';
-import { motion } from 'framer-motion';
-import { useTheme } from '../../context/ThemeContext';
-import { Card } from './Card';
+import { useRef, useEffect, memo } from 'react';
+import { motion as Motion, useSpring, useTransform } from 'framer-motion';
+import { Card } from '../ui/Card';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { useInView } from 'framer-motion';
 
@@ -9,8 +8,21 @@ import { useInView } from 'framer-motion';
  * Animated number counter
  */
 function AnimatedNumber({ value }) {
-    // Simple implementation for now - full animation would use useSpring/useMotionValue
-    return <span>{value}</span>;
+    const isNumber = typeof value === 'number';
+    const spring = useSpring(0, { stiffness: 80, damping: 25 });
+    const display = useTransform(spring, (latest) => {
+        if (!isNumber) return value;
+        return Number.isInteger(value)
+            ? Math.round(latest).toLocaleString()
+            : latest.toFixed(1);
+    });
+
+    useEffect(() => {
+        if (isNumber) spring.set(value);
+    }, [spring, value, isNumber]);
+
+    if (!isNumber) return <span>{value}</span>;
+    return <Motion.span>{display}</Motion.span>;
 }
 
 /**
@@ -24,59 +36,59 @@ function AnimatedNumber({ value }) {
  * @param {object} trend - Optional trend object { value: 12, direction: 'up'|'down'|'neutral', label: 'vs last month' }
  * @param {number} delay - Animation delay index
  */
-export function StatCard({
+export const StatCard = memo(function StatCard({
     title,
     value,
     icon: Icon,
     color = 'brand',
     trend,
     delay = 0,
-    ...props
+    className, // Extract className explicitly
+    ...restProps // Use restProps for other props
 }) {
-    const { isDark } = useTheme();
     const ref = useRef(null);
     const isInView = useInView(ref, { once: true });
 
     // Color variants for icon background and text
     const colorVariants = {
         brand: {
-            bg: isDark ? 'bg-brand-500/20' : 'bg-brand-100',
-            text: isDark ? 'text-brand-400' : 'text-brand-600',
+            bg: 'bg-brand-100 dark:bg-brand-500/20',
+            text: 'text-brand-600 dark:text-brand-400',
         },
         success: {
-            bg: isDark ? 'bg-green-500/20' : 'bg-green-100',
-            text: isDark ? 'text-green-400' : 'text-green-600',
+            bg: 'bg-green-100 dark:bg-green-500/20',
+            text: 'text-green-600 dark:text-green-400',
         },
         warning: {
-            bg: isDark ? 'bg-yellow-500/20' : 'bg-yellow-100',
-            text: isDark ? 'text-yellow-400' : 'text-yellow-600',
+            bg: 'bg-yellow-100 dark:bg-yellow-500/20',
+            text: 'text-yellow-600 dark:text-yellow-400',
         },
         error: {
-            bg: isDark ? 'bg-red-500/20' : 'bg-red-100',
-            text: isDark ? 'text-red-400' : 'text-red-600',
+            bg: 'bg-red-100 dark:bg-red-500/20',
+            text: 'text-red-600 dark:text-red-400',
         },
         info: {
-            bg: isDark ? 'bg-blue-500/20' : 'bg-blue-100',
-            text: isDark ? 'text-blue-400' : 'text-blue-600',
+            bg: 'bg-blue-100 dark:bg-blue-500/20',
+            text: 'text-blue-600 dark:text-blue-400',
         },
     };
 
     const currentVariant = colorVariants[color] || colorVariants.brand;
 
     return (
-        <motion.div
+        <Motion.div
             ref={ref}
             initial={{ opacity: 0, y: 20 }}
             animate={isInView ? { opacity: 1, y: 0 } : {}}
             transition={{ duration: 0.5, delay: delay * 0.1 }}
         >
-            <Card hoverable className={`h-full ${props.className || ''}`} {...props}>
+            <Card hoverable className={`h-full ${className || ''}`} {...restProps}>
                 <div className="flex items-start justify-between mb-4">
                     <div>
-                        <p className={`text-sm font-medium ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
                             {title}
                         </p>
-                        <h3 className={`text-2xl font-bold mt-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                        <h3 className="text-2xl font-bold mt-1 text-gray-900 dark:text-white">
                             <AnimatedNumber value={value} />
                         </h3>
                     </div>
@@ -103,12 +115,12 @@ export function StatCard({
                             {trend.direction === 'neutral' && <Minus size={16} />}
                             {Math.abs(trend.value)}%
                         </span>
-                        <span className={isDark ? 'text-gray-500' : 'text-gray-400'}>
+                        <span className="text-gray-400 dark:text-gray-500">
                             {trend.label || 'vs last month'}
                         </span>
                     </div>
                 )}
             </Card>
-        </motion.div>
+        </Motion.div>
     );
-}
+});

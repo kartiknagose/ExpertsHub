@@ -42,3 +42,39 @@ export const getVerificationStatusVariant = (status) => {
       return 'info';
   }
 };
+
+export const getVerificationLevelVariant = (level) => {
+  switch (level) {
+    case 'PREMIUM':
+      return 'success';
+    case 'VERIFIED':
+      return 'info';
+    case 'DOCUMENTS':
+      return 'warning';
+    default:
+      return 'default';
+  }
+};
+
+/**
+ * Determines if payment badge should be shown for a booking
+ * Cancelled bookings should not show payment badges
+ * @param {Object} booking - The booking object
+ * @returns {boolean} - Whether to show the payment badge
+ */
+export const shouldShowPaymentBadge = (booking) => {
+  if (!booking) return false;
+  return booking.status !== 'CANCELLED';
+};
+
+/**
+ * Gets the appropriate payment status text for display
+ * Cancelled bookings show 'N/A' instead of payment status
+ * @param {Object} booking - The booking object
+ * @returns {string} - The payment status text to display
+ */
+export const getPaymentDisplayText = (booking) => {
+  if (!booking) return 'PENDING';
+  if (booking.status === 'CANCELLED') return 'N/A';
+  return booking.paymentStatus || 'PENDING';
+};

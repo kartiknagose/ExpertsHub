@@ -82,7 +82,7 @@ export const getCurrentUser = async () => {
  * @returns {Promise} Response confirming email verification
  */
 export const verifyEmail = async (token) => {
-  const response = await axiosInstance.get(`${AUTH_ENDPOINTS.VERIFY_EMAIL}?token=${token}`);
+  const response = await axiosInstance.get(`${AUTH_ENDPOINTS.VERIFY_EMAIL}?token=${encodeURIComponent(token)}`);
   return response.data;
 };
 

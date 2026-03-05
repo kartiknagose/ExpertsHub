@@ -2,9 +2,11 @@ import { useState } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { UserX, UserCheck, Trash2, Search } from 'lucide-react';
 import { MainLayout } from '../../components/layout/MainLayout';
-import { Card, Badge, Button, AsyncState } from '../../components/common';
-import { useTheme } from '../../context/ThemeContext';
+import { Card, Badge, Button, AsyncState, ConfirmDialog, PageHeader, RoleBadge } from '../../components/common';
 import { getAdminUsers, updateUserStatus, deleteUser } from '../../api/admin';
+import { getPageLayout } from '../../constants/layout';
+import { queryKeys } from '../../utils/queryKeys';
+import { useSocketEvent } from '../../hooks/useSocket';
 
 const roleFilters = [
   { label: 'All', value: '' },
@@ -13,53 +15,56 @@ const roleFilters = [
   { label: 'Admins', value: 'ADMIN' },
 ];
 
-const roleVariant = (role) => {
-  switch (role) {
-    case 'ADMIN':
-      return 'info';
-    case 'WORKER':
-      return 'warning';
-    default:
-      return 'default';
-  }
-};
 
 export function AdminUsersPage() {
-  const { isDark } = useTheme();
   const queryClient = useQueryClient();
   const [roleFilter, setRoleFilter] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, type: null, user: null });
 
   const statusMutation = useMutation({
     mutationFn: ({ id, isActive }) => updateUserStatus(id, isActive),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-users'] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.admin.users() }),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id) => deleteUser(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-users'] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.admin.users() }),
   });
 
   const handleStatusChange = (user) => {
-    // Determine target state: if undefined/true -> false, if false -> true
-    const targetState = user.isActive === false; // activate if suspended
-    const action = targetState ? 'activate' : 'suspend';
-
-    if (confirm(`Are you sure you want to ${action} this user?`)) {
-      statusMutation.mutate({ id: user.id, isActive: targetState });
-    }
+    setConfirmDialog({ isOpen: true, type: 'status', user });
   };
 
-  const handleDelete = (id) => {
-    if (confirm('Are you sure you want to permanently delete this user? This action cannot be undone.')) {
-      deleteMutation.mutate(id);
+  const handleDelete = (user) => {
+    setConfirmDialog({ isOpen: true, type: 'delete', user });
+  };
+
+  const handleConfirm = () => {
+    if (confirmDialog.type === 'status') {
+      const targetState = confirmDialog.user.isActive === false;
+      statusMutation.mutate({ id: confirmDialog.user.id, isActive: targetState });
+    } else if (confirmDialog.type === 'delete') {
+      deleteMutation.mutate(confirmDialog.user.id);
     }
+    setConfirmDialog({ isOpen: false, type: null, user: null });
   };
 
   const { data, isLoading, isError, error, refetch } = useQuery({
-    queryKey: ['admin-users', roleFilter],
+    queryKey: queryKeys.admin.users(roleFilter),
     queryFn: () => getAdminUsers(roleFilter || undefined),
   });
+
+  const refreshUsers = () => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.users() });
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.usersPreview() });
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.dashboard() });
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.workers() });
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.workersPreview() });
+  };
+
+  useSocketEvent('admin:users_updated', refreshUsers);
+  useSocketEvent('admin:workers_updated', refreshUsers);
 
   const users = data?.users || [];
 
@@ -71,15 +76,12 @@ export function AdminUsersPage() {
 
   return (
     <MainLayout>
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        <div className="mb-8">
-          <h1 className={`text-4xl font-bold ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
-            Users
-          </h1>
-          <p className={isDark ? 'text-gray-400 mt-2' : 'text-gray-600 mt-2'}>
-            Manage platform users by role.
-          </p>
-        </div>
+      <div className={getPageLayout('default')}>
+        <PageHeader
+          title="Users"
+          subtitle="Manage platform users by role."
+          badge={{ text: `${filteredUsers.length} users`, variant: 'info' }}
+        />
 
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div className="flex flex-wrap gap-2">
@@ -102,10 +104,7 @@ export function AdminUsersPage() {
               placeholder="Search users..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className={`w-full pl-9 pr-4 py-2 rounded-lg border text-sm outline-none transition-colors ${isDark
-                  ? 'bg-dark-900 border-dark-700 text-white focus:border-brand-500'
-                  : 'bg-white border-gray-200 text-gray-900 focus:border-brand-500'
-                }`}
+              className="w-full pl-9 pr-4 py-2 rounded-lg border text-sm outline-none transition-colors bg-white border-gray-200 text-gray-900 focus:border-brand-500 dark:bg-dark-900 dark:border-dark-700 dark:text-white"
             />
           </div>
         </div>
@@ -134,19 +133,19 @@ export function AdminUsersPage() {
               <Card key={user.id} className="p-6">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
-                    <p className={isDark ? 'text-gray-100 font-semibold' : 'text-gray-900 font-semibold'}>
+                    <p className="text-gray-900 dark:text-gray-100 font-semibold">
                       {user.name}
                     </p>
-                    <p className={isDark ? 'text-gray-400 text-sm' : 'text-gray-600 text-sm'}>
+                    <p className="text-gray-600 dark:text-gray-400 text-sm">
                       {user.email}
                     </p>
-                    <p className={isDark ? 'text-gray-400 text-sm' : 'text-gray-600 text-sm'}>
+                    <p className="text-gray-600 dark:text-gray-400 text-sm">
                       {user.mobile}
                     </p>
                   </div>
                   <div className="flex flex-col items-end gap-2">
                     <div className="flex items-center gap-2">
-                      <Badge variant={roleVariant(user.role)}>{user.role}</Badge>
+                      <RoleBadge role={user.role} />
                       <Badge variant={user.emailVerified ? 'success' : 'warning'}>
                         {user.emailVerified ? 'Verified' : 'Unverified'}
                       </Badge>
@@ -174,9 +173,10 @@ export function AdminUsersPage() {
                       <Button
                         size="sm"
                         variant="danger"
-                        onClick={() => handleDelete(user.id)}
+                        onClick={() => handleDelete(user)}
                         disabled={deleteMutation.isPending}
                         title="Delete User"
+                        aria-label="Delete user"
                       >
                         <Trash2 size={14} />
                       </Button>
@@ -187,6 +187,24 @@ export function AdminUsersPage() {
             ))}
           </div>
         </AsyncState>
+
+        {/* Confirmation Dialog */}
+        <ConfirmDialog
+          isOpen={confirmDialog.isOpen}
+          onConfirm={handleConfirm}
+          onCancel={() => setConfirmDialog({ isOpen: false, type: null, user: null })}
+          title={confirmDialog.type === 'delete' ? 'Delete User' : confirmDialog.user?.isActive === false ? 'Activate User' : 'Suspend User'}
+          message={
+            confirmDialog.type === 'delete'
+              ? `Are you sure you want to permanently delete ${confirmDialog.user?.name}? This action cannot be undone.`
+              : confirmDialog.user?.isActive === false
+                ? `Are you sure you want to activate ${confirmDialog.user?.name}? They will regain access to the platform.`
+                : `Are you sure you want to suspend ${confirmDialog.user?.name}? They will lose access to the platform.`
+          }
+          confirmText={confirmDialog.type === 'delete' ? 'Delete' : confirmDialog.user?.isActive === false ? 'Activate' : 'Suspend'}
+          variant={confirmDialog.type === 'delete' ? 'danger' : confirmDialog.user?.isActive === false ? 'success' : 'warning'}
+          loading={statusMutation.isPending || deleteMutation.isPending}
+        />
       </div>
     </MainLayout>
   );

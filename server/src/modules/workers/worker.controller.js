@@ -1,10 +1,13 @@
 const asyncHandler = require('../../common/utils/asyncHandler');
-const { 
-  upsertWorkerProfile, 
+const AppError = require('../../common/errors/AppError');
+const { isValidUploadUrl } = require('../../common/utils/validateUploadUrl');
+const {
+  upsertWorkerProfile,
   getMyWorkerProfile,
   addWorkerService,
   getMyWorkerServices,
   getWorkerServicesById,
+  getWorkerProfileById,
   removeWorkerService,
 } = require('./worker.service');
 
@@ -12,14 +15,22 @@ const {
 // Create or update the authenticated user's worker profile (lets any user become a worker)
 exports.saveProfile = asyncHandler(async (req, res) => {
   const userId = req.user.id; // from auth middleware
-  const { bio, hourlyRate, skills, serviceAreas, profilePhotoUrl } = req.body;
+  const { bio, hourlyRate, skills, serviceAreas, profilePhotoUrl, baseLatitude, baseLongitude, serviceRadius } = req.body;
+
+  // Validate profilePhotoUrl if provided — only accept URLs from our upload endpoint
+  if (profilePhotoUrl && !isValidUploadUrl(profilePhotoUrl, ['/uploads/profile-photos/'])) {
+    throw new AppError(400, 'Invalid profile photo URL. Please use the upload endpoint.');
+  }
 
   const profile = await upsertWorkerProfile(userId, {
     bio,
-    hourlyRate: typeof hourlyRate === 'number' ? hourlyRate : undefined, // avoid storing non-numeric values
-    skills, // array like ["plumbing", "cleaning"]
-    serviceAreas, // array like ["Mumbai", "Pune"]
+    hourlyRate: typeof hourlyRate === 'number' ? hourlyRate : undefined,
+    skills,
+    serviceAreas,
     profilePhotoUrl,
+    baseLatitude,
+    baseLongitude,
+    serviceRadius: serviceRadius ? Number(serviceRadius) : undefined,
   });
 
   res.status(201).json({ profile });
@@ -30,7 +41,7 @@ exports.saveProfile = asyncHandler(async (req, res) => {
 exports.me = asyncHandler(async (req, res) => {
   const userId = req.user.id;
   const profile = await getMyWorkerProfile(userId);
-  if (!profile) return res.status(404).json({ error: 'No worker profile found' });
+  if (!profile) throw new AppError(404, 'No worker profile found');
   res.json({ profile });
 });
 
@@ -42,7 +53,7 @@ exports.addService = asyncHandler(async (req, res) => {
 
   const workerService = await addWorkerService(userId, serviceId);
 
-  res.status(201).json({ 
+  res.status(201).json({
     message: 'Service added successfully',
     workerService,
   });
@@ -53,7 +64,7 @@ exports.addService = asyncHandler(async (req, res) => {
 exports.getServices = asyncHandler(async (req, res) => {
   const userId = req.user.id;
   const services = await getMyWorkerServices(userId);
-  
+
   res.json({ services });
 });
 
@@ -62,8 +73,22 @@ exports.getServices = asyncHandler(async (req, res) => {
 exports.getWorkerServices = asyncHandler(async (req, res) => {
   const { workerId } = req.params;
   const services = await getWorkerServicesById(parseInt(workerId));
-  
+
   res.json({ services });
+});
+
+// GET /api/workers/:workerId
+// Get worker public profile (name, rating, bio, etc)
+exports.getProfile = asyncHandler(async (req, res) => {
+  const { workerId } = req.params;
+  const profile = await getWorkerProfileById(parseInt(workerId));
+
+  if (!profile) throw new AppError(404, 'Worker not found');
+
+  // Also fetch services to make it a complete profile view
+  const services = await getWorkerServicesById(parseInt(workerId));
+
+  res.json({ profile, services });
 });
 
 // DELETE /api/workers/services/:serviceId
@@ -74,7 +99,7 @@ exports.removeService = asyncHandler(async (req, res) => {
 
   await removeWorkerService(userId, parseInt(serviceId));
 
-  res.json({ 
+  res.json({
     message: 'Service removed successfully',
   });
 });

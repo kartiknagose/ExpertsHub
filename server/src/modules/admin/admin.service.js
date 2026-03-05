@@ -20,45 +20,57 @@ async function getDashboardStats() {
   };
 }
 
-async function listUsers(role) {
+async function listUsers(role, { skip = 0, limit = 20 } = {}) {
   const where = role ? { role } : undefined;
-  return prisma.user.findMany({
-    where,
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      mobile: true,
-      role: true,
-      isActive: true,
-      emailVerified: true,
-      profilePhotoUrl: true,
-      createdAt: true,
-    },
-    orderBy: { createdAt: 'desc' },
-  });
+  const [data, total] = await Promise.all([
+    prisma.user.findMany({
+      where,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        mobile: true,
+        role: true,
+        isActive: true,
+        emailVerified: true,
+        profilePhotoUrl: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take: limit,
+    }),
+    prisma.user.count({ where }),
+  ]);
+  return { data, total };
 }
 
-async function listWorkers() {
-  return prisma.workerProfile.findMany({
-    include: {
-      user: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          mobile: true,
-          profilePhotoUrl: true,
+async function listWorkers({ skip = 0, limit = 20 } = {}) {
+  const [data, total] = await Promise.all([
+    prisma.workerProfile.findMany({
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            mobile: true,
+            profilePhotoUrl: true,
+          },
+        },
+        services: {
+          include: {
+            service: { select: { id: true, name: true, category: true } },
+          },
         },
       },
-      services: {
-        include: {
-          service: { select: { id: true, name: true, category: true } },
-        },
-      },
-    },
-    orderBy: { id: 'desc' },
-  });
+      orderBy: { id: 'desc' },
+      skip,
+      take: limit,
+    }),
+    prisma.workerProfile.count(),
+  ]);
+  return { data, total };
 }
 
 async function updateUserStatus(userId, isActive) {

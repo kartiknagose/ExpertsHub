@@ -2,7 +2,7 @@
 
 import { MainLayout } from '../../components/layout/MainLayout';
 import { Card } from '../../components/common';
-import { useTheme } from '../../context/ThemeContext';
+import { getPageLayout } from '../../constants/layout';
 
 const posts = [
   {
@@ -20,16 +20,14 @@ const posts = [
 ];
 
 export function BlogPage() {
-  const { isDark } = useTheme();
-
   return (
     <MainLayout>
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div className={getPageLayout('narrow')}>
         <div className="mb-10">
-          <h1 className={`text-4xl font-bold ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
+          <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100">
             Blog
           </h1>
-          <p className={isDark ? 'text-gray-400 mt-3' : 'text-gray-600 mt-3'}>
+          <p className="text-gray-600 dark:text-gray-400 mt-3">
             Insights, tips, and updates from the UrbanPro team.
           </p>
         </div>
@@ -37,10 +35,10 @@ export function BlogPage() {
         <div className="space-y-4">
           {posts.map((post) => (
             <Card key={post.title}>
-              <h3 className={`text-lg font-semibold mb-2 ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
+              <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-gray-100">
                 {post.title}
               </h3>
-              <p className={isDark ? 'text-gray-400' : 'text-gray-600'}>
+              <p className="text-gray-600 dark:text-gray-400">
                 {post.summary}
               </p>
             </Card>

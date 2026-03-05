@@ -1,13 +1,17 @@
 const prisma = require('../../config/prisma');
+const AppError = require('../../common/errors/AppError');
 
 // Create or update a worker profile for the current user (idempotent)
-async function upsertWorkerProfile(userId, { bio, hourlyRate, skills, serviceAreas, profilePhotoUrl }) {
+async function upsertWorkerProfile(userId, { bio, hourlyRate, skills, serviceAreas, profilePhotoUrl, baseLatitude, baseLongitude, serviceRadius }) {
   // Store skills and serviceAreas as JSON arrays for flexibility
   const data = {
     bio: bio ?? null,
-    hourlyRate: hourlyRate ?? null, // allow null; validate number in controller before
+    hourlyRate: hourlyRate ?? null,
     skills: skills ?? null,
     serviceAreas: serviceAreas ?? null,
+    baseLatitude: baseLatitude ?? null,
+    baseLongitude: baseLongitude ?? null,
+    serviceRadius: serviceRadius ?? 10,
     user: { connect: { id: userId } },
   };
 
@@ -57,6 +61,69 @@ async function getMyWorkerProfile(userId) {
   });
 }
 
+/**
+ * GET WORKER PROFILE BY PROFILE ID
+ * (Used for public profile views)
+ */
+async function getWorkerProfileById(profileId) {
+  return prisma.workerProfile.findUnique({
+    where: { id: profileId },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          mobile: true,
+          role: true,
+          profilePhotoUrl: true,
+          rating: true,
+          totalReviews: true,
+          reviewsReceived: {
+            include: {
+              reviewer: {
+                select: {
+                  id: true,
+                  name: true,
+                  profilePhotoUrl: true,
+                },
+              },
+            },
+            orderBy: {
+              createdAt: 'desc',
+            },
+            take: 10,
+          },
+        },
+      },
+      availability: true,
+      location: true,
+    },
+  });
+}
+
+/**
+ * GET WORKER PROFILE BY USER ID
+ * (Used for mapping user ID to profile for reviews etc)
+ */
+async function getWorkerProfileByUserId(userId) {
+  return prisma.workerProfile.findUnique({
+    where: { userId },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          role: true,
+          profilePhotoUrl: true,
+          rating: true,
+          totalReviews: true,
+        },
+      },
+    },
+  });
+}
+
 // Add a service to the worker's offered services
 async function addWorkerService(userId, serviceId) {
   // 1. Get worker profile
@@ -65,7 +132,7 @@ async function addWorkerService(userId, serviceId) {
   });
 
   if (!workerProfile) {
-    throw new Error('Worker profile not found. Please create your profile first.');
+    throw new AppError(404, 'Worker profile not found. Please create your profile first.');
   }
 
   // 2. Check if service exists
@@ -74,7 +141,7 @@ async function addWorkerService(userId, serviceId) {
   });
 
   if (!service) {
-    throw new Error('Service not found');
+    throw new AppError(404, 'Service not found');
   }
 
   // 3. Check if association already exists
@@ -88,7 +155,7 @@ async function addWorkerService(userId, serviceId) {
   });
 
   if (existing) {
-    throw new Error('You are already offering this service');
+    throw new AppError(409, 'You are already offering this service');
   }
 
   // 4. Create the association
@@ -110,7 +177,7 @@ async function getMyWorkerServices(userId) {
   });
 
   if (!workerProfile) {
-    throw new Error('Worker profile not found');
+    throw new AppError(404, 'Worker profile not found');
   }
 
   return prisma.workerService.findMany({
@@ -140,7 +207,7 @@ async function removeWorkerService(userId, serviceId) {
   });
 
   if (!workerProfile) {
-    throw new Error('Worker profile not found');
+    throw new AppError(404, 'Worker profile not found');
   }
 
   // 2. Check if association exists
@@ -154,7 +221,7 @@ async function removeWorkerService(userId, serviceId) {
   });
 
   if (!existing) {
-    throw new Error('You are not offering this service');
+    throw new AppError(404, 'You are not offering this service');
   }
 
   // 3. Delete the association
@@ -174,5 +241,7 @@ module.exports = {
   addWorkerService,
   getMyWorkerServices,
   getWorkerServicesById,
+  getWorkerProfileById,
+  getWorkerProfileByUserId,
   removeWorkerService,
 };

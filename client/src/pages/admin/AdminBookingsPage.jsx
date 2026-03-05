@@ -1,19 +1,19 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CalendarClock, CheckCircle, XCircle, PlayCircle } from 'lucide-react';
 import { MainLayout } from '../../components/layout/MainLayout';
 import { Card, CardHeader, CardTitle, CardDescription } from '../../components/common';
 import { Badge, Button, PageHeader, AsyncState } from '../../components/common';
-import { useTheme } from '../../context/ThemeContext';
+import { BookingStatusBadge } from '../../components/common';
 import { cancelBooking, getAllBookings, updateBookingStatus } from '../../api/bookings';
 import { queryKeys } from '../../utils/queryKeys';
-import { getBookingStatusVariant } from '../../utils/statusHelpers';
+import { getPageLayout } from '../../constants/layout';
+import { useSocketEvent } from '../../hooks/useSocket';
 
 
 const statusFilters = ['ALL', 'PENDING', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
 
 export function AdminBookingsPage() {
-  const { isDark } = useTheme();
   const [filter, setFilter] = useState('ALL');
   const queryClient = useQueryClient();
 
@@ -32,7 +32,16 @@ export function AdminBookingsPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.bookings.admin() }),
   });
 
-  const bookings = bookingsQuery.data?.bookings || [];
+  const bookings = useMemo(() => bookingsQuery.data?.bookings || [], [bookingsQuery.data?.bookings]);
+
+  const refreshAdminBookings = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.bookings.admin() });
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.dashboard() });
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.bookingsPreview() });
+  }, [queryClient]);
+
+  useSocketEvent('booking:created', refreshAdminBookings);
+  useSocketEvent('booking:status_updated', refreshAdminBookings);
 
   const filteredBookings = useMemo(() => {
     if (filter === 'ALL') return bookings;
@@ -80,17 +89,19 @@ export function AdminBookingsPage() {
 
   return (
     <MainLayout>
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      <div className={getPageLayout('default')}>
         <PageHeader
           title="Bookings"
           subtitle="Review and manage all marketplace bookings."
         />
 
-        <div className="flex flex-wrap gap-2 mb-6">
+        <div role="radiogroup" aria-label="Booking status filter" className="flex flex-wrap gap-2 mb-6">
           {statusFilters.map((status) => (
             <Button
               key={status}
               size="sm"
+              role="radio"
+              aria-checked={filter === status}
               variant={filter === status ? 'primary' : 'outline'}
               onClick={() => setFilter(status)}
             >
@@ -118,21 +129,19 @@ export function AdminBookingsPage() {
                         {new Date(booking.scheduledAt || booking.scheduledDate).toLocaleString()}
                       </CardDescription>
                     </div>
-                    <Badge variant={getBookingStatusVariant(booking.status)}>
-                      {booking.status}
-                    </Badge>
+                    <BookingStatusBadge status={booking.status} />
                   </div>
                 </CardHeader>
 
                 <div className="space-y-3">
                   <div className="flex items-center gap-2">
                     <CalendarClock size={18} className="text-brand-500" />
-                    <span className={isDark ? 'text-gray-300' : 'text-gray-700'}>
+                    <span className="text-gray-700 dark:text-gray-300">
                       {booking.service?.name || `Service #${booking.serviceId}`}
                     </span>
                   </div>
 
-                  <div className={isDark ? 'text-gray-400' : 'text-gray-600'}>
+                  <div className="text-gray-600 dark:text-gray-400">
                     Customer: {booking.customer?.name || 'Customer'} · Worker: {booking.workerProfile?.user?.name || 'Unassigned'}
                   </div>
                 </div>

@@ -107,17 +107,20 @@ export default {
         sans: ['Space Grotesk', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
       },
       fontSize: {
-        xs: ['0.75rem', { lineHeight: '1rem' }],
-        sm: ['0.875rem', { lineHeight: '1.25rem' }],
-        base: ['1rem', { lineHeight: '1.5rem' }],
-        lg: ['1.125rem', { lineHeight: '1.75rem' }],
-        xl: ['1.25rem', { lineHeight: '1.75rem' }],
-        '2xl': ['1.5rem', { lineHeight: '2rem' }],
-        '3xl': ['1.875rem', { lineHeight: '2.25rem' }],
-        '4xl': ['2.25rem', { lineHeight: '2.5rem' }],
-        '5xl': ['3rem', { lineHeight: '1' }],
-        '6xl': ['3.75rem', { lineHeight: '1' }],
-        '7xl': ['4.5rem', { lineHeight: '1' }],
+        micro: ['0.5rem', { lineHeight: '0.75rem' }],      // 8px - extremely small labels
+        tiny: ['0.5625rem', { lineHeight: '0.875rem' }],   // 9px - tiny labels, metadata
+        '2xs': ['0.625rem', { lineHeight: '0.875rem' }],   // 10px - small badges, labels
+        xs: ['0.75rem', { lineHeight: '1rem' }],           // 12px - standard small text
+        sm: ['0.875rem', { lineHeight: '1.25rem' }],       // 14px - secondary text
+        base: ['1rem', { lineHeight: '1.5rem' }],          // 16px - body text
+        lg: ['1.125rem', { lineHeight: '1.75rem' }],       // 18px - emphasized text
+        xl: ['1.25rem', { lineHeight: '1.75rem' }],        // 20px - section headers
+        '2xl': ['1.5rem', { lineHeight: '2rem' }],         // 24px - page subtitles
+        '3xl': ['1.875rem', { lineHeight: '2.25rem' }],    // 30px - large headers
+        '4xl': ['2.25rem', { lineHeight: '2.5rem' }],      // 36px - page titles
+        '5xl': ['3rem', { lineHeight: '1' }],              // 48px - hero titles
+        '6xl': ['3.75rem', { lineHeight: '1' }],           // 60px - extra large
+        '7xl': ['4.5rem', { lineHeight: '1' }],            // 72px - super large
       },
       spacing: {
         18: '4.5rem',

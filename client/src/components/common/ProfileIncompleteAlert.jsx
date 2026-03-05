@@ -1,12 +1,10 @@
 import { useNavigate } from 'react-router-dom';
 import { AlertCircle, ArrowRight } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
-import { useTheme } from '../../context/ThemeContext';
-import { Button } from './Button';
+import { Button } from '../ui/Button';
 
 export function ProfileIncompleteAlert() {
     const { user, isAuthenticated } = useAuth();
-    const { isDark } = useTheme();
     const navigate = useNavigate();
 
     if (!isAuthenticated || !user) return null;
@@ -41,10 +39,9 @@ export function ProfileIncompleteAlert() {
         : "Verify your identity (ID proof) to start receiving job requests.";
 
     return (
-        <div className={`w-full px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-4 border-b ${isDark
-            ? 'bg-brand-900/30 border-brand-800 text-brand-100'
-            : 'bg-brand-50 border-brand-100 text-brand-800'
-            }`}>
+        <div className={`w-full px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-4 border-b
+            bg-brand-50 dark:bg-brand-900/30 border-brand-100 dark:border-brand-800 text-brand-800 dark:text-brand-100
+            `}>
             <div className="flex items-center gap-3">
                 <AlertCircle className="shrink-0 text-brand-500" size={20} />
                 <span className="text-sm font-medium">{message}</span>

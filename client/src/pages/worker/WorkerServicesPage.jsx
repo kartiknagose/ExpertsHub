@@ -6,43 +6,50 @@ import { useNavigate } from 'react-router-dom';
 import { Briefcase, PlusCircle, Trash2, Search } from 'lucide-react';
 import { MainLayout } from '../../components/layout/MainLayout';
 import { Card, CardHeader, CardTitle, CardDescription } from '../../components/common';
-import { Badge, Button, AsyncState, Input } from '../../components/common';
-import { useTheme } from '../../context/ThemeContext';
+import { Badge, Button, AsyncState, Input, PageHeader } from '../../components/common';
 import { getAllServices } from '../../api/services';
 import { getMyServices, addServiceToWorker, removeServiceFromWorker } from '../../api/workers';
+import { getPageLayout } from '../../constants/layout';
+import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcut';
+import { queryKeys } from '../../utils/queryKeys';
 
 export function WorkerServicesPage() {
-  const { isDark } = useTheme();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
 
+  // Keyboard shortcuts
+  useKeyboardShortcuts([
+    { key: 'd', callback: () => navigate('/worker/dashboard'), meta: true },
+    { key: 'b', callback: () => navigate('/worker/bookings'), meta: true },
+  ]);
+
   const servicesQuery = useQuery({
-    queryKey: ['services'],
+    queryKey: queryKeys.services.all(),
     queryFn: getAllServices,
   });
 
   const myServicesQuery = useQuery({
-    queryKey: ['worker-services'],
+    queryKey: queryKeys.worker.services(),
     queryFn: getMyServices,
   });
 
   const addMutation = useMutation({
     mutationFn: (serviceId) => addServiceToWorker({ serviceId }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['worker-services'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.worker.services() });
     },
   });
 
   const removeMutation = useMutation({
     mutationFn: (serviceId) => removeServiceFromWorker(serviceId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['worker-services'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.worker.services() });
     },
   });
 
-  const allServices = servicesQuery.data?.services || servicesQuery.data || [];
-  const myServices = myServicesQuery.data?.services || [];
+  const allServices = useMemo(() => servicesQuery.data?.services || servicesQuery.data || [], [servicesQuery.data]);
+  const myServices = useMemo(() => myServicesQuery.data?.services || [], [myServicesQuery.data?.services]);
   const isLoading = servicesQuery.isLoading || myServicesQuery.isLoading;
   const hasServicesError = servicesQuery.isError;
   const hasMyServicesError = myServicesQuery.isError;
@@ -75,15 +82,11 @@ export function WorkerServicesPage() {
 
   return (
     <MainLayout>
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        <div className="mb-8">
-          <h1 className={`text-4xl font-bold ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
-            My Services
-          </h1>
-          <p className={isDark ? 'text-gray-400 mt-2' : 'text-gray-600 mt-2'}>
-            Manage the services you offer to customers.
-          </p>
-        </div>
+      <div className={getPageLayout('default')}>
+        <PageHeader
+          title="My Services"
+          subtitle="Manage the services you offer to customers."
+        />
 
         {showProfileMessage && (
           <Card className="p-6 mb-6">
@@ -116,7 +119,7 @@ export function WorkerServicesPage() {
               </CardHeader>
 
               {myServices.length === 0 && (
-                <p className={`px-6 pb-6 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
+                <p className="px-6 pb-6 text-gray-600 dark:text-gray-300">
                   You have not added any services yet.
                 </p>
               )}
@@ -124,13 +127,13 @@ export function WorkerServicesPage() {
               {myServices.length > 0 && (
                 <div className="space-y-3 px-6 pb-6">
                   {myServices.map((entry) => (
-                    <div key={entry.serviceId} className={`flex items-center justify-between p-3 rounded-lg border ${isDark ? 'border-dark-700 bg-dark-800' : 'border-gray-100 bg-gray-50'}`}>
+                    <div key={entry.serviceId} className="flex items-center justify-between p-3 rounded-lg border border-gray-100 bg-gray-50 dark:border-dark-700 dark:bg-dark-800">
                       <div>
-                        <p className={`font-medium ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
+                        <p className="font-medium text-gray-900 dark:text-gray-100">
                           {entry.service?.name || 'Service'}
                         </p>
                         {entry.service?.category && (
-                          <p className={isDark ? 'text-gray-400 text-xs' : 'text-gray-600 text-xs'}>
+                          <p className="text-gray-600 dark:text-gray-400 text-xs">
                             {entry.service.category}
                           </p>
                         )}
@@ -158,23 +161,17 @@ export function WorkerServicesPage() {
               </CardHeader>
 
               <div className="px-6 mb-4">
-                <div className="relative">
-                  <Search className={`absolute left-3 top-1/2 -translate-y-1/2 ${isDark ? 'text-gray-500' : 'text-gray-400'}`} size={18} />
-                  <input
-                    type="text"
-                    placeholder="Search services..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className={`w-full pl-10 pr-4 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-brand-500 transition-colors ${isDark
-                        ? 'bg-dark-900 border-dark-700 text-gray-100 placeholder-gray-500'
-                        : 'bg-white border-gray-200 text-gray-900 placeholder-gray-400'
-                      }`}
-                  />
-                </div>
+                <Input
+                  type="text"
+                  placeholder="Search services..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  icon={Search}
+                />
               </div>
 
               {filteredAvailableServices.length === 0 && (
-                <p className={`px-6 pb-6 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
+                <p className="px-6 pb-6 text-gray-600 dark:text-gray-300">
                   {searchTerm ? 'No services match your search.' : 'No more services to add right now.'}
                 </p>
               )}
@@ -182,9 +179,9 @@ export function WorkerServicesPage() {
               {filteredAvailableServices.length > 0 && (
                 <div className="space-y-3 px-6 pb-6 max-h-[500px] overflow-y-auto custom-scrollbar">
                   {filteredAvailableServices.map((service) => (
-                    <div key={service.id} className={`flex items-center justify-between p-3 rounded-lg border ${isDark ? 'border-dark-700 hover:border-dark-600' : 'border-gray-100 hover:border-gray-200'} transition-colors`}>
+                    <div key={service.id} className="flex items-center justify-between p-3 rounded-lg border border-gray-100 hover:border-gray-200 dark:border-dark-700 dark:hover:border-dark-600 transition-colors">
                       <div>
-                        <p className={`font-medium ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
+                        <p className="font-medium text-gray-900 dark:text-gray-100">
                           {service.name}
                         </p>
                         {service.category && (

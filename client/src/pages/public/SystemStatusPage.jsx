@@ -7,8 +7,9 @@ import { Activity, Database, Server } from 'lucide-react';
 import { MainLayout } from '../../components/layout/MainLayout';
 import { Card, CardHeader, CardTitle, CardDescription } from '../../components/common';
 import { Badge, Spinner } from '../../components/common';
-import { useTheme } from '../../context/ThemeContext';
 import { getAllServices } from '../../api/services';
+import { getPageLayout } from '../../constants/layout';
+import { queryKeys } from '../../utils/queryKeys';
 
 const getApiRoot = () => {
   const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
@@ -24,18 +25,18 @@ const fetchHealth = async () => {
 };
 
 export function SystemStatusPage() {
-  const { isDark } = useTheme();
-
   const healthQuery = useQuery({
-    queryKey: ['health'],
+    queryKey: queryKeys.health.status(),
     queryFn: fetchHealth,
     refetchInterval: 15000,
+    refetchIntervalInBackground: false,
   });
 
   const servicesQuery = useQuery({
-    queryKey: ['services-status'],
+    queryKey: queryKeys.services.status(),
     queryFn: () => getAllServices(),
     refetchInterval: 15000,
+    refetchIntervalInBackground: false,
   });
 
   const serviceCount = useMemo(() => {
@@ -52,12 +53,12 @@ export function SystemStatusPage() {
 
   return (
     <MainLayout>
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div className={getPageLayout('narrow')}>
         <div className="mb-8">
-          <h1 className={`text-4xl font-bold ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
+          <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100">
             System Status
           </h1>
-          <p className={isDark ? 'text-gray-400 mt-2' : 'text-gray-600 mt-2'}>
+          <p className="text-gray-600 dark:text-gray-400 mt-2">
             Live connection checks between frontend, backend, and database.
           </p>
         </div>
@@ -75,7 +76,7 @@ export function SystemStatusPage() {
             {healthQuery.isLoading ? (
               <div className="flex items-center gap-2">
                 <Spinner size="sm" />
-                <span className={isDark ? 'text-gray-300' : 'text-gray-700'}>Checking...</span>
+                <span className="text-gray-700 dark:text-gray-300">Checking...</span>
               </div>
             ) : healthQuery.isError ? (
               <div className="space-y-2">
@@ -85,7 +86,7 @@ export function SystemStatusPage() {
             ) : (
               <div className="flex items-center justify-between">
                 {statusBadge(healthQuery.data?.status || 'ok')}
-                <span className={isDark ? 'text-gray-400' : 'text-gray-600'}>
+                <span className="text-gray-600 dark:text-gray-400">
                   Locale: {healthQuery.data?.locale || 'n/a'}
                 </span>
               </div>
@@ -104,7 +105,7 @@ export function SystemStatusPage() {
             {servicesQuery.isLoading ? (
               <div className="flex items-center gap-2">
                 <Spinner size="sm" />
-                <span className={isDark ? 'text-gray-300' : 'text-gray-700'}>Checking...</span>
+                <span className="text-gray-700 dark:text-gray-300">Checking...</span>
               </div>
             ) : servicesQuery.isError ? (
               <div className="space-y-2">
@@ -114,7 +115,7 @@ export function SystemStatusPage() {
             ) : (
               <div className="flex items-center justify-between">
                 {statusBadge('ok')}
-                <span className={isDark ? 'text-gray-400' : 'text-gray-600'}>
+                <span className="text-gray-600 dark:text-gray-400">
                   Services: {serviceCount}
                 </span>
               </div>
@@ -130,7 +131,7 @@ export function SystemStatusPage() {
             </CardTitle>
             <CardDescription>What these checks mean</CardDescription>
           </CardHeader>
-          <div className={isDark ? 'text-gray-400' : 'text-gray-600'}>
+          <div className="text-gray-600 dark:text-gray-400">
             <p className="mb-2">
               Backend Health checks the API server is running and reachable.
             </p>

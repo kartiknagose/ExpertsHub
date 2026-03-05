@@ -2,8 +2,8 @@
 
 import { UserPlus, Search, CalendarCheck, Star } from 'lucide-react';
 import { MainLayout } from '../../components/layout/MainLayout';
-import { Card } from '../../components/common';
-import { useTheme } from '../../context/ThemeContext';
+import { Card, PageHeader } from '../../components/common';
+import { getPageLayout } from '../../constants/layout';
 
 const steps = [
   { icon: UserPlus, title: 'Sign Up', text: 'Create an account in minutes as a customer or worker.' },
@@ -13,19 +13,13 @@ const steps = [
 ];
 
 export function HowItWorksPage() {
-  const { isDark } = useTheme();
-
   return (
     <MainLayout>
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="mb-10">
-          <h1 className={`text-4xl font-bold ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
-            How It Works
-          </h1>
-          <p className={isDark ? 'text-gray-400 mt-3' : 'text-gray-600 mt-3'}>
-            From signup to service completion, UrbanPro makes it seamless for both customers and workers.
-          </p>
-        </div>
+      <div className={getPageLayout('default')}>
+        <PageHeader
+          title="How It Works"
+          subtitle="From signup to service completion, UrbanPro makes it seamless for both customers and workers."
+        />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {steps.map((step) => {
@@ -37,10 +31,10 @@ export function HowItWorksPage() {
                     <Icon className="text-white" size={24} />
                   </div>
                   <div>
-                    <h3 className={`text-xl font-semibold mb-2 ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
+                    <h3 className="text-xl font-semibold mb-2 text-gray-900 dark:text-gray-100">
                       {step.title}
                     </h3>
-                    <p className={isDark ? 'text-gray-400' : 'text-gray-600'}>
+                    <p className="text-gray-600 dark:text-gray-400">
                       {step.text}
                     </p>
                   </div>

@@ -6,12 +6,38 @@
  */
 
 const asyncHandler = require('../../common/utils/asyncHandler');
+const parsePagination = require('../../common/utils/parsePagination');
 const {
   createReview,
   getMyReviews,
   getReviewsAboutMe,
   getPendingReviews,
 } = require('./review.service');
+
+let getIo;
+try {
+  ({ getIo } = require('../../socket'));
+} catch (_e) {
+  getIo = null;
+}
+
+function emitReviewEvent(eventName, review) {
+  if (!getIo || !review) return;
+
+  try {
+    const io = getIo();
+    // Notify admins
+    io.to('admin').emit(eventName, review);
+
+    // Notify the person who was reviewed (reviewee)
+    const revieweeId = review.revieweeId;
+    if (revieweeId) {
+      io.to(`user:${revieweeId}`).emit('review:received', review);
+    }
+  } catch (err) {
+    console.warn(`Socket emit failed (${eventName}):`, err.message);
+  }
+}
 
 /**
  * CREATE A REVIEW
@@ -24,6 +50,8 @@ exports.create = asyncHandler(async (req, res) => {
     message: 'Review submitted successfully.',
     review,
   });
+
+  emitReviewEvent('review:created', review);
 });
 
 /**
@@ -32,8 +60,9 @@ exports.create = asyncHandler(async (req, res) => {
  * Returns all reviews the logged-in user has written
  */
 exports.listMyReviews = asyncHandler(async (req, res) => {
-  const reviews = await getMyReviews(req.user.id);
-  res.json({ reviews });
+  const { page, limit, skip } = parsePagination(req.query);
+  const { data: reviews, total } = await getMyReviews(req.user.id, { skip, limit });
+  res.json({ reviews, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } });
 });
 
 /**
@@ -42,8 +71,9 @@ exports.listMyReviews = asyncHandler(async (req, res) => {
  * Returns all reviews others have written about the logged-in user
  */
 exports.listReviewsAboutMe = asyncHandler(async (req, res) => {
-  const reviews = await getReviewsAboutMe(req.user.id);
-  res.json({ reviews });
+  const { page, limit, skip } = parsePagination(req.query);
+  const { data: reviews, total } = await getReviewsAboutMe(req.user.id, { skip, limit });
+  res.json({ reviews, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } });
 });
 
 /**
@@ -52,6 +82,7 @@ exports.listReviewsAboutMe = asyncHandler(async (req, res) => {
  * Returns completed bookings where user hasn't left a review yet
  */
 exports.listPendingReviews = asyncHandler(async (req, res) => {
-  const bookings = await getPendingReviews(req.user.id, req.user.role);
-  res.json({ bookings });
+  const { page, limit, skip } = parsePagination(req.query);
+  const { data: bookings, total } = await getPendingReviews(req.user.id, req.user.role, { skip, limit });
+  res.json({ bookings, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } });
 });

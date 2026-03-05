@@ -3,14 +3,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ShieldCheck, FileText, RefreshCw, UploadCloud, X, CheckCircle2, AlertCircle } from 'lucide-react';
 import { MainLayout } from '../../components/layout/MainLayout';
 import { Card, CardHeader, CardTitle, CardDescription } from '../../components/common';
-import { Button, Badge, AsyncState } from '../../components/common';
-import { useTheme } from '../../context/ThemeContext';
+import { Button, Badge, AsyncState, PageHeader, VerificationStatusBadge, Textarea } from '../../components/common';
 import { applyForVerification, getMyVerification } from '../../api/verification';
 import { uploadVerificationDocument } from '../../api/uploads';
-import { getVerificationStatusVariant } from '../../utils/statusHelpers';
+import { getPageLayout } from '../../constants/layout';
+import { queryKeys } from '../../utils/queryKeys';
 
 export function WorkerVerificationPage() {
-  const { isDark } = useTheme();
   const queryClient = useQueryClient();
   const [notes, setNotes] = useState('');
   const [files, setFiles] = useState({ ID_PROOF: null, ADDRESS_PROOF: null, EXPERIENCE_LETTER: null });
@@ -18,14 +17,14 @@ export function WorkerVerificationPage() {
   const [uploadError, setUploadError] = useState('');
 
   const verificationQuery = useQuery({
-    queryKey: ['verification'],
+    queryKey: queryKeys.verification.my(),
     queryFn: getMyVerification,
   });
 
   const applyMutation = useMutation({
     mutationFn: (payload) => applyForVerification(payload),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['verification'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.verification.my() });
       setNotes('');
       setFiles({ ID_PROOF: null, ADDRESS_PROOF: null });
       setPreviews({ ID_PROOF: null, ADDRESS_PROOF: null });
@@ -87,22 +86,18 @@ export function WorkerVerificationPage() {
         notes,
         documents: uploadedDocs
       });
-    } catch (err) {
+    } catch {
       setUploadError('Failed to upload documents. Please try again.');
     }
   };
 
   return (
     <MainLayout>
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        <div className="mb-8">
-          <h1 className={`text-4xl font-bold ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
-            Verification
-          </h1>
-          <p className={isDark ? 'text-gray-400 mt-2' : 'text-gray-600 mt-2'}>
-            Submit your verification request to build customer trust.
-          </p>
-        </div>
+      <div className={getPageLayout('narrow')}>
+        <PageHeader
+          title="Verification"
+          subtitle="Submit your verification request to build customer trust."
+        />
 
         <div className="grid grid-cols-1 lg:grid-cols-[350px_1fr] gap-8">
           {/* Status Card */}
@@ -134,19 +129,17 @@ export function WorkerVerificationPage() {
                     {application?.status === 'APPROVED' ? <CheckCircle2 size={24} /> : <ShieldCheck size={24} />}
                   </div>
                   <div>
-                    <p className={`font-bold ${isDark ? 'text-gray-100' : 'text-gray-800'}`}>
+                    <p className="font-bold text-gray-800 dark:text-gray-100">
                       {application ? 'Application Submitted' : 'Not Submitted'}
                     </p>
                     {application && (
-                      <Badge variant={getVerificationStatusVariant(application.status)} className="mt-1">
-                        {application.status}
-                      </Badge>
+                      <VerificationStatusBadge status={application.status} className="mt-1" />
                     )}
                   </div>
                 </div>
 
                 {application?.notes && (
-                  <div className={`p-3 rounded-lg text-sm ${isDark ? 'bg-dark-800 text-gray-300' : 'bg-gray-50 text-gray-600'}`}>
+                  <div className="p-3 rounded-lg text-sm bg-gray-50 text-gray-600 dark:bg-dark-800 dark:text-gray-300">
                     <span className="font-semibold block mb-1">Your Note:</span>
                     {application.notes}
                   </div>
@@ -160,7 +153,7 @@ export function WorkerVerificationPage() {
                 )}
 
                 {application?.submittedAt && (
-                  <div className={isDark ? 'text-gray-400 text-xs' : 'text-gray-500 text-xs'}>
+                  <div className="text-gray-500 text-xs dark:text-gray-400">
                     Submitted on {new Date(application.submittedAt).toLocaleString()}
                   </div>
                 )}
@@ -182,8 +175,8 @@ export function WorkerVerificationPage() {
                     <div className="w-16 h-16 bg-success-50 text-success-500 rounded-full flex items-center justify-center mx-auto mb-4">
                       <CheckCircle2 size={32} />
                     </div>
-                    <h3 className={`text-lg font-semibold mb-2 ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>Identity Verified</h3>
-                    <p className={isDark ? 'text-gray-400' : 'text-gray-500'}>
+                    <h3 className="text-lg font-semibold mb-2 text-gray-800 dark:text-gray-200">Identity Verified</h3>
+                    <p className="text-gray-500 dark:text-gray-400">
                       Congratulations! Your profile has been verified. You can now accept bookings and offer services.
                     </p>
                   </>
@@ -192,8 +185,8 @@ export function WorkerVerificationPage() {
                     <div className="w-16 h-16 bg-brand-50 text-brand-500 rounded-full flex items-center justify-center mx-auto mb-4">
                       <ClockIcon />
                     </div>
-                    <h3 className={`text-lg font-semibold mb-2 ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>Application Under Review</h3>
-                    <p className={isDark ? 'text-gray-400' : 'text-gray-500'}>
+                    <h3 className="text-lg font-semibold mb-2 text-gray-800 dark:text-gray-200">Application Under Review</h3>
+                    <p className="text-gray-500 dark:text-gray-400">
                       Your verification request is currently being reviewed by our team. We will notify you once a decision is made.
                     </p>
                   </>
@@ -203,15 +196,14 @@ export function WorkerVerificationPage() {
               <form onSubmit={handleSubmit} className="space-y-6 px-6 pb-6">
                 {/* ID Proof Upload */}
                 <div>
-                  <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>
+                  <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-200">
                     ID Proof (Aadhaar / PAN) <span className="text-error-500">*</span>
                   </label>
                   {!files.ID_PROOF ? (
-                    <label className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-xl cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-800 transition-colors ${isDark ? 'border-dark-600 bg-dark-800/50' : 'border-gray-200 bg-gray-50/50'
-                      }`}>
+                    <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-xl cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-800 transition-colors border-gray-200 bg-gray-50/50 dark:border-dark-600 dark:bg-dark-800/50">
                       <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                        <UploadCloud className={`w-8 h-8 mb-2 ${isDark ? 'text-gray-400' : 'text-gray-500'}`} />
-                        <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                        <UploadCloud className="w-8 h-8 mb-2 text-gray-500 dark:text-gray-400" />
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
                           <span className="font-semibold">Click to upload</span> or drag and drop
                         </p>
                         <p className="text-xs text-gray-400">PDF, PNG, JPG up to 10MB</p>
@@ -224,14 +216,14 @@ export function WorkerVerificationPage() {
                       />
                     </label>
                   ) : (
-                    <div className={`relative flex items-center p-3 rounded-xl border ${isDark ? 'border-dark-600 bg-dark-800' : 'border-gray-200 bg-white'}`}>
+                    <div className="relative flex items-center p-3 rounded-xl border border-gray-200 bg-white dark:border-dark-600 dark:bg-dark-800">
                       {previews.ID_PROOF ? (
                         <img src={previews.ID_PROOF} alt="Preview" className="w-12 h-12 rounded object-cover mr-3 bg-gray-200" />
                       ) : (
                         <div className="w-12 h-12 rounded bg-red-100 flex items-center justify-center mr-3 text-red-600 font-bold text-xs">PDF</div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <p className={`text-sm font-medium truncate ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>
+                        <p className="text-sm font-medium truncate text-gray-800 dark:text-gray-200">
                           {files.ID_PROOF.name}
                         </p>
                         <p className="text-xs text-gray-400">{(files.ID_PROOF.size / 1024 / 1024).toFixed(2)} MB</p>
@@ -249,15 +241,14 @@ export function WorkerVerificationPage() {
 
                 {/* Address Proof Upload */}
                 <div>
-                  <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>
+                  <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-200">
                     Address Proof (Utility Bill / Rent Agreement) <span className="text-error-500">*</span>
                   </label>
                   {!files.ADDRESS_PROOF ? (
-                    <label className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-xl cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-800 transition-colors ${isDark ? 'border-dark-600 bg-dark-800/50' : 'border-gray-200 bg-gray-50/50'
-                      }`}>
+                    <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-xl cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-800 transition-colors border-gray-200 bg-gray-50/50 dark:border-dark-600 dark:bg-dark-800/50">
                       <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                        <UploadCloud className={`w-8 h-8 mb-2 ${isDark ? 'text-gray-400' : 'text-gray-500'}`} />
-                        <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                        <UploadCloud className="w-8 h-8 mb-2 text-gray-500 dark:text-gray-400" />
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
                           <span className="font-semibold">Click to upload</span> or drag and drop
                         </p>
                         <p className="text-xs text-gray-400">PDF, PNG, JPG up to 10MB</p>
@@ -270,14 +261,14 @@ export function WorkerVerificationPage() {
                       />
                     </label>
                   ) : (
-                    <div className={`relative flex items-center p-3 rounded-xl border ${isDark ? 'border-dark-600 bg-dark-800' : 'border-gray-200 bg-white'}`}>
+                    <div className="relative flex items-center p-3 rounded-xl border border-gray-200 bg-white dark:border-dark-600 dark:bg-dark-800">
                       {previews.ADDRESS_PROOF ? (
                         <img src={previews.ADDRESS_PROOF} alt="Preview" className="w-12 h-12 rounded object-cover mr-3 bg-gray-200" />
                       ) : (
                         <div className="w-12 h-12 rounded bg-red-100 flex items-center justify-center mr-3 text-red-600 font-bold text-xs">PDF</div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <p className={`text-sm font-medium truncate ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>
+                        <p className="text-sm font-medium truncate text-gray-800 dark:text-gray-200">
                           {files.ADDRESS_PROOF.name}
                         </p>
                         <p className="text-xs text-gray-400">{(files.ADDRESS_PROOF.size / 1024 / 1024).toFixed(2)} MB</p>
@@ -295,15 +286,14 @@ export function WorkerVerificationPage() {
 
                 {/* Experience / Certification Upload */}
                 <div>
-                  <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>
+                  <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-200">
                     Photos of Past Work / Experience Proof (Recommended)
                   </label>
                   {!files.EXPERIENCE_LETTER ? (
-                    <label className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-xl cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-800 transition-colors ${isDark ? 'border-dark-600 bg-dark-800/50' : 'border-gray-200 bg-gray-50/50'
-                      }`}>
+                    <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-xl cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-800 transition-colors border-gray-200 bg-gray-50/50 dark:border-dark-600 dark:bg-dark-800/50">
                       <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                        <UploadCloud className={`w-8 h-8 mb-2 ${isDark ? 'text-gray-400' : 'text-gray-500'}`} />
-                        <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                        <UploadCloud className="w-8 h-8 mb-2 text-gray-500 dark:text-gray-400" />
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
                           <span className="font-semibold">Click to upload</span> photos of work
                         </p>
                         <p className="text-xs text-gray-400">Images of past jobs, or certificates</p>
@@ -316,14 +306,14 @@ export function WorkerVerificationPage() {
                       />
                     </label>
                   ) : (
-                    <div className={`relative flex items-center p-3 rounded-xl border ${isDark ? 'border-dark-600 bg-dark-800' : 'border-gray-200 bg-white'}`}>
+                    <div className="relative flex items-center p-3 rounded-xl border border-gray-200 bg-white dark:border-dark-600 dark:bg-dark-800">
                       {previews.EXPERIENCE_LETTER ? (
                         <img src={previews.EXPERIENCE_LETTER} alt="Preview" className="w-12 h-12 rounded object-cover mr-3 bg-gray-200" />
                       ) : (
                         <div className="w-12 h-12 rounded bg-red-100 flex items-center justify-center mr-3 text-red-600 font-bold text-xs">PDF</div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <p className={`text-sm font-medium truncate ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>
+                        <p className="text-sm font-medium truncate text-gray-800 dark:text-gray-200">
                           {files.EXPERIENCE_LETTER.name}
                         </p>
                         <p className="text-xs text-gray-400">{(files.EXPERIENCE_LETTER.size / 1024 / 1024).toFixed(2)} MB</p>
@@ -340,21 +330,13 @@ export function WorkerVerificationPage() {
                 </div>
 
                 {/* Notes */}
-                <div>
-                  <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>
-                    Experience Details & References (Recommended)
-                  </label>
-                  <textarea
-                    rows={3}
-                    value={notes}
-                    onChange={(event) => setNotes(event.target.value)}
-                    placeholder="Describe your work experience, years in the field, or provide contact references of previous clients..."
-                    className={`w-full px-4 py-2.5 rounded-lg border transition-colors duration-200 focus:outline-none focus:ring-2 ${isDark
-                      ? 'bg-dark-800 border-dark-600 text-gray-100 placeholder-gray-500 focus:border-brand-500 focus:ring-brand-500/50'
-                      : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400 focus:border-brand-600 focus:ring-brand-600/50'
-                      }`}
-                  />
-                </div>
+                <Textarea
+                  label="Experience Details & References (Recommended)"
+                  rows={3}
+                  value={notes}
+                  onChange={(event) => setNotes(event.target.value)}
+                  placeholder="Describe your work experience, years in the field, or provide contact references of previous clients..."
+                />
 
                 {uploadError && (
                   <p className="text-sm text-error-500 flex items-center gap-1">

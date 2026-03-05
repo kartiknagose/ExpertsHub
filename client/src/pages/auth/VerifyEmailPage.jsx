@@ -8,10 +8,8 @@ import { verifyEmail } from '../../api/auth';
 import { MainLayout } from '../../components/layout/MainLayout';
 import { Card, CardHeader, CardTitle, CardDescription } from '../../components/common';
 import { Button } from '../../components/common';
-import { useTheme } from '../../context/ThemeContext';
 
 export function VerifyEmailPage() {
-  const { isDark } = useTheme();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
@@ -88,17 +86,17 @@ export function VerifyEmailPage() {
   };
 
   return (
-    <div className={`min-h-screen flex items-center justify-center p-4 ${isDark ? 'bg-dark-900' : 'bg-gray-50'}`}>
+    <div className="min-h-screen flex items-center justify-center p-4 bg-gray-50 dark:bg-dark-900">
       <Card className="w-full max-w-md text-center p-8 shadow-xl">
         <div className="mb-6">
           {getIcon()}
         </div>
 
-        <h2 className={`text-2xl font-bold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+        <h2 className="text-2xl font-bold mb-2 text-gray-900 dark:text-white">
           {status === 'loading' ? 'Verifying...' : status === 'success' ? 'Verified!' : 'Verification Failed'}
         </h2>
 
-        <p className={`text-lg mb-8 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
+        <p className="text-lg mb-8 text-gray-600 dark:text-gray-300">
           {message}
         </p>
 

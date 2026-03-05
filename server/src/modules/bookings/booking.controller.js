@@ -16,9 +16,82 @@
  * Controllers DO NOT contain business logic - that's the service's job!
  */
 
-const asyncHandler = require('../../common/utils/asyncHandler'); // Wrapper to catch errors automatically
-const bookingService = require('./booking.service'); // The service that does actual work
+const asyncHandler = require('../../common/utils/asyncHandler');
+const parseId = require('../../common/utils/parseId');
+const parsePagination = require('../../common/utils/parsePagination');
+const AppError = require('../../common/errors/AppError');
+const bookingService = require('./booking.service');
 const prisma = require('../../config/prisma');
+const notificationService = require('../notifications/notification.service');
+
+// Socket.IO accessor (optional) - will throw if not initialized, so guard usage
+let getIo;
+try {
+  ({ getIo } = require('../../socket'));
+} catch (_e) {
+  // Socket.IO is optional during tests or if not installed; controllers should still work
+  getIo = null;
+}
+
+async function emitBookingStatusUpdated(booking) {
+  if (!getIo || !booking) return;
+
+  try {
+    const io = getIo();
+    const workerUserId = booking.workerProfile?.userId || booking.workerProfile?.user?.id || booking.workerUserId || null;
+    const customerId = booking.customer?.id || booking.customerId || null;
+
+    // Create Notification Titles / Messages based on status
+    let title = 'Booking Update';
+    let message = `Your booking for ${booking.service?.name} is now ${booking.status}.`;
+    let type = 'BOOKING_UPDATE';
+
+    if (booking.status === 'CONFIRMED') {
+      title = 'Booking Confirmed';
+      message = `Your booking for ${booking.service?.name} has been confirmed.`;
+    } else if (booking.status === 'IN_PROGRESS') {
+      title = 'Job Started';
+      message = `Live tracking is now available for your ${booking.service?.name} task.`;
+    } else if (booking.status === 'COMPLETED') {
+      title = 'Job Completed';
+      message = `Hope you liked the service! Please rate your experience.`;
+    } else if (booking.status === 'CANCELLED') {
+      title = 'Booking Cancelled';
+      message = `The booking for ${booking.service?.name} has been cancelled.`;
+    }
+
+    // Notify Customer
+    if (customerId) {
+      await notificationService.createNotification({
+        userId: customerId,
+        type,
+        title,
+        message,
+        data: { bookingId: booking.id, status: booking.status }
+      });
+      io.to(`user:${customerId}`).emit('booking:status_updated', booking);
+    }
+
+    // Notify Worker
+    if (workerUserId) {
+      // Different message for worker
+      const workerTitle = `Status: ${booking.status}`;
+      const workerMsg = `Booking #${booking.id} (${booking.service?.name}) is now ${booking.status}.`;
+
+      await notificationService.createNotification({
+        userId: workerUserId,
+        type,
+        title: workerTitle,
+        message: workerMsg,
+        data: { bookingId: booking.id, status: booking.status }
+      });
+      io.to(`user:${workerUserId}`).emit('booking:status_updated', booking);
+    }
+
+  } catch (err) {
+    console.warn('Notification/Socket emit failed:', err.message);
+  }
+}
 
 /**
  * CREATE A NEW BOOKING
@@ -56,8 +129,7 @@ const createBooking = asyncHandler(async (req, res) => {
   });
 
   if (!user || !user.isProfileComplete) {
-    res.status(403);
-    throw new Error('You must complete your profile (address and details) before booking a service.');
+    throw new AppError(403, 'You must complete your profile (address and details) before booking a service.');
   }
 
   // Call the service to create the booking (service handles all business logic)
@@ -69,6 +141,31 @@ const createBooking = asyncHandler(async (req, res) => {
     booking: newBooking,
   });
   // Status 201 means "Created" (something new was added to database)
+  // Emit a real-time event and persist notification
+  try {
+    if (getIo) {
+      const io = getIo();
+      const workerUserId = newBooking.workerProfile?.userId || newBooking.workerUserId;
+
+      if (workerUserId) {
+        // Targeted notification
+        await notificationService.createNotification({
+          userId: workerUserId,
+          type: 'BOOKING_CREATED',
+          title: 'New Job Request',
+          message: `You have a new booking request for ${newBooking.service?.name}.`,
+          data: { bookingId: newBooking.id }
+        });
+        io.to(`user:${workerUserId}`).emit('booking:created', newBooking);
+      } else {
+        // For public/open jobs, we don't persist notification to all yet (might be noisy)
+        // Just broadcast for real-time dashboard updates
+        io.emit('booking:created', newBooking);
+      }
+    }
+  } catch (err) {
+    console.warn('Notification failed (booking:created):', err.message);
+  }
 });
 
 /**
@@ -96,14 +193,16 @@ const getMyBookings = asyncHandler(async (req, res) => {
   // Allow WORKER to view as CUSTOMER if requested
   const roleToUse = (userRole === 'WORKER' && viewAs === 'CUSTOMER') ? 'CUSTOMER' : userRole;
 
+  const { page, limit, skip } = parsePagination(req.query);
+
   // Call service to fetch bookings based on user's role
-  const bookings = await bookingService.getBookingsByUser(userId, roleToUse);
+  const { data: bookings, total } = await bookingService.getBookingsByUser(userId, roleToUse, { skip, limit });
 
   // Send bookings back to client
   res.status(200).json({
-    bookings: bookings,
+    bookings,
+    pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
   });
-  // Status 200 means "OK" (request successful)
 });
 
 /**
@@ -123,7 +222,7 @@ const getMyBookings = asyncHandler(async (req, res) => {
 const getBookingById = asyncHandler(async (req, res) => {
   // Extract booking ID from URL parameter
   // If URL is /api/bookings/5, then req.params.id = '5'
-  const bookingId = parseInt(req.params.id); // Convert string to number
+  const bookingId = parseId(req.params.id, 'Booking ID');
 
   // Get user's ID and role from JWT token
   const userId = req.user.id;
@@ -164,7 +263,7 @@ const getBookingById = asyncHandler(async (req, res) => {
  */
 const updateBookingStatus = asyncHandler(async (req, res) => {
   // Extract booking ID from URL parameter
-  const bookingId = parseInt(req.params.id);
+  const bookingId = parseId(req.params.id, 'Booking ID');
 
   // Extract new status from request body
   const { status } = req.body;
@@ -186,6 +285,8 @@ const updateBookingStatus = asyncHandler(async (req, res) => {
     message: 'Booking status updated successfully.',
     booking: updatedBooking,
   });
+
+  emitBookingStatusUpdated(updatedBooking);
 });
 
 /**
@@ -212,7 +313,7 @@ const updateBookingStatus = asyncHandler(async (req, res) => {
  */
 const cancelBooking = asyncHandler(async (req, res) => {
   // Extract booking ID from URL parameter
-  const bookingId = parseInt(req.params.id);
+  const bookingId = parseId(req.params.id, 'Booking ID');
 
   // Extract cancellation reason from request body (optional)
   const { cancellationReason } = req.body || {};
@@ -234,6 +335,8 @@ const cancelBooking = asyncHandler(async (req, res) => {
     message: 'Booking cancelled successfully.',
     booking: cancelledBooking,
   });
+
+  emitBookingStatusUpdated(cancelledBooking);
 });
 
 /**
@@ -254,7 +357,7 @@ const cancelBooking = asyncHandler(async (req, res) => {
  * }
  */
 const payBooking = asyncHandler(async (req, res) => {
-  const bookingId = parseInt(req.params.id);
+  const bookingId = parseId(req.params.id, 'Booking ID');
   const { paymentReference } = req.body;
   const userId = req.user.id;
   const userRole = req.user.role;
@@ -270,6 +373,8 @@ const payBooking = asyncHandler(async (req, res) => {
     message: 'Payment recorded successfully.',
     booking: paidBooking,
   });
+
+  emitBookingStatusUpdated(paidBooking);
 });
 
 /**
@@ -288,14 +393,15 @@ const getOpenBookings = asyncHandler(async (req, res) => {
   const userRole = req.user.role;
 
   if (userRole !== 'WORKER') {
-    res.status(403);
-    throw new Error('Only workers can view open bookings.');
+    throw new AppError(403, 'Only workers can view open bookings.');
   }
 
-  const bookings = await bookingService.getOpenBookingsForWorker(userId);
+  const { page, limit, skip } = parsePagination(req.query);
+  const { data: bookings, total } = await bookingService.getOpenBookingsForWorker(userId, { skip, limit });
 
   res.status(200).json({
     bookings,
+    pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
   });
 });
 
@@ -312,13 +418,12 @@ const getOpenBookings = asyncHandler(async (req, res) => {
  * }
  */
 const acceptBooking = asyncHandler(async (req, res) => {
-  const bookingId = parseInt(req.params.id);
+  const bookingId = parseId(req.params.id, 'Booking ID');
   const userId = req.user.id;
   const userRole = req.user.role;
 
   if (userRole !== 'WORKER') {
-    res.status(403);
-    throw new Error('Only workers can accept bookings.');
+    throw new AppError(403, 'Only workers can accept bookings.');
   }
 
   // Check valid profile and verification
@@ -337,8 +442,7 @@ const acceptBooking = asyncHandler(async (req, res) => {
   });
 
   if (!user || !user.isProfileComplete) {
-    res.status(403);
-    throw new Error('Please complete your profile details first.');
+    throw new AppError(403, 'Please complete your profile details first.');
   }
 
   // We should also check verification status.
@@ -356,6 +460,8 @@ const acceptBooking = asyncHandler(async (req, res) => {
     message: 'Booking accepted successfully. You can now view customer details.',
     booking,
   });
+
+  emitBookingStatusUpdated(booking);
 });
 
 /**
@@ -365,13 +471,12 @@ const acceptBooking = asyncHandler(async (req, res) => {
  * Who can access: Only WORKERS
  */
 const verifyBookingStart = asyncHandler(async (req, res) => {
-  const bookingId = parseInt(req.params.id);
+  const bookingId = parseId(req.params.id, 'Booking ID');
   const userId = req.user.id;
   const { otp } = req.body;
 
   if (!otp) {
-    res.status(400);
-    throw new Error('OTP is required.');
+    throw new AppError(400, 'OTP is required.');
   }
 
   const updatedBooking = await bookingService.verifyBookingStart(bookingId, otp, userId);
@@ -380,6 +485,8 @@ const verifyBookingStart = asyncHandler(async (req, res) => {
     message: 'OTP verified! Job started successfully.',
     booking: updatedBooking
   });
+
+  emitBookingStatusUpdated(updatedBooking);
 });
 
 /**
@@ -389,13 +496,12 @@ const verifyBookingStart = asyncHandler(async (req, res) => {
  * Who can access: Only WORKERS
  */
 const verifyBookingCompletion = asyncHandler(async (req, res) => {
-  const bookingId = parseInt(req.params.id);
+  const bookingId = parseId(req.params.id, 'Booking ID');
   const userId = req.user.id;
   const { otp } = req.body;
 
   if (!otp) {
-    res.status(400);
-    throw new Error('OTP is required.');
+    throw new AppError(400, 'OTP is required.');
   }
 
   const updatedBooking = await bookingService.verifyBookingCompletion(bookingId, otp, userId);
@@ -404,6 +510,143 @@ const verifyBookingCompletion = asyncHandler(async (req, res) => {
     message: 'OTP verified! Job completed successfully.',
     booking: updatedBooking
   });
+
+  emitBookingStatusUpdated(updatedBooking);
+});
+
+// ─── SESSION MANAGEMENT (Phase 7) ──────────────────────────────────
+
+const getBookingSessions = asyncHandler(async (req, res) => {
+  const bookingId = parseId(req.params.id, 'Booking ID');
+  const sessions = await bookingService.getBookingSessions(bookingId, req.user.id, req.user.role);
+  res.status(200).json({ sessions });
+});
+
+const createSession = asyncHandler(async (req, res) => {
+  const bookingId = parseId(req.params.id, 'Booking ID');
+  const { sessionDate, notes } = req.body;
+
+  if (!sessionDate) throw new AppError(400, 'Session date is required.');
+
+  const session = await bookingService.createSession(bookingId, req.user.id, { sessionDate, notes });
+
+  res.status(201).json({ message: 'Session scheduled successfully.', session });
+
+  // Notify customer about the scheduled visit
+  try {
+    if (getIo) {
+      const booking = await prisma.booking.findUnique({
+        where: { id: bookingId },
+        select: { customerId: true, service: { select: { name: true } } },
+      });
+      if (booking) {
+        await notificationService.createNotification({
+          userId: booking.customerId,
+          type: 'BOOKING_UPDATE',
+          title: 'Next Visit Scheduled',
+          message: `Your worker has scheduled the next visit for ${new Date(sessionDate).toLocaleDateString()} for ${booking.service?.name || 'your booking'}.`,
+          data: { bookingId, sessionId: session.id },
+        });
+        const io = getIo();
+        io.to(`user:${booking.customerId}`).emit('session:scheduled', { bookingId, session });
+      }
+    }
+  } catch (err) {
+    console.warn('Session notification failed:', err.message);
+  }
+});
+
+const startSession = asyncHandler(async (req, res) => {
+  const sessionId = parseId(req.params.sessionId, 'Session ID');
+  const { otp } = req.body;
+
+  if (!otp) throw new AppError(400, 'OTP is required.');
+
+  const session = await bookingService.startSession(sessionId, otp, req.user.id);
+
+  res.status(200).json({ message: 'Session started successfully.', session });
+
+  // Notify customer
+  try {
+    if (getIo) {
+      const booking = await prisma.booking.findUnique({
+        where: { id: session.bookingId },
+        select: { customerId: true },
+      });
+      if (booking) {
+        const io = getIo();
+        io.to(`user:${booking.customerId}`).emit('session:started', { bookingId: session.bookingId, session });
+      }
+    }
+  } catch (err) {
+    console.warn('Session start notification failed:', err.message);
+  }
+});
+
+const endSession = asyncHandler(async (req, res) => {
+  const sessionId = parseId(req.params.sessionId, 'Session ID');
+  const { notes } = req.body || {};
+
+  const session = await bookingService.endSession(sessionId, req.user.id, { notes });
+
+  res.status(200).json({ message: 'Session ended successfully.', session });
+
+  // Notify customer
+  try {
+    if (getIo) {
+      const booking = await prisma.booking.findUnique({
+        where: { id: session.bookingId },
+        select: { customerId: true },
+      });
+      if (booking) {
+        const io = getIo();
+        io.to(`user:${booking.customerId}`).emit('session:ended', { bookingId: session.bookingId, session });
+      }
+    }
+  } catch (err) {
+    console.warn('Session end notification failed:', err.message);
+  }
+});
+
+// ─── RESCHEDULING (Phase 7) ────────────────────────────────────────
+
+const rescheduleBooking = asyncHandler(async (req, res) => {
+  const bookingId = parseId(req.params.id, 'Booking ID');
+  const { newScheduledDate } = req.body;
+
+  if (!newScheduledDate) throw new AppError(400, 'New scheduled date is required.');
+
+  const booking = await bookingService.rescheduleBooking(bookingId, req.user.id, req.user.role, { newScheduledDate });
+
+  res.status(200).json({ message: 'Booking rescheduled successfully.', booking });
+
+  emitBookingStatusUpdated(booking);
+});
+
+// ─── STATUS HISTORY (Phase 7) ──────────────────────────────────────
+
+const getBookingStatusHistory = asyncHandler(async (req, res) => {
+  const bookingId = parseId(req.params.id, 'Booking ID');
+
+  // Auth: ensure user has access to this booking
+  await bookingService.getBookingById(bookingId, req.user.id, req.user.role);
+
+  const history = await prisma.bookingStatusHistory.findMany({
+    where: { bookingId },
+    include: { changer: { select: { id: true, name: true, role: true } } },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  res.status(200).json({ history });
+});
+
+// ─── CANCELLATION POLICY (Phase 7) ─────────────────────────────────
+
+const getCancellationPolicy = asyncHandler(async (req, res) => {
+  const bookingId = parseId(req.params.id, 'Booking ID');
+  const booking = await bookingService.getBookingById(bookingId, req.user.id, req.user.role);
+  const policy = bookingService.getCancellationPolicy(booking);
+  res.status(200).json({ policy });
 });
 
 // Export all controller functions so routes can use them
@@ -418,4 +661,11 @@ module.exports = {
   acceptBooking,
   verifyBookingStart,
   verifyBookingCompletion,
+  getBookingSessions,
+  createSession,
+  startSession,
+  endSession,
+  rescheduleBooking,
+  getBookingStatusHistory,
+  getCancellationPolicy,
 };

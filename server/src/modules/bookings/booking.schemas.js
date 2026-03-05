@@ -70,6 +70,11 @@ const createBookingSchema = [
       return true;
     }),
 
+  // Optional: Estimated duration in minutes (e.g., 30 for quick fix, 480 for full-day job)
+  body('estimatedDuration')
+    .optional()
+    .isInt({ min: 15, max: 1440 }).withMessage('Estimated duration must be between 15 and 1440 minutes (24 hours)'),
+
   // Optional: Additional notes from customer
   body('notes')
     .optional()

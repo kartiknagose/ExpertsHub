@@ -2,11 +2,9 @@ import { useNavigate } from 'react-router-dom';
 import { Home, ArrowLeft } from 'lucide-react';
 import { MainLayout } from '../../components/layout/MainLayout';
 import { Button } from '../../components/common';
-import { useTheme } from '../../context/ThemeContext';
 
 export function NotFoundPage() {
     const navigate = useNavigate();
-    const { isDark } = useTheme();
 
     return (
         <MainLayout>
@@ -17,11 +15,11 @@ export function NotFoundPage() {
                         404
                     </h1>
 
-                    <h2 className={`text-3xl font-bold mb-4 ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
+                    <h2 className="text-3xl font-bold mb-4 text-gray-900 dark:text-gray-100">
                         Page Not Found
                     </h2>
 
-                    <p className={`text-lg mb-8 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                    <p className="text-lg mb-8 text-gray-600 dark:text-gray-400">
                         Oops! The page you're looking for doesn't exist or has been moved.
                     </p>
 
@@ -46,9 +44,9 @@ export function NotFoundPage() {
 
                     {/* Decorative element */}
                     <div className="mt-12 flex justify-center gap-2 opacity-20">
-                        <div className={`w-2 h-2 rounded-full ${isDark ? 'bg-gray-400' : 'bg-gray-900'} animate-bounce delay-0`}></div>
-                        <div className={`w-2 h-2 rounded-full ${isDark ? 'bg-gray-400' : 'bg-gray-900'} animate-bounce delay-100`}></div>
-                        <div className={`w-2 h-2 rounded-full ${isDark ? 'bg-gray-400' : 'bg-gray-900'} animate-bounce delay-200`}></div>
+                        <div className="w-2 h-2 rounded-full bg-gray-900 dark:bg-gray-400 animate-bounce delay-0"></div>
+                        <div className="w-2 h-2 rounded-full bg-gray-900 dark:bg-gray-400 animate-bounce delay-100"></div>
+                        <div className="w-2 h-2 rounded-full bg-gray-900 dark:bg-gray-400 animate-bounce delay-200"></div>
                     </div>
                 </div>
             </div>

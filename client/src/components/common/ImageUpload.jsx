@@ -1,14 +1,32 @@
 import React, { useState, useRef } from 'react';
 import { Upload, X, Camera, Image as ImageIcon } from 'lucide-react';
-import { Button } from './index';
+import { Button } from '../ui/Button';
 
 export const ImageUpload = ({ label, onUpload, value, error, className = '' }) => {
     const [preview, setPreview] = useState(value || null);
     const fileInputRef = useRef(null);
 
+    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+    const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+    const [sizeError, setSizeError] = useState(null);
+
     const handleFileChange = (e) => {
         const file = e.target.files[0];
         if (file) {
+            setSizeError(null);
+
+            if (!ALLOWED_TYPES.includes(file.type)) {
+                setSizeError('Only JPG, PNG, and WebP images are allowed');
+                if (fileInputRef.current) fileInputRef.current.value = '';
+                return;
+            }
+
+            if (file.size > MAX_FILE_SIZE) {
+                setSizeError(`File size (${(file.size / (1024 * 1024)).toFixed(1)}MB) exceeds 5MB limit`);
+                if (fileInputRef.current) fileInputRef.current.value = '';
+                return;
+            }
+
             const reader = new FileReader();
             reader.onloadend = () => {
                 setPreview(reader.result);
@@ -20,6 +38,7 @@ export const ImageUpload = ({ label, onUpload, value, error, className = '' }) =
 
     const clearImage = () => {
         setPreview(null);
+        setSizeError(null);
         onUpload(null);
         if (fileInputRef.current) fileInputRef.current.value = '';
     };
@@ -67,7 +86,7 @@ export const ImageUpload = ({ label, onUpload, value, error, className = '' }) =
                 />
             </div>
 
-            {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+            {(error || sizeError) && <p className="text-xs text-red-500 mt-1">{sizeError || error}</p>}
         </div>
     );
 };

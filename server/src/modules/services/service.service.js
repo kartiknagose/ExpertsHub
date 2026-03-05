@@ -13,6 +13,7 @@
  */
 
 const prisma = require('../../config/prisma');
+const AppError = require('../../common/errors/AppError');
 
 /**
  * CREATE A NEW SERVICE
@@ -43,7 +44,7 @@ async function createService(serviceData) {
 
   if (existingService) {
     // Service name already taken, reject the request
-    throw new Error(`A service with the name "${name}" already exists. Please choose a different name.`);
+    throw new AppError(409, `A service with the name "${name}" already exists. Please choose a different name.`);
   }
 
   // STEP 2: All checks passed, create the service
@@ -72,7 +73,7 @@ async function createService(serviceData) {
  * @param {object} filters - Optional filters { category: "Plumbing" }
  * @returns {Promise<array>} - List of services
  */
-async function listServices({ category, search } = {}) {
+async function listServices({ category, search, skip = 0, limit = 20 } = {}) {
   const where = {};
 
   if (category) {
@@ -88,10 +89,16 @@ async function listServices({ category, search } = {}) {
   }
 
   // Fetch services from database, sorted alphabetically
-  return prisma.service.findMany({
-    where,
-    orderBy: { name: 'asc' } // 'asc' means ascending (A-Z)
-  });
+  const [data, total] = await Promise.all([
+    prisma.service.findMany({
+      where,
+      orderBy: { name: 'asc' },
+      skip,
+      take: limit,
+    }),
+    prisma.service.count({ where }),
+  ]);
+  return { data, total };
 }
 
 /**
@@ -118,32 +125,38 @@ async function getServiceById(id) {
  * @param {number} serviceId - The service ID
  * @returns {Promise<array>} - List of worker profiles offering the service
  */
-async function getServiceWorkers(serviceId) {
-  const workers = await prisma.workerService.findMany({
-    where: {
-      serviceId,
-      worker: {
-        isVerified: true,
-      },
+async function getServiceWorkers(serviceId, { skip = 0, limit = 20 } = {}) {
+  const where = {
+    serviceId,
+    worker: {
+      isVerified: true,
     },
-    include: {
-      worker: {
-        select: {
-          id: true,
-          hourlyRate: true,
-          rating: true,
-          totalReviews: true,
-          isVerified: true,
-          user: {
-            select: { id: true, name: true, email: true, profilePhotoUrl: true },
+  };
+  const [workers, total] = await Promise.all([
+    prisma.workerService.findMany({
+      where,
+      include: {
+        worker: {
+          select: {
+            id: true,
+            hourlyRate: true,
+            rating: true,
+            totalReviews: true,
+            isVerified: true,
+            user: {
+              select: { id: true, name: true, email: true, profilePhotoUrl: true },
+            },
           },
         },
       },
-    },
-  });
+      skip,
+      take: limit,
+    }),
+    prisma.workerService.count({ where }),
+  ]);
 
   // Flatten to worker profiles for easier consumption by frontend
-  return workers.map((entry) => entry.worker);
+  return { data: workers.map((entry) => entry.worker), total };
 }
 
 /**
@@ -161,7 +174,7 @@ async function updateService(id, data) {
       }
     });
     if (existing) {
-      throw new Error(`Service '${data.name}' already exists.`);
+      throw new AppError(409, `Service '${data.name}' already exists.`);
     }
   }
 

@@ -45,7 +45,8 @@ function requireRole(...allowedRoles) {
     if (!req.user) {
       // User is not logged in (authenticate middleware failed or wasn't used)
       return res.status(401).json({ 
-        error: 'Authentication required. Please log in to access this resource.' 
+        error: 'Authentication required. Please log in to access this resource.',
+        statusCode: 401
       });
       // Status 401 = Unauthorized (not logged in)
     }
@@ -57,7 +58,8 @@ function requireRole(...allowedRoles) {
     if (!allowedRoles.includes(userRole)) {
       // User's role is not allowed to access this endpoint
       return res.status(403).json({ 
-        error: `Access denied. This endpoint requires one of the following roles: ${allowedRoles.join(', ')}. Your role: ${userRole}.` 
+        error: `Access denied. This endpoint requires one of the following roles: ${allowedRoles.join(', ')}. Your role: ${userRole}.`,
+        statusCode: 403
       });
       // Status 403 = Forbidden (logged in, but not authorized)
     }

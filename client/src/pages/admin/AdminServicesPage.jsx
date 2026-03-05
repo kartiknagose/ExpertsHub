@@ -2,13 +2,13 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { PlusCircle, Pencil, Trash2, X, Search } from 'lucide-react';
 import { MainLayout } from '../../components/layout/MainLayout';
-import { Card, CardHeader, CardTitle, CardDescription } from '../../components/common';
-import { Button, AsyncState } from '../../components/common';
-import { useTheme } from '../../context/ThemeContext';
+import { Card, CardHeader, CardTitle, CardDescription, Input, Textarea } from '../../components/common';
+import { Button, AsyncState, ConfirmDialog, PageHeader } from '../../components/common';
 import { createService, getAllServices, updateService, deleteService } from '../../api/services';
+import { getPageLayout } from '../../constants/layout';
+import { queryKeys } from '../../utils/queryKeys';
 
 export function AdminServicesPage() {
-  const { isDark } = useTheme();
   const queryClient = useQueryClient();
   const [formState, setFormState] = useState({
     name: '',
@@ -18,16 +18,17 @@ export function AdminServicesPage() {
   });
   const [editId, setEditId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [deleteDialog, setDeleteDialog] = useState({ isOpen: false, service: null });
 
   const servicesQuery = useQuery({
-    queryKey: ['services'],
+    queryKey: queryKeys.services.all(),
     queryFn: getAllServices,
   });
 
   const createMutation = useMutation({
     mutationFn: (payload) => createService(payload),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['services'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.services.all() });
       resetForm();
     },
   });
@@ -35,7 +36,7 @@ export function AdminServicesPage() {
   const updateMutation = useMutation({
     mutationFn: ({ id, payload }) => updateService(id, payload),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['services'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.services.all() });
       resetForm();
     },
   });
@@ -43,7 +44,7 @@ export function AdminServicesPage() {
   const deleteMutation = useMutation({
     mutationFn: (id) => deleteService(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['services'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.services.all() });
     },
   });
 
@@ -93,15 +94,11 @@ export function AdminServicesPage() {
 
   return (
     <MainLayout>
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        <div className="mb-8">
-          <h1 className={`text-4xl font-bold ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
-            Services Catalog
-          </h1>
-          <p className={isDark ? 'text-gray-400 mt-2' : 'text-gray-600 mt-2'}>
-            Manage the services available for customers.
-          </p>
-        </div>
+      <div className={getPageLayout('default')}>
+        <PageHeader
+          title="Services Catalog"
+          subtitle="Manage the services available for customers."
+        />
 
         <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-6">
           <Card>
@@ -113,67 +110,36 @@ export function AdminServicesPage() {
             </CardHeader>
 
             <form onSubmit={handleSubmit} className="space-y-4 px-6 pb-6">
-              <div>
-                <label className={isDark ? 'block text-sm font-medium text-gray-200 mb-2' : 'block text-sm font-medium text-gray-700 mb-2'}>
-                  Service Name
-                </label>
-                <input
-                  value={formState.name}
-                  onChange={(event) => handleChange('name', event.target.value)}
-                  placeholder="e.g., Home Cleaning"
-                  className={`w-full px-4 py-2.5 rounded-lg border transition-colors duration-200 focus:outline-none focus:ring-2 ${isDark
-                    ? 'bg-dark-800 border-dark-600 text-gray-100 placeholder-gray-500 focus:border-brand-500 focus:ring-brand-500/50'
-                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400 focus:border-brand-600 focus:ring-brand-600/50'
-                    }`}
-                />
-              </div>
+              <Input
+                label="Service Name"
+                value={formState.name}
+                onChange={(event) => handleChange('name', event.target.value)}
+                placeholder="e.g., Home Cleaning"
+                required
+              />
 
-              <div>
-                <label className={isDark ? 'block text-sm font-medium text-gray-200 mb-2' : 'block text-sm font-medium text-gray-700 mb-2'}>
-                  Category
-                </label>
-                <input
-                  value={formState.category}
-                  onChange={(event) => handleChange('category', event.target.value)}
-                  placeholder="e.g., Home"
-                  className={`w-full px-4 py-2.5 rounded-lg border transition-colors duration-200 focus:outline-none focus:ring-2 ${isDark
-                    ? 'bg-dark-800 border-dark-600 text-gray-100 placeholder-gray-500 focus:border-brand-500 focus:ring-brand-500/50'
-                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400 focus:border-brand-600 focus:ring-brand-600/50'
-                    }`}
-                />
-              </div>
+              <Input
+                label="Category"
+                value={formState.category}
+                onChange={(event) => handleChange('category', event.target.value)}
+                placeholder="e.g., Home"
+              />
 
-              <div>
-                <label className={isDark ? 'block text-sm font-medium text-gray-200 mb-2' : 'block text-sm font-medium text-gray-700 mb-2'}>
-                  Base Price (Rs)
-                </label>
-                <input
-                  type="number"
-                  value={formState.basePrice}
-                  onChange={(event) => handleChange('basePrice', event.target.value)}
-                  placeholder="e.g., 500"
-                  className={`w-full px-4 py-2.5 rounded-lg border transition-colors duration-200 focus:outline-none focus:ring-2 ${isDark
-                    ? 'bg-dark-800 border-dark-600 text-gray-100 placeholder-gray-500 focus:border-brand-500 focus:ring-brand-500/50'
-                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400 focus:border-brand-600 focus:ring-brand-600/50'
-                    }`}
-                />
-              </div>
+              <Input
+                label="Base Price (₹)"
+                type="number"
+                value={formState.basePrice}
+                onChange={(event) => handleChange('basePrice', event.target.value)}
+                placeholder="e.g., 500"
+              />
 
-              <div>
-                <label className={isDark ? 'block text-sm font-medium text-gray-200 mb-2' : 'block text-sm font-medium text-gray-700 mb-2'}>
-                  Description
-                </label>
-                <textarea
-                  rows={4}
-                  value={formState.description}
-                  onChange={(event) => handleChange('description', event.target.value)}
-                  placeholder="Describe the service"
-                  className={`w-full px-4 py-2.5 rounded-lg border transition-colors duration-200 focus:outline-none focus:ring-2 ${isDark
-                    ? 'bg-dark-800 border-dark-600 text-gray-100 placeholder-gray-500 focus:border-brand-500 focus:ring-brand-500/50'
-                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400 focus:border-brand-600 focus:ring-brand-600/50'
-                    }`}
-                />
-              </div>
+              <Textarea
+                label="Description"
+                rows={4}
+                value={formState.description}
+                onChange={(event) => handleChange('description', event.target.value)}
+                placeholder="Describe the service"
+              />
 
               {(createMutation.isError || updateMutation.isError) && (
                 <p className="text-sm text-error-500">
@@ -213,18 +179,12 @@ export function AdminServicesPage() {
             </CardHeader>
 
             <div className="px-6 pt-2 pb-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                <input
-                  type="text"
-                  placeholder="Search by name or category..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className={`w-full pl-10 pr-4 py-2 rounded-lg border outline-none transition-colors ${isDark
-                    ? 'bg-dark-900 border-dark-700 text-white focus:border-brand-500'
-                    : 'bg-gray-50 border-gray-200 text-gray-900 focus:border-brand-500'}`}
-                />
-              </div>
+              <Input
+                icon={Search}
+                placeholder="Search by name or category..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
             </div>
 
             <AsyncState
@@ -242,18 +202,17 @@ export function AdminServicesPage() {
             >
               <div className="space-y-3 px-6 pb-6 max-h-[calc(100vh-250px)] overflow-y-auto custom-scrollbar">
                 {filteredServices.map((service) => (
-                  <div key={service.id} className={`rounded-lg border px-4 py-3 flex items-start justify-between group transition-all ${isDark ? 'border-dark-700 bg-dark-800 hover:border-dark-600' : 'border-gray-100 bg-gray-50 hover:border-gray-200'
-                    }`}>
+                  <div key={service.id} className="rounded-lg border px-4 py-3 flex items-start justify-between group transition-all border-gray-100 bg-gray-50 hover:border-gray-200 dark:border-dark-700 dark:bg-dark-800 dark:hover:border-dark-600">
                     <div>
                       <div className="flex items-center gap-2">
-                        <p className={`font-semibold ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
+                        <p className="font-semibold text-gray-900 dark:text-gray-100">
                           {service.name}
                         </p>
                         {service.id === editId && (
                           <span className="text-xs bg-brand-500/10 text-brand-500 px-2 py-0.5 rounded-full">Editing</span>
                         )}
                       </div>
-                      <p className={isDark ? 'text-gray-400 text-sm mt-1' : 'text-gray-600 text-sm mt-1'}>
+                      <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">
                         {service.category || 'Uncategorized'} · {service.basePrice ? `INR ${service.basePrice}` : 'No base price'}
                       </p>
                     </div>
@@ -263,7 +222,7 @@ export function AdminServicesPage() {
                         variant="ghost"
                         icon={Pencil}
                         onClick={() => handleEdit(service)}
-                        className={isDark ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-900'}
+                        className="text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
                       >
                       </Button>
                       <Button
@@ -271,12 +230,9 @@ export function AdminServicesPage() {
                         variant="ghost"
                         icon={Trash2}
                         loading={deleteMutation.isPending && deleteMutation.variables === service.id}
-                        onClick={() => {
-                          if (window.confirm('Are you sure you want to delete this service?')) {
-                            deleteMutation.mutate(service.id);
-                          }
-                        }}
+                        onClick={() => setDeleteDialog({ isOpen: true, service })}
                         className="text-error-500 hover:text-error-600 hover:bg-error-50 dark:hover:bg-error-900/20"
+                        aria-label="Delete service"
                       >
                       </Button>
                     </div>
@@ -286,6 +242,21 @@ export function AdminServicesPage() {
             </AsyncState>
           </Card>
         </div>
+
+        {/* Delete Confirmation Dialog */}
+        <ConfirmDialog
+          isOpen={deleteDialog.isOpen}
+          onConfirm={() => {
+            deleteMutation.mutate(deleteDialog.service.id);
+            setDeleteDialog({ isOpen: false, service: null });
+          }}
+          onCancel={() => setDeleteDialog({ isOpen: false, service: null })}
+          title="Delete Service"
+          message={`Are you sure you want to delete "${deleteDialog.service?.name}"? This action cannot be undone.`}
+          confirmText="Delete"
+          variant="danger"
+          loading={deleteMutation.isPending}
+        />
       </div>
     </MainLayout>
   );

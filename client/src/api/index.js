@@ -12,4 +12,6 @@ export * from './reviews';
 export * from './admin';
 export * from './verification';
 export * from './payments';
+export * from './notifications';
+export * from './chat';
 export { default as axiosInstance } from './axios';

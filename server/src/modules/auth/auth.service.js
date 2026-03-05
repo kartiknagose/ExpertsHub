@@ -4,7 +4,12 @@ const { signJwt } = require('../../common/utils/jwt');
 const { generateEmailVerificationToken, generatePasswordResetToken } = require('../../common/utils/tokenGenerator');
 const AppError = require('../../common/errors/AppError');
 
-async function registerUser({ name, email, mobile, password }) {
+async function registerUser({ name, email, mobile, password, role = 'CUSTOMER' }) {
+  const validRoles = ['CUSTOMER', 'WORKER'];
+  if (!validRoles.includes(role)) {
+    throw new AppError(400, 'Invalid role. Must be CUSTOMER or WORKER.');
+  }
+
   const passwordHash = await hashPassword(password);
   const { token: verificationToken, expiresAt } = generateEmailVerificationToken();
 
@@ -25,49 +30,7 @@ async function registerUser({ name, email, mobile, password }) {
         email,
         mobile,
         passwordHash,
-        role: 'CUSTOMER',
-        emailVerifications: {
-          create: {
-            email,
-            token: verificationToken,
-            expiresAt,
-          }
-        }
-      },
-      include: { emailVerifications: true }
-    });
-  });
-
-  const jwtToken = signJwt({ id: user.id, role: user.role });
-  return {
-    user: { id: user.id, name: user.name, email: user.email, role: user.role },
-    token: jwtToken,
-    verificationToken
-  };
-}
-
-async function registerWorker({ name, email, mobile, password }) {
-  const passwordHash = await hashPassword(password);
-  const { token: verificationToken, expiresAt } = generateEmailVerificationToken();
-
-  // Atomic transaction: check uniqueness and create user together (prevents race condition)
-  const user = await prisma.$transaction(async (tx) => {
-    // Check email uniqueness within transaction
-    const existingEmail = await tx.user.findUnique({ where: { email } });
-    if (existingEmail) throw new AppError(409, 'Email already registered');
-
-    // Check mobile uniqueness within transaction
-    const existingMobile = await tx.user.findUnique({ where: { mobile } });
-    if (existingMobile) throw new AppError(409, 'Mobile number already registered');
-
-    // Create user with WORKER role and EmailVerification atomically
-    return await tx.user.create({
-      data: {
-        name,
-        email,
-        mobile,
-        passwordHash,
-        role: 'WORKER',
+        role,
         emailVerifications: {
           create: {
             email,
@@ -176,7 +139,7 @@ async function requestPasswordReset({ email, baseUrl }) {
     },
   });
 
-  const resetLink = `${baseUrl}/reset-password?token=${token}`;
+  const resetLink = `${baseUrl}/reset-password?token=${encodeURIComponent(token)}`;
 
   return {
     message: 'If an account exists, a reset link has been created.',
@@ -210,7 +173,6 @@ async function resetPasswordWithToken({ token, password }) {
 
 module.exports = {
   registerUser,
-  registerWorker,
   loginUser,
   verifyEmailToken,
   requestPasswordReset,

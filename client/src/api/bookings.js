@@ -128,3 +128,46 @@ export const verifyBookingCompletion = async (bookingId, otp) => {
   const response = await axiosInstance.post(`/bookings/${bookingId}/complete`, { otp });
   return response.data;
 };
+
+// ─── Session Management (Phase 7) ──────────────────────────────────
+
+export const getBookingSessions = async (bookingId) => {
+  const response = await axiosInstance.get(`/bookings/${bookingId}/sessions`);
+  return response.data;
+};
+
+export const createSession = async (bookingId, data) => {
+  const response = await axiosInstance.post(`/bookings/${bookingId}/sessions`, data);
+  return response.data;
+};
+
+export const startSession = async (bookingId, sessionId, otp) => {
+  const response = await axiosInstance.post(`/bookings/${bookingId}/sessions/${sessionId}/start`, { otp });
+  return response.data;
+};
+
+export const endSession = async (bookingId, sessionId, data = {}) => {
+  const response = await axiosInstance.post(`/bookings/${bookingId}/sessions/${sessionId}/end`, data);
+  return response.data;
+};
+
+// ─── Rescheduling (Phase 7) ────────────────────────────────────────
+
+export const rescheduleBooking = async (bookingId, newScheduledDate) => {
+  const response = await axiosInstance.patch(`/bookings/${bookingId}/reschedule`, { newScheduledDate });
+  return response.data;
+};
+
+// ─── Status History (Phase 7) ──────────────────────────────────────
+
+export const getBookingStatusHistory = async (bookingId) => {
+  const response = await axiosInstance.get(`/bookings/${bookingId}/history`);
+  return response.data;
+};
+
+// ─── Cancellation Policy (Phase 7) ────────────────────────────────
+
+export const getCancellationPolicy = async (bookingId) => {
+  const response = await axiosInstance.get(`/bookings/${bookingId}/cancellation-policy`);
+  return response.data;
+};

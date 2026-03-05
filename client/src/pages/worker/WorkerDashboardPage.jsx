@@ -1,30 +1,29 @@
-// Worker dashboard page
-// Shows job summary and recent bookings for the worker
-
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner';
+import { useNavigate, Link } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Briefcase,
   Wallet,
   Clock,
   CalendarCheck,
   Star,
+  MessageSquare,
   ShieldCheck,
   CheckCircle,
   Activity,
   Calendar,
-  DollarSign,
+  IndianRupee,
   Target,
   MapPin,
   ChevronRight,
   User,
   AlertCircle,
-  XCircle,
   PlayCircle,
   ShieldAlert,
-  Image as ImageIcon
+  Zap,
+  ArrowRight,
+  Wifi,
+  WifiOff
 } from 'lucide-react';
 import { MainLayout } from '../../components/layout/MainLayout';
 import {
@@ -36,636 +35,434 @@ import {
   Button,
   Badge,
   StatCard,
-  Skeleton,
+  BookingCard,
+  Avatar,
+  BookingCardSkeleton,
+  StatGridSkeleton,
   AsyncState,
-  Spinner,
-  SimpleBarChart,
-  SimpleDonutChart,
   Modal,
-  Input,
-  ImageUpload
+  ConfirmDialog
 } from '../../components/common';
 
-import { useTheme } from '../../context/ThemeContext';
-import { getAllBookings, updateBookingStatus, cancelBooking, getOpenBookings, acceptBooking, verifyBookingStart, verifyBookingCompletion } from '../../api/bookings';
-import { getMyAvailability } from '../../api/availability';
-import { getMyServices, getMyWorkerProfile } from '../../api/workers';
-import { uploadBookingPhoto } from '../../api/uploads';
+import { getAllBookings, getOpenBookings } from '../../api/bookings';
+import { getMyWorkerProfile } from '../../api/workers';
+import { OtpVerificationModal } from '../../components/features/bookings/OtpVerificationModal';
 import { queryKeys } from '../../utils/queryKeys';
-import { getBookingStatusVariant } from '../../utils/statusHelpers';
-
+import { useAuth } from '../../hooks/useAuth';
+import { getPageLayout } from '../../constants/layout';
+import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcut';
+import { useWorkerLocation } from '../../hooks/useWorkerLocation';
+import { useBookingActions } from '../../hooks/useBookingActions';
+import { useSocketEvent } from '../../hooks/useSocket';
+import { toast } from 'sonner';
 
 export function WorkerDashboardPage() {
-  const { isDark } = useTheme();
+  const { user } = useAuth();
   const navigate = useNavigate();
+
+  const [dashboardTab, setDashboardTab] = useState('active');
+  const { isOnline, toggleOnline } = useWorkerLocation(true);
+
   const queryClient = useQueryClient();
-  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
-  const [cancelReason, setCancelReason] = useState('');
-  const [activeBookingId, setActiveBookingId] = useState(null);
 
-  // OTP Verification State
-  const [isOtpModalOpen, setIsOtpModalOpen] = useState(false);
-  const [selectedBookingId, setSelectedBookingId] = useState(null);
-  const [otpAction, setOtpAction] = useState(null); // 'start' or 'complete'
-  const [otpCode, setOtpCode] = useState('');
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [isUploading, setIsUploading] = useState(false);
+  const { handleBookingAction, activeActionId, isAnyPending, otpModalProps, cancelConfirmProps } = useBookingActions({
+    invalidateKeys: [queryKeys.bookings.worker(), queryKeys.bookings.open()],
+  });
 
-  const { data, isLoading, isError, error, refetch } = useQuery({
+  // Keyboard shortcuts
+  useKeyboardShortcuts([
+    { key: 'b', callback: () => navigate('/worker/bookings'), meta: true },
+    { key: 's', callback: () => navigate('/worker/services'), meta: true },
+    { key: 'a', callback: () => navigate('/worker/availability'), meta: true },
+  ]);
+
+  const { data, isLoading, refetch } = useQuery({
     queryKey: queryKeys.bookings.worker(),
     queryFn: getAllBookings,
-    refetchInterval: 30000, // Poll every 30s to catch new direct bookings
   });
 
   const { data: profileData } = useQuery({
-    queryKey: ['worker-profile'],
+    queryKey: queryKeys.worker.profile(),
     queryFn: getMyWorkerProfile,
   });
   const profile = profileData?.profile;
 
-  const statusMutation = useMutation({
-    mutationFn: ({ id, status }) => updateBookingStatus(id, { status }),
-    onSuccess: (_, variables) => {
-      const labels = { CONFIRMED: 'accepted', IN_PROGRESS: 'started', COMPLETED: 'completed' };
-      toast.success(`Job ${labels[variables.status] || 'updated'} successfully!`);
-      queryClient.invalidateQueries({ queryKey: queryKeys.bookings.worker() });
-    },
-    onError: (err) => {
-      toast.error(err?.response?.data?.error || 'Failed to update booking status.');
-    },
-  });
-
-  const cancelMutation = useMutation({
-    mutationFn: (id) => cancelBooking(id, cancelReason),
-    onSuccess: () => {
-      toast.success('Booking updated successfully.');
-      queryClient.invalidateQueries({ queryKey: queryKeys.bookings.worker() });
-      setIsCancelModalOpen(false);
-      setCancelReason('');
-      setActiveBookingId(null);
-    },
-    onError: (err) => {
-      toast.error(err?.response?.data?.error || 'Failed to update booking.');
-    },
-  });
-
-  const handleCancelClick = (e, bookingId) => {
-    e.stopPropagation();
-    setActiveBookingId(bookingId);
-    setCancelReason('');
-    setIsCancelModalOpen(true);
-  };
-
-  const handleCancelSubmit = () => {
-    if (!cancelReason.trim()) return;
-    cancelMutation.mutate(activeBookingId);
-  };
-
-  // Query for Open Jobs (Job Board)
-  const { data: openJobsData, refetch: refetchOpenJobs } = useQuery({
-    queryKey: ['open-bookings'],
+  const { data: openJobsData } = useQuery({
+    queryKey: queryKeys.bookings.open(),
     queryFn: getOpenBookings,
   });
 
-  const acceptJobMutation = useMutation({
-    mutationFn: (id) => acceptBooking(id),
-    onSuccess: () => {
-      toast.success('Job accepted! You can now see customer details.');
-      queryClient.invalidateQueries({ queryKey: queryKeys.bookings.worker() });
-      queryClient.invalidateQueries({ queryKey: ['open-bookings'] });
-    },
-    onError: (err) => {
-      toast.error(err?.response?.data?.error || 'Failed to accept job.');
-    },
-  });
-
-  // Verification Mutations
-  const verifyStartMutation = useMutation({
-    mutationFn: ({ bookingId, otp }) => verifyBookingStart(bookingId, otp),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.bookings.worker() });
-      setIsOtpModalOpen(false);
-      setOtpCode('');
-      setSelectedFile(null);
-      toast.success('Job started successfully!');
-    },
-    onError: (error) => toast.error(error.response?.data?.message || error.message || 'Invalid OTP'),
-  });
-
-  const verifyCompleteMutation = useMutation({
-    mutationFn: ({ bookingId, otp }) => verifyBookingCompletion(bookingId, otp),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.bookings.worker() });
-      setIsOtpModalOpen(false);
-      setOtpCode('');
-      setSelectedFile(null);
-      toast.success('Job completed successfully!');
-    },
-    onError: (error) => toast.error(error.response?.data?.message || error.message || 'Invalid OTP'),
-  });
-
-  const handleOtpSubmit = async () => {
-    if (!selectedFile) {
-      toast.error(`Please upload a ${otpAction === 'start' ? 'BEFORE' : 'AFTER'} photo as proof.`);
-      return;
-    }
-
-    if (!otpCode || otpCode.length < 4) {
-      toast.error('Please enter a valid OTP');
-      return;
-    }
-
-    setIsUploading(true);
-    try {
-      const type = otpAction === 'start' ? 'BEFORE' : 'AFTER';
-      await uploadBookingPhoto(selectedFile, selectedBookingId, type);
-
-      if (otpAction === 'start') {
-        verifyStartMutation.mutate({ bookingId: selectedBookingId, otp: otpCode });
-      } else if (otpAction === 'complete') {
-        verifyCompleteMutation.mutate({ bookingId: selectedBookingId, otp: otpCode });
-      }
-    } catch (error) {
-      toast.error('Failed to upload photo proof. Please try again.');
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  const openOtpModal = (bookingId, action) => {
-    setSelectedBookingId(bookingId);
-    setOtpAction(action);
-    setOtpCode('');
-    setSelectedFile(null);
-    setIsOtpModalOpen(true);
-  };
-
   const openJobs = openJobsData?.bookings || [];
-  const bookings = data?.bookings || [];
+  const bookings = useMemo(() => data?.bookings || [], [data?.bookings]);
+  const activeBookings = useMemo(() =>
+    bookings.filter(b => {
+      // Always show active jobs
+      if (['CONFIRMED', 'IN_PROGRESS'].includes(b.status)) return true;
+      // Keep completed jobs until worker has reviewed
+      if (b.status === 'COMPLETED') {
+        const hasReviewed = (b.reviews || []).some(r => r.reviewerId === user?.id);
+        return !hasReviewed;
+      }
+      return false;
+    }),
+    [bookings, user?.id]);
 
-  // Stats Calculation
+  // Direct requests — PENDING bookings where the customer specifically chose this worker
+  const directRequests = useMemo(() =>
+    bookings.filter(b => b.status === 'PENDING'),
+    [bookings]);
+
   const stats = useMemo(() => {
-    const totalJobs = bookings.length;
-    const completedJobs = bookings.filter((b) => b.status === 'COMPLETED').length;
-    const pendingJobs = bookings.filter((b) => ['PENDING', 'CONFIRMED', 'IN_PROGRESS'].includes(b.status)).length;
     const totalEarnings = bookings
-      .filter((b) => b.status === 'COMPLETED')
-      .reduce((sum, b) => sum + (Number(b.totalPrice) || 0), 0);
-
-    // Calculate rating (mock based on profile if available, else standard)
-    const rating = profile?.rating || 0;
+      .filter(b => b.status === 'COMPLETED')
+      .reduce((sum, b) => sum + Number(b.totalPrice || 0), 0);
 
     return [
-      { title: 'Total Earnings', value: `₹${totalEarnings.toFixed(0)}`, icon: Wallet, color: 'brand', trend: { value: 12, direction: 'up', label: 'vs last week' } },
-      { title: 'Active Jobs', value: pendingJobs, icon: Activity, color: 'info' },
-      { title: 'Completed Jobs', value: completedJobs, icon: CheckCircle, color: 'success' },
-      { title: 'Rating', value: rating ? rating.toFixed(1) : 'New', icon: Star, color: 'warning' },
+      { title: 'Revenue', value: `₹${totalEarnings.toLocaleString()}`, icon: Wallet, color: 'brand' },
+      { title: 'Active', value: activeBookings.length, icon: Activity, color: 'info' },
+      { title: 'Rating', value: profile?.rating || 'NEW', icon: Star, color: 'warning' },
+      { title: 'Jobs Done', value: bookings.filter(b => b.status === 'COMPLETED').length, icon: CheckCircle, color: 'success' },
     ];
-  }, [bookings, profile]);
+  }, [bookings, activeBookings, profile]);
 
-  const chartData = useMemo(() => {
-    // Earnings (Last 7 Days)
-    const last7Days = Array.from({ length: 7 }, (_, i) => {
-      const d = new Date();
-      d.setDate(d.getDate() - (6 - i));
-      return d;
-    });
+  useSocketEvent('booking:created', () => {
+    toast.info('New service request available on the board!');
+    refetch();
+    queryClient.invalidateQueries({ queryKey: queryKeys.bookings.open() });
+  });
 
-    const earningsData = last7Days.map(date => {
-      const dateString = date.toISOString().split('T')[0];
-      const dailyTotal = bookings
-        .filter(b => {
-          if (b.status !== 'COMPLETED') return false;
-          // Use scheduledDate as the reference date
-          if (!b.scheduledDate) return false;
-          const bookingDate = new Date(b.scheduledDate).toISOString().split('T')[0];
-          return bookingDate === dateString;
-        })
-        .reduce((sum, b) => sum + (Number(b.totalPrice) || 0), 0);
-
-      return {
-        label: date.toLocaleDateString('en-US', { weekday: 'short' }),
-        value: dailyTotal,
-        tooltip: `₹${dailyTotal}`
-      };
-    });
-
-    // Job Status Distribution
-    const activeJobsCount = bookings.filter(b => ['PENDING', 'CONFIRMED', 'IN_PROGRESS'].includes(b.status)).length;
-    const completedCount = bookings.filter(b => b.status === 'COMPLETED').length;
-    const cancelledCount = bookings.filter(b => ['CANCELLED', 'REJECTED'].includes(b.status)).length;
-
-    const statusData = [
-      { label: 'Completed', value: completedCount, color: '#10b981' }, // emerald-500
-      { label: 'Active', value: activeJobsCount, color: '#3b82f6' },    // blue-500
-      { label: 'Cancelled', value: cancelledCount, color: '#ef4444' }   // red-500
-    ];
-
-    return { earningsData, statusData };
-  }, [bookings]);
-
-  const activeBookings = bookings
-    .filter(b => ['PENDING', 'CONFIRMED', 'IN_PROGRESS'].includes(b.status))
-    .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt))
-    .slice(0, 5);
+  useSocketEvent('booking:status_updated', (payload) => {
+    const isMine = payload.workerId === profile?.id;
+    if (isMine || payload.status === 'PENDING') {
+      toast.info(`Mission update: ${payload.status}`);
+      refetch();
+    }
+  });
 
   return (
     <MainLayout>
-      <div className={`min-h-screen pb-20 ${isDark ? 'bg-dark-950' : 'bg-gray-50'}`}>
+      <div className={getPageLayout('wide')}>
 
-        {/* Welcome Header */}
-        <div className={`pt-12 pb-16 px-4 sm:px-6 lg:px-8 relative overflow-hidden ${isDark ? 'bg-gradient-to-r from-brand-900 via-dark-900 to-dark-950' : 'bg-gradient-to-r from-brand-600 via-brand-500 to-accent-500'}`}>
-          <div className="absolute inset-0 bg-[url('/pattern.svg')] opacity-10"></div>
-          <div className="max-w-7xl mx-auto relative z-10 text-white">
-            <div className="flex justify-between items-end">
-              <div>
-                <h1 className="text-3xl md:text-4xl font-bold mb-2">Welcome back, {profile?.user?.name || 'Pro'}!</h1>
-                <p className="text-brand-100 text-lg max-w-2xl">
-                  Here's what's happening with your business today. You have {activeBookings.length} active jobs.
-                </p>
-              </div>
-              <Button
-                variant="outline"
-                className="hidden sm:flex bg-white/10 border-white/20 text-white hover:bg-white/20 backdrop-blur-sm"
-                onClick={() => navigate('/worker/availability')}
+        {/* Dynamic Header */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-12">
+          <div className="flex items-center gap-8">
+            <div className="relative group">
+              <Avatar name={user?.name} src={user?.profilePhotoUrl} size="xl" ring status={isOnline ? 'online' : 'offline'} />
+              <button
+                onClick={toggleOnline}
+                aria-label={isOnline ? 'Go offline' : 'Go online'}
+                className={`absolute -bottom-2 -right-2 p-2 rounded-full shadow-xl transition-all ${isOnline ? 'bg-success-500 text-white animate-pulse' : 'bg-gray-400 text-white'}`}
               >
-                <Clock size={16} className="mr-2" /> Manage Availability
-              </Button>
+                {isOnline ? <Wifi size={14} /> : <WifiOff size={14} />}
+              </button>
             </div>
+            <div>
+              <h1 className="text-4xl md:text-5xl font-black tracking-tighter mb-2 text-gray-900 dark:text-white">
+                HQ, <span className="text-brand-500 font-black">{user?.name?.split(' ')[0]}</span>
+              </h1>
+              <p className="text-gray-500 font-bold uppercase text-[10px] tracking-widest flex items-center gap-2">
+                <Activity size={12} /> System Status: {isOnline ? 'Active & Ready' : 'Standby Mode'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex gap-3">
+            <Button onClick={() => navigate('/worker/earnings')} variant="outline" className="rounded-2xl px-6 h-12 font-black uppercase text-[10px] bg-transparent border-2 border-brand-500/20">
+              Wallet
+            </Button>
+            <Button onClick={() => navigate('/worker/availability')} className="rounded-2xl px-8 h-12 font-black uppercase text-[10px] shadow-xl shadow-brand-500/20">
+              Set Schedule
+            </Button>
           </div>
         </div>
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-8 relative z-20">
-
-          {/* Stats Grid */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
-            {stats.map((stat, index) => (
-              <StatCard
-                key={index}
-                title={stat.title}
-                value={stat.value}
-                icon={stat.icon}
-                color={stat.color}
-                trend={stat.trend}
-                delay={index}
-                onClick={stat.title === 'Rating' ? () => navigate('/worker/reviews') : undefined}
-                className={`shadow-lg border-none ring-1 ring-black/5 dark:ring-white/5 ${stat.title === 'Rating' ? 'cursor-pointer' : ''}`}
-              />
+        {/* Stats Matrix */}
+        {isLoading ? (
+          <StatGridSkeleton />
+        ) : (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+            {stats.map((s, idx) => (
+              <StatCard key={idx} {...s} className="md:scale-105" />
             ))}
           </div>
+        )}
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-            <SimpleBarChart
-              title="Weekly Earnings"
-              data={chartData.earningsData}
-              height="h-64"
-            />
-            <SimpleDonutChart
-              title="Job Status Overview"
-              data={chartData.statusData}
-            />
-          </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+          {/* Mission Control Column */}
+          <div className="lg:col-span-2 space-y-8">
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Section Tabs */}
+            <div role="tablist" aria-label="Dashboard sections" className="flex flex-wrap gap-2 p-1 rounded-2xl bg-gray-100 dark:bg-dark-900">
+              {[
+                { id: 'direct', label: 'Direct Requests', count: directRequests.length, color: 'warning' },
+                { id: 'public', label: 'Public Jobs', count: openJobs.length, color: 'error' },
+                { id: 'active', label: 'Active Jobs', count: activeBookings.filter(b => ['CONFIRMED', 'IN_PROGRESS'].includes(b.status)).length, color: 'brand' },
+                { id: 'review', label: 'Pending Review', count: activeBookings.filter(b => b.status === 'COMPLETED').length, color: 'success' },
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  role="tab"
+                  aria-selected={dashboardTab === tab.id}
+                  aria-controls={`tabpanel-${tab.id}`}
+                  id={`tab-${tab.id}`}
+                  onClick={() => setDashboardTab(tab.id)}
+                  className={`
+                    relative flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all
+                    ${dashboardTab === tab.id
+                      ? 'bg-white text-gray-900 shadow-md dark:bg-dark-700 dark:text-white dark:shadow-lg'
+                      : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                    }
+                  `}
+                >
+                  {tab.label}
+                  {tab.count > 0 && (
+                    <span className={`
+                      inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-[10px] font-black
+                      ${tab.color === 'warning' ? 'bg-warning-500/15 text-warning-600' : ''}
+                      ${tab.color === 'error' ? 'bg-error-500/15 text-error-600' : ''}
+                      ${tab.color === 'brand' ? 'bg-brand-500/15 text-brand-600' : ''}
+                      ${tab.color === 'success' ? 'bg-success-500/15 text-success-600' : ''}
+                    `}>
+                      {tab.count}
+                    </span>
+                  )}
+                  {tab.id === 'direct' && tab.count > 0 && (
+                    <>
+                      <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-warning-500 rounded-full animate-ping" />
+                      <span className="sr-only">New direct requests available</span>
+                    </>
+                  )}
+                </button>
+              ))}
+            </div>
 
-            {/* Main Column: Jobs */}
-            <div className="lg:col-span-2 space-y-8">
-
-              {/* Active Jobs Section */}
-              <section>
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className={`text-xl font-bold flex items-center gap-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                    <Briefcase className="text-brand-500" size={20} /> Active Jobs
-                  </h2>
-                  <Button variant="ghost" size="sm" onClick={() => navigate('/worker/bookings')}>View All</Button>
+            {/* Direct Requests Tab */}
+            {dashboardTab === 'direct' && (
+              <section role="tabpanel" id="tabpanel-direct" aria-labelledby="tab-direct" className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-warning-50 dark:bg-warning-500/10">
+                      <User size={20} className="text-warning-500" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-black tracking-tight text-gray-900 dark:text-white">Direct Requests</h2>
+                      <p className="text-xs text-gray-500 font-medium">Customers who specifically chose you</p>
+                    </div>
+                  </div>
                 </div>
 
-                {isLoading ? (
-                  <div className="space-y-4">
-                    {[1, 2].map(i => <Skeleton key={i} className="h-32 rounded-2xl" />)}
-                  </div>
-                ) : activeBookings.length > 0 ? (
-                  <div className="space-y-4">
-                    {activeBookings.map((booking) => (
-                      <div
-                        key={booking.id}
-                        onClick={() => navigate(`/worker/bookings/${booking.id}`)}
-                        className={`p-6 rounded-2xl border transition-all duration-300 cursor-pointer group hover:shadow-xl active:scale-[0.98] ${isDark ? 'bg-dark-800 border-dark-700 hover:border-brand-500/50' : 'bg-white border-gray-100 hover:border-brand-500/30'}`}
-                      >
-                        <div className="flex justify-between items-start mb-4">
-                          <div className="flex gap-4">
-                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${isDark ? 'bg-brand-900/30 text-brand-400' : 'bg-brand-50 text-brand-600'}`}>
-                              <CalendarCheck size={24} />
-                            </div>
-                            <div>
-                              <h3 className={`font-bold text-lg ${isDark ? 'text-white' : 'text-gray-900'}`}>{booking.service?.name}</h3>
-                              <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mt-1">
-                                <User size={14} /> {booking.customer?.name}
-                              </div>
-                            </div>
-                          </div>
-                          <Badge variant={getBookingStatusVariant(booking.status)}>
-                            {booking.status.replace('_', ' ')}
-                          </Badge>
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4 pl-16">
-                          <div className="flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-300">
-                            <Calendar size={16} className="text-brand-500" />
-                            {new Date(booking.scheduledAt || booking.scheduledDate).toLocaleDateString()} at {new Date(booking.scheduledAt || booking.scheduledDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </div>
-                          <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
-                            <MapPin size={16} className="text-success-500" />
-                            <span className="truncate">{booking.address || booking.addressDetails}</span>
-                          </div>
-                        </div>
-
-
-                        <div className="pl-16 flex flex-wrap gap-3">
-                          {booking.status === 'PENDING' && (
-                            <>
-                              <Button
-                                size="sm"
-                                icon={CheckCircle}
-                                onClick={(e) => { e.stopPropagation(); statusMutation.mutate({ id: booking.id, status: 'CONFIRMED' }); }}
-                                className="bg-accent-600 text-white hover:bg-accent-700"
-                              >
-                                Confirm Job
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                icon={XCircle}
-                                onClick={(e) => handleCancelClick(e, booking.id)}
-                                loading={cancelMutation.isPending && activeBookingId === booking.id}
-                                className="text-error-500 hover:bg-error-50"
-                              >
-                                Reject
-                              </Button>
-                            </>
-                          )}
-                          {booking.status === 'CONFIRMED' && (
-                            <>
-                              <Button
-                                size="sm"
-                                icon={PlayCircle}
-                                onClick={(e) => { e.stopPropagation(); openOtpModal(booking.id, 'start'); }}
-                                className="bg-brand-600 text-white hover:bg-brand-700"
-                              >
-                                Start Job
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                icon={XCircle}
-                                onClick={(e) => handleCancelClick(e, booking.id)}
-                                loading={cancelMutation.isPending && activeBookingId === booking.id}
-                                className="text-error-500 hover:bg-error-50"
-                              >
-                                Cancel Job
-                              </Button>
-                            </>
-                          )}
-                          {booking.status === 'IN_PROGRESS' && (
-                            <Button
-                              size="sm"
-                              icon={CheckCircle}
-                              onClick={(e) => { e.stopPropagation(); openOtpModal(booking.id, 'complete'); }}
-                              className="bg-green-600 text-white hover:bg-green-700"
-                            >
-                              Complete Job
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                {directRequests.length === 0 ? (
+                  <Card className="p-12 text-center border-dashed border-2">
+                    <User size={40} className="text-gray-300 mx-auto mb-4" />
+                    <p className="font-black text-lg text-gray-500 dark:text-gray-400">No direct requests yet</p>
+                    <p className="text-xs text-gray-400 mt-2 max-w-xs mx-auto">When customers book you directly from your profile, their requests will appear here.</p>
+                  </Card>
                 ) : (
-                  <div className={`text-center py-12 rounded-2xl border border-dashed ${isDark ? 'border-dark-700 bg-dark-800/50' : 'border-gray-200 bg-gray-50'}`}>
-                    <Briefcase className="mx-auto text-gray-400 mb-2" size={32} />
-                    <h3 className={`text-lg font-medium ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>No active jobs</h3>
-                    <p className="text-gray-500">Check the Open Requests tab to find work.</p>
+                  <div className="space-y-4">
+                    {directRequests.map(booking => (
+                      <BookingCard
+                        key={booking.id}
+                        booking={booking}
+                        role="WORKER"
+                        onAction={handleBookingAction}
+                        activeActionId={activeActionId}
+                        isActionLoading={isAnyPending}
+                      />
+                    ))}
                   </div>
                 )}
               </section>
+            )}
 
-              {/* Open Requests Section */}
-              <section>
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className={`text-xl font-bold flex items-center gap-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                    <Target className="text-accent-500" size={20} /> Open Requests
-                  </h2>
-                  <Button variant="ghost" size="sm" onClick={() => refetchOpenJobs()}>Refresh</Button>
+            {/* Public Jobs Tab */}
+            {dashboardTab === 'public' && (
+              <section role="tabpanel" id="tabpanel-public" aria-labelledby="tab-public" className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-red-50 dark:bg-error-500/10">
+                      <Zap size={20} className="text-error-500" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-black tracking-tight text-gray-900 dark:text-white">Public Job Board</h2>
+                      <p className="text-xs text-gray-500 font-medium">Open requests from nearby customers</p>
+                    </div>
+                  </div>
                 </div>
 
-                {openJobs.length > 0 ? (
-                  <div className="space-y-4">
-                    {openJobs.map((job) => (
-                      <Card key={job.id} className="group overflow-hidden hover:shadow-2xl hover:shadow-brand-500/10 transition-all duration-300 border-none ring-1 ring-black/5 dark:ring-white/10 relative">
-                        {/* Decorative Gradient Background */}
-                        <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-accent-500 to-brand-500" />
-
-                        <div className="p-6">
-                          <div className="flex justify-between items-start mb-4">
+                {openJobs.length === 0 ? (
+                  <Card className="p-12 text-center border-dashed border-2">
+                    <Zap size={40} className="text-gray-300 mx-auto mb-4" />
+                    <p className="font-black text-lg text-gray-500 dark:text-gray-400">No open jobs right now</p>
+                    <p className="text-xs text-gray-400 mt-2 max-w-xs mx-auto">New open requests from customers will appear here. Stay online to get notified.</p>
+                  </Card>
+                ) : (
+                  <div className="grid grid-cols-1 gap-4">
+                    {openJobs.map(job => (
+                      <Card key={job.id} className="p-5 group hover:shadow-2xl transition-all border-dashed border-2 hover:border-brand-500/50">
+                        <div className="flex flex-col md:flex-row justify-between gap-4">
+                          <div className="flex gap-4">
+                            <div className="w-12 h-12 rounded-xl bg-brand-500/10 flex items-center justify-center text-brand-500 shrink-0">
+                              <Zap size={24} />
+                            </div>
                             <div>
-                              <h3 className={`font-bold text-xl mb-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                                {job.service?.name}
-                              </h3>
-                              <div className="flex items-center gap-3">
-                                <Badge variant="outline" className="text-[10px] font-black uppercase tracking-widest text-accent-600 border-accent-200 bg-accent-50 dark:bg-accent-900/20 dark:border-accent-800">
-                                  New Request
-                                </Badge>
-                                <span className={`text-xs font-semibold ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                                  ID: #{job.id}
-                                </span>
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <span className={`block text-xs uppercase tracking-tighter font-bold ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>Est. Payout</span>
-                              <span className={`text-2xl font-black ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                                ₹{job.totalPrice || job.estimatedPrice || job.service?.basePrice}
-                              </span>
+                              <h4 className="font-bold text-lg leading-none mb-1">{job.service?.name}</h4>
+                              <p className="text-sm text-gray-500 flex items-center gap-2">
+                                <MapPin size={12} /> {job.address?.split(',')[0] || 'Nearby Location'}
+                              </p>
+                              <p className="text-xs text-gray-400 mt-1">
+                                {new Date(job.scheduledAt || job.scheduledDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                              </p>
                             </div>
                           </div>
-
-                          <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 p-4 rounded-xl ${isDark ? 'bg-dark-900/50' : 'bg-gray-50'}`}>
-                            <div className="flex items-center gap-2 text-sm font-medium">
-                              <Calendar size={16} className="text-brand-500" />
-                              <span className={isDark ? 'text-gray-300' : 'text-gray-700'}>
-                                {new Date(job.scheduledAt || job.scheduledDate).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
-                              </span>
+                          <div className="flex items-center gap-6">
+                            <div className="text-right hidden md:block">
+                              <p className="text-[10px] font-black uppercase text-gray-400">Potential</p>
+                              <p className="text-lg font-black text-success-500">₹{job.totalPrice || '750+'}</p>
                             </div>
-                            <div className="flex items-center gap-2 text-sm font-medium">
-                              <Clock size={16} className="text-blue-500" />
-                              <span className={isDark ? 'text-gray-300' : 'text-gray-700'}>
-                                {new Date(job.scheduledAt || job.scheduledDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2 text-sm font-medium sm:col-span-2">
-                              <MapPin size={16} className="text-success-500" />
-                              <span className={`truncate ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                                {job.address || job.addressDetails || 'Service Location Specified'}
-                              </span>
-                            </div>
+                            <Button
+                              variant="primary"
+                              className="px-8 rounded-xl h-11 font-black uppercase text-[10px]"
+                              onClick={() => handleBookingAction('CONFIRM', { id: job.id })}
+                              loading={isAnyPending && activeActionId === job.id}
+                            >
+                              Accept Job
+                            </Button>
                           </div>
-
-                          <Button
-                            fullWidth
-                            size="lg"
-                            onClick={() => acceptJobMutation.mutate(job.id)}
-                            loading={acceptJobMutation.isPending}
-                            className="bg-brand-600 text-white hover:bg-brand-700 shadow-lg shadow-brand-500/20 h-12 rounded-xl text-base font-bold transition-transform active:scale-95"
-                          >
-                            Claim Job
-                          </Button>
                         </div>
                       </Card>
                     ))}
                   </div>
+                )}
+              </section>
+            )}
+
+            {/* Active Jobs Tab */}
+            {dashboardTab === 'active' && (
+              <section role="tabpanel" id="tabpanel-active" aria-labelledby="tab-active" className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-brand-50 dark:bg-brand-500/10">
+                      <Activity size={20} className="text-brand-500" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-black tracking-tight text-gray-900 dark:text-white">Active Jobs</h2>
+                      <p className="text-xs text-gray-500 font-medium">Confirmed and in-progress work</p>
+                    </div>
+                  </div>
+                </div>
+
+                <AsyncState
+                  isLoading={isLoading}
+                  isEmpty={activeBookings.filter(b => ['CONFIRMED', 'IN_PROGRESS'].includes(b.status)).length === 0}
+                  loadingFallback={<div className="space-y-6"><BookingCardSkeleton /><BookingCardSkeleton /></div>}
+                  emptyTitle="No active jobs"
+                  emptyMessage="Accept a request or public job to get started."
+                >
+                  <div className="space-y-4">
+                    {activeBookings.filter(b => ['CONFIRMED', 'IN_PROGRESS'].includes(b.status)).map(booking => (
+                      <BookingCard
+                        key={booking.id}
+                        booking={booking}
+                        role="WORKER"
+                        onAction={handleBookingAction}
+                        activeActionId={activeActionId}
+                      />
+                    ))}
+                  </div>
+                </AsyncState>
+              </section>
+            )}
+
+            {/* Pending Review Tab */}
+            {dashboardTab === 'review' && (
+              <section role="tabpanel" id="tabpanel-review" aria-labelledby="tab-review" className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-green-50 dark:bg-success-500/10">
+                      <Star size={20} className="text-success-500" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-black tracking-tight text-gray-900 dark:text-white">Pending Reviews</h2>
+                      <p className="text-xs text-gray-500 font-medium">Rate your experience with the customer</p>
+                    </div>
+                  </div>
+                </div>
+
+                {activeBookings.filter(b => b.status === 'COMPLETED').length === 0 ? (
+                  <Card className="p-12 text-center border-dashed border-2">
+                    <Star size={40} className="text-gray-300 mx-auto mb-4" />
+                    <p className="font-black text-lg text-gray-500 dark:text-gray-400">All caught up!</p>
+                    <p className="text-xs text-gray-400 mt-2 max-w-xs mx-auto">No completed jobs waiting for your review.</p>
+                  </Card>
                 ) : (
-                  <div className={`text-center py-12 rounded-2xl border border-dashed ${isDark ? 'border-dark-700 bg-dark-800/50' : 'border-gray-200 bg-gray-50'}`}>
-                    <Target className="mx-auto text-gray-400 mb-2" size={32} />
-                    <h3 className={`text-lg font-medium ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>No listed jobs nearby</h3>
-                    <p className="text-gray-500">We'll notify you when new requests come in.</p>
+                  <div className="space-y-4">
+                    {activeBookings.filter(b => b.status === 'COMPLETED').map(booking => (
+                      <BookingCard
+                        key={booking.id}
+                        booking={booking}
+                        role="WORKER"
+                        onAction={handleBookingAction}
+                        activeActionId={activeActionId}
+                        isActionLoading={isAnyPending}
+                      />
+                    ))}
                   </div>
                 )}
               </section>
-            </div>
+            )}
+          </div>
 
-            {/* Sidebar: Quick Actions */}
-            <div className="lg:col-span-1 space-y-6">
-              <Card className="border-none shadow-lg shadow-brand-500/5">
-                <CardHeader>
-                  <CardTitle className="text-lg">Quick Actions</CardTitle>
-                </CardHeader>
-                <div className="p-4 pt-0 space-y-2">
-                  <Button variant="ghost" fullWidth className="justify-start h-12" onClick={() => navigate('/worker/availability')}>
-                    <Clock size={18} className="mr-3 text-blue-500" /> Availability
-                  </Button>
-                  <Button variant="ghost" fullWidth className="justify-start h-12" onClick={() => navigate('/worker/services')}>
-                    <Briefcase size={18} className="mr-3 text-purple-500" /> My Services
-                  </Button>
-                  <Button variant="ghost" fullWidth className="justify-start h-12" onClick={() => navigate('/worker/profile')}>
-                    <User size={18} className="mr-3 text-green-500" /> Profile
-                  </Button>
-                  <Button variant="ghost" fullWidth className="justify-start h-12" onClick={() => navigate('/worker/reviews')}>
-                    <Star size={18} className="mr-3 text-yellow-500" /> Reviews
-                  </Button>
+          {/* Tactical Intelligence Column */}
+          <div className="space-y-8">
+            <Card className="p-8 rounded-[2.5rem] bg-gradient-to-br from-gray-100 to-gray-50 dark:from-dark-900 dark:to-dark-800 border-0 shadow-2xl">
+              <h3 className="font-black uppercase tracking-widest text-[10px] mb-8 opacity-60 text-gray-900 dark:text-white">Status Dashboard</h3>
+              <div className="space-y-8">
+                <div className="flex justify-between items-center group">
+                  <div className="flex gap-4 items-center">
+                    <div className="w-10 h-10 rounded-xl bg-info-500/10 flex items-center justify-center text-info-500 group-hover:scale-110 transition-transform">
+                      <Target size={20} />
+                    </div>
+                    <span className="text-sm font-bold text-gray-700 dark:text-gray-300">Success Rate</span>
+                  </div>
+                  <span className="font-black text-brand-500">{bookings.length > 0 ? `${((bookings.filter(b => b.status === 'COMPLETED').length / bookings.length) * 100).toFixed(0)}%` : 'N/A'}</span>
                 </div>
-              </Card>
-
-              <div className={`p-6 rounded-2xl ${isDark ? 'bg-brand-900/10 border border-brand-800' : 'bg-brand-50 border border-brand-100'}`}>
-                <h3 className={`font-bold mb-2 ${isDark ? 'text-brand-100' : 'text-brand-900'}`}>Pro Tip</h3>
-                <p className={`text-sm ${isDark ? 'text-brand-200' : 'text-brand-700'}`}>
-                  Updating your availability calendar weekly increases your chances of getting hired by 40%.
-                </p>
+                <div className="flex justify-between items-center group">
+                  <div className="flex gap-4 items-center">
+                    <div className="w-10 h-10 rounded-xl bg-success-500/10 flex items-center justify-center text-success-500 group-hover:scale-110 transition-transform">
+                      <ShieldCheck size={20} />
+                    </div>
+                    <span className="text-sm font-bold text-gray-700 dark:text-gray-300">Trust Rank</span>
+                  </div>
+                  <span className="font-black text-success-500">{profile?.verificationStatus === 'VERIFIED' ? 'Verified' : 'Pending'}</span>
+                </div>
               </div>
+              <div className="mt-12 pt-8 border-t border-white/5">
+                <Button
+                  variant="ghost"
+                  fullWidth
+                  className="justify-between h-14 bg-white/5 hover:bg-white/10 text-white rounded-2xl group"
+                  onClick={() => navigate('/worker/reviews')}
+                >
+                  <span className="font-black uppercase tracking-widest text-[10px]">Client Intel</span>
+                  <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                </Button>
+              </div>
+            </Card>
+
+            {/* Training/Tips Widget */}
+            <div className="p-8 bg-yellow-500/10 border-2 border-dashed border-yellow-500/20 rounded-[2rem]">
+              <p className="font-black text-yellow-600 uppercase text-[10px] tracking-widest mb-4">Pro Tip</p>
+              <p className="text-sm font-medium leading-relaxed text-gray-700 dark:text-gray-300">
+                High-quality "Before" and "After" photos significantly increase your trust score and lead to better reviews.
+              </p>
             </div>
           </div>
         </div>
+
+        {/* OTP Verification Modal */}
+        <OtpVerificationModal {...otpModalProps} />
+        <ConfirmDialog {...cancelConfirmProps} />
       </div>
-
-      {/* Verification Modal */}
-      <Modal
-        isOpen={isOtpModalOpen}
-        onClose={() => setIsOtpModalOpen(false)}
-        title={otpAction === 'start' ? 'Start Verification' : 'Completion Verification'}
-        size="sm"
-      >
-        <div className="space-y-4">
-          <div className={`p-4 rounded-xl border ${isDark ? 'bg-brand-900/10 border-brand-800' : 'bg-brand-50 border-brand-100'}`}>
-            <p className={`text-sm font-bold ${isDark ? 'text-brand-300' : 'text-brand-800'}`}>
-              Step 1: Upload Proof
-            </p>
-            <p className={`text-xs mt-1 ${isDark ? 'text-brand-400' : 'text-brand-600'}`}>
-              A {otpAction === 'start' ? 'BEFORE' : 'AFTER'} photo is required to document the work area.
-            </p>
-          </div>
-
-          <ImageUpload
-            label={otpAction === 'start' ? "Work area before starting" : "Completed service photo"}
-            onUpload={setSelectedFile}
-            value={selectedFile}
-          />
-
-          <div className={`border-t pt-6 ${isDark ? 'border-dark-700' : 'border-gray-100'}`}>
-            <p className={`text-sm font-bold mb-1 ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>
-              Step 2: Enter Verification Code
-            </p>
-            <p className={`text-xs mb-3 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-              Get the code from the customer's dashboard.
-            </p>
-
-            <Input
-              placeholder="e.g. 1234"
-              value={otpCode}
-              onChange={(e) => setOtpCode(e.target.value)}
-              maxLength={6}
-              className="text-center text-2xl tracking-widest font-bold h-16"
-              autoFocus
-            />
-          </div>
-
-          <div className="flex justify-end gap-3 pt-4">
-            <Button variant="outline" onClick={() => setIsOtpModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleOtpSubmit}
-              loading={verifyStartMutation.isPending || verifyCompleteMutation.isPending || isUploading}
-              disabled={!selectedFile || !otpCode}
-              className="px-8"
-            >
-              Verify & {otpAction === 'start' ? 'Start' : 'Complete'}
-            </Button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* Cancellation Reason Modal */}
-      <Modal
-        isOpen={isCancelModalOpen}
-        onClose={() => setIsCancelModalOpen(false)}
-        title="Reason for Cancellation"
-        size="sm"
-      >
-        <div className="space-y-4">
-          <div className={`p-4 rounded-xl flex items-center gap-4 bg-error-50 dark:bg-error-950/20 text-error-600`}>
-            <ShieldAlert size={24} />
-            <p className="text-sm font-bold leading-tight">Please provide a reason for cancelling or rejecting this job.</p>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-xs font-black uppercase text-gray-500 tracking-widest pl-1">Cancellation Reason</label>
-            <Input
-              placeholder="e.g., Scheduling conflict, out of specialized tools..."
-              value={cancelReason}
-              onChange={(e) => setCancelReason(e.target.value)}
-              className="h-12 text-sm"
-              autoFocus
-            />
-          </div>
-
-          <div className="flex gap-3 pt-4">
-            <Button
-              fullWidth
-              variant="ghost"
-              onClick={() => setIsCancelModalOpen(false)}
-            >
-              Go Back
-            </Button>
-            <Button
-              fullWidth
-              className="bg-error-600 text-white hover:bg-error-700"
-              onClick={handleCancelSubmit}
-              disabled={!cancelReason.trim()}
-              loading={cancelMutation.isPending}
-            >
-              Confirm Cancellation
-            </Button>
-          </div>
-        </div>
-      </Modal>
     </MainLayout>
   );
 }

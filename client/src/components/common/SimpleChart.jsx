@@ -1,6 +1,5 @@
-import { motion } from 'framer-motion';
-import { useTheme } from '../../context/ThemeContext';
-import { Card, CardHeader, CardTitle } from './Card';
+import { motion as Motion } from 'framer-motion';
+import { Card, CardHeader, CardTitle } from '../ui/Card';
 
 /**
  * Simple Bar Chart Component
@@ -11,7 +10,6 @@ import { Card, CardHeader, CardTitle } from './Card';
  * @param {string} height - Height of the chart area (default: h-64)
  */
 export function SimpleBarChart({ title, data = [], height = 'h-64', className = '' }) {
-    const { isDark } = useTheme();
 
     // Find max value for scaling
     const maxValue = Math.max(...data.map(d => d.value), 10); // Minimum scale of 10
@@ -33,24 +31,24 @@ export function SimpleBarChart({ title, data = [], height = 'h-64', className = 
                         <div key={index} className="flex flex-col items-center justify-end flex-1 h-full group relative">
                             {/* Tooltip on Hover */}
                             <div className={`mb-2 opacity-0 group-hover:opacity-100 transition-opacity text-xs font-bold 
-                ${isDark ? 'bg-gray-100 text-gray-900 border-gray-300' : 'bg-gray-800 text-white border-gray-700'} 
+                bg-gray-800 text-white border-gray-700 dark:bg-gray-100 dark:text-gray-900 dark:border-gray-300 
                 px-2 py-1 rounded absolute bottom-full mb-1 pointer-events-none whitespace-nowrap z-10 shadow-lg border`}>
                                 {item.tooltip || item.value}
                             </div>
 
                             {/* Bar */}
-                            <motion.div
+                            <Motion.div
                                 initial={{ height: 0 }}
                                 whileInView={{ height: `${heightPercent}%` }}
                                 viewport={{ once: true }}
                                 transition={{ duration: 0.8, delay: index * 0.1, ease: 'easeOut' }}
-                                className={`w-full max-w-[40px] rounded-t-lg transition-colors duration-300 ${item.color ? '' : isDark ? 'bg-brand-500 hover:bg-brand-400' : 'bg-brand-600 hover:bg-brand-500'
+                                className={`w-full max-w-[40px] rounded-t-lg transition-colors duration-300 ${item.color ? '' : 'bg-brand-600 hover:bg-brand-500 dark:bg-brand-500 dark:hover:bg-brand-400'
                                     }`}
                                 style={{ backgroundColor: item.color }}
                             />
 
                             {/* Label */}
-                            <div className={`mt-2 text-xs text-center truncate w-full ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                            <div className="mt-2 text-xs text-center truncate w-full text-gray-500 dark:text-gray-400">
                                 {item.label}
                             </div>
                         </div>
@@ -66,14 +64,11 @@ export function SimpleBarChart({ title, data = [], height = 'h-64', className = 
  * Renders a responsive SVG donut chart.
  */
 export function SimpleDonutChart({ title, data = [], size = 160, className = '' }) {
-    const { isDark } = useTheme();
     const total = data.reduce((acc, curr) => acc + curr.value, 0);
-
-    let currentAngle = 0;
 
     return (
         <Card className={`flex flex-col items-center justify-center p-6 ${className}`}>
-            {title && <h3 className={`text-lg font-bold mb-6 w-full text-left ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>{title}</h3>}
+            {title && <h3 className="text-lg font-bold mb-6 w-full text-left text-gray-900 dark:text-gray-100">{title}</h3>}
 
             <div className="relative">
                 <svg width={size} height={size} viewBox="0 0 100 100" className="transform -rotate-90">
@@ -81,12 +76,16 @@ export function SimpleDonutChart({ title, data = [], size = 160, className = '' 
                         if (item.value === 0) return null;
 
                         const percentage = item.value / total;
-                        const angle = percentage * 360;
                         const radius = 40;
                         const circumference = 2 * Math.PI * radius;
 
-                        const circle = (
-                            <motion.circle
+                        // Calculate accumulated angle for this item
+                        const accumulatedAngle = data
+                            .slice(0, index)
+                            .reduce((acc, curr) => acc + (curr.value / total) * 360, 0);
+
+                        return (
+                            <Motion.circle
                                 key={index}
                                 cx="50"
                                 cy="50"
@@ -97,21 +96,18 @@ export function SimpleDonutChart({ title, data = [], size = 160, className = '' 
                                 initial={{ strokeDasharray: `0 ${circumference}` }}
                                 animate={{ strokeDasharray: `${percentage * circumference} ${circumference}` }}
                                 transition={{ duration: 1, delay: 0.2 + (index * 0.1), ease: "easeOut" }}
-                                style={{ transformOrigin: 'center', transform: `rotate(${currentAngle}deg)` }}
+                                style={{ transformOrigin: 'center', transform: `rotate(${accumulatedAngle}deg)` }}
                             />
                         );
-
-                        currentAngle += angle;
-                        return circle;
                     })}
                 </svg>
 
                 {/* Center Text */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                    <span className={`text-2xl font-bold ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
+                    <span className="text-2xl font-bold text-gray-900 dark:text-gray-100">
                         {total}
                     </span>
-                    <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
                         Total
                     </span>
                 </div>
@@ -122,7 +118,7 @@ export function SimpleDonutChart({ title, data = [], size = 160, className = '' 
                 {data.map((item, i) => (
                     <div key={i} className="flex items-center gap-2">
                         <span className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color || '#3b82f6' }}></span>
-                        <span className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>{item.label}</span>
+                        <span className="text-sm text-gray-600 dark:text-gray-300">{item.label}</span>
                     </div>
                 ))}
             </div>
