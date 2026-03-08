@@ -91,9 +91,9 @@ export function WorkerProfileModern({ workerId, onClose, onAction }) {
     const isOnline = profile?.location?.isOnline || false;
 
     const stats = useMemo(() => [
-        { label: 'Rating', value: profile?.user?.rating?.toFixed(1) || '4.9', icon: Star, color: 'text-yellow-500' },
-        { label: 'Jobs Done', value: '120+', icon: CheckCircle2, color: 'text-green-500' },
-        { label: 'Exp', value: '6 Years', icon: Briefcase, color: 'text-blue-500' },
+        { label: 'Rating', value: profile?.user?.rating?.toFixed(1) || 'N/A', icon: Star, color: 'text-yellow-500' },
+        { label: 'Jobs Done', value: profile?.totalReviews || 0, icon: CheckCircle2, color: 'text-green-500' },
+        { label: 'Exp', value: profile?.experienceYears ? `${profile.experienceYears} Yrs` : 'N/A', icon: Briefcase, color: 'text-blue-500' },
         { label: 'Response', value: isOnline ? 'Online Now' : '< 1hr', icon: Clock, color: isOnline ? 'text-success-500' : 'text-purple-500' }
     ], [profile, isOnline]);
 
@@ -129,9 +129,11 @@ export function WorkerProfileModern({ workerId, onClose, onAction }) {
                                     className="w-32 h-32 md:w-40 md:h-40 rounded-2xl object-cover shadow-inner"
                                 />
                             </div>
-                            {profile.isVerified && (
-                                <div className="absolute -bottom-2 -right-2 bg-brand-500 text-white p-2 rounded-xl shadow-lg border-4 border-inherit">
-                                    <ShieldCheck size={20} fill="white" className="text-brand-500" />
+                            {profile.verificationLevel && (
+                                <div className="absolute -bottom-2 -right-2 bg-white dark:bg-dark-950 p-2 rounded-xl shadow-lg border-4 border-inherit">
+                                    <Badge variant={getVerificationLevelVariant(profile.verificationLevel)} className="flex items-center gap-1">
+                                        <ShieldCheck size={16} fill="currentColor" /> {profile.verificationLevel}
+                                    </Badge>
                                 </div>
                             )}
                         </div>

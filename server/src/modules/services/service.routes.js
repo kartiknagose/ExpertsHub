@@ -17,7 +17,7 @@
  */
 
 const { Router } = require('express');
-const { create, list, getOne, getWorkers, update, remove } = require('./service.controller');
+const { create, getOne, getWorkers, update, remove } = require('./service.controller');
 const authenticate = require('../../middleware/auth'); // Check if user is logged in
 const { requireAdmin } = require('../../middleware/requireRole'); // Check if user is admin
 const validate = require('../../middleware/validation'); // Check if request data is valid
@@ -78,7 +78,8 @@ router.post(
  * - Customers need to browse services before registering
  * - Helps with SEO and discoverability
  */
-router.get('/', list);
+const { serviceCatalogCache } = require('../cache/cache.middleware');
+router.get('/', serviceCatalogCache);
 
 /**
  * ROUTE 3: GET A SINGLE SERVICE BY ID
@@ -114,14 +115,22 @@ router.get('/:id/workers', getWorkers);
  * Endpoint: PATCH /api/services/:id
  * Access: Admin Only
  */
-router.patch('/:id', authenticate, requireAdmin, update);
+router.patch('/:id', authenticate, requireAdmin, async (req, res, next) => {
+  const { invalidateServiceCatalog } = require('../cache/cache.service');
+  await invalidateServiceCatalog();
+  return update(req, res, next);
+});
 
 /**
  * ROUTE 6: DELETE A SERVICE
  * Endpoint: DELETE /api/services/:id
  * Access: Admin Only
  */
-router.delete('/:id', authenticate, requireAdmin, remove);
+router.delete('/:id', authenticate, requireAdmin, async (req, res, next) => {
+  const { invalidateServiceCatalog } = require('../cache/cache.service');
+  await invalidateServiceCatalog();
+  return remove(req, res, next);
+});
 
 // Export the router so index.js can mount it at /api/services
 module.exports = router;

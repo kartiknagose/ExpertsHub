@@ -14,9 +14,11 @@ import { queryKeys } from '../../utils/queryKeys';
 import { StarRating } from '../../components/features/reviews/StarRating';
 import { getRatingLabel } from '../../utils/rating';
 import { getPageLayout } from '../../constants/layout';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 
 export function CustomerReviewsPage() {
+    usePageTitle('My Reviews');
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [drafts, setDrafts] = useState({});

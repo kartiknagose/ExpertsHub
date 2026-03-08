@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
-import { acceptBooking, cancelBooking } from '../api/bookings';
+import { acceptBooking, cancelBooking, downloadInvoice } from '../api/bookings';
 import { createReview } from '../api/reviews';
 
 /**
@@ -45,6 +45,13 @@ export function useBookingActions({ invalidateKeys = [] } = {}) {
       invalidateAll();
       toast.success('Job accepted successfully!');
     },
+    onError: (error) => {
+      toast.error(
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        'Failed to accept job',
+      );
+    },
   });
 
   const cancelMutation = useMutation({
@@ -52,6 +59,13 @@ export function useBookingActions({ invalidateKeys = [] } = {}) {
     onSuccess: () => {
       invalidateAll();
       toast.success('Job cancelled successfully.');
+    },
+    onError: (error) => {
+      toast.error(
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        'Failed to cancel job',
+      );
     },
   });
 
@@ -64,8 +78,8 @@ export function useBookingActions({ invalidateKeys = [] } = {}) {
     onError: (error) => {
       toast.error(
         error.response?.data?.message ||
-          error.response?.data?.error ||
-          'Failed to submit review',
+        error.response?.data?.error ||
+        'Failed to submit review',
       );
     },
   });
@@ -88,11 +102,57 @@ export function useBookingActions({ invalidateKeys = [] } = {}) {
         otpBookingRef.current = actionId;
         setOtpAction('complete');
         setIsOtpModalOpen(true);
+      } else if (type === 'PAY') {
+        // Razorpay checkout handler
+        function launchRazorpayCheckout(order, booking, user, onSuccess, onFailure) {
+          const options = {
+            key: 'rzp_test_xxxxxxxx', // Test key
+            amount: order.amount,
+            currency: order.currency,
+            name: 'UrbanPro V2',
+            description: `Booking #${booking.id}`,
+            order_id: order.id,
+            prefill: {
+              name: user.name,
+              email: user.email,
+              contact: user.mobile,
+            },
+            handler: function (response) {
+              onSuccess(response);
+            },
+            modal: {
+              ondismiss: onFailure,
+            },
+          };
+          const rzp = new window.Razorpay(options);
+          rzp.open();
+        }
+        // 1. Call backend to create Razorpay order
+        const orderResp = await window.payBooking(payload.id, { createRazorpayOrder: true });
+        const order = orderResp.order;
+        // 2. Launch Razorpay modal
+        launchRazorpayCheckout(order, payload.booking, payload.user,
+          async (razorpayResponse) => {
+            // 3. On success, update payment status
+            await window.payBooking(payload.id, { paymentReference: razorpayResponse.razorpay_payment_id });
+            invalidateAll();
+            toast.success('Payment successful! Thank you.');
+          },
+          () => {
+            toast.error('Payment cancelled or failed.');
+          }
+        );
       } else if (type === 'REVIEW') {
         await reviewMutation.mutateAsync({
           bookingId: payload.bookingId,
           rating: payload.rating,
           comment: payload.comment,
+        });
+      } else if (type === 'DOWNLOAD_INVOICE') {
+        toast.promise(downloadInvoice(actionId), {
+          loading: 'Generating PDF Invoice...',
+          success: 'Invoice downloaded successfully!',
+          error: 'Failed to download invoice.'
         });
       }
     } finally {

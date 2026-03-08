@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { updateWorkerLocation } from '../api/location';
 import { toast } from 'sonner';
+import { io } from 'socket.io-client';
 
 const ONLINE_STATE_KEY = 'upro.worker.online';
 const LAST_LOCATION_KEY = 'upro.worker.last_location';
@@ -35,8 +36,9 @@ const getDistance = (l1, l2) => {
  */
 export function useWorkerLocation(isWorker = false) {
     const [isOnline, setIsOnline] = useState(() => {
-        if (typeof window === 'undefined') return false;
-        return window.localStorage.getItem(ONLINE_STATE_KEY) === '1';
+        if (typeof window === 'undefined') return true;
+        const stored = window.localStorage.getItem(ONLINE_STATE_KEY);
+        return stored === null ? true : stored === '1';
     });
 
     const [currentLocation, setCurrentLocation] = useState(() => {
@@ -187,4 +189,31 @@ export function useWorkerLocation(isWorker = false) {
         retryLocation: () => startWatching(true),
         isUpdating: mutation.isPending
     };
+}
+
+export function useLiveWorkerLocation(workerProfileId) {
+    const [location, setLocation] = useState(null);
+
+    useEffect(() => {
+        if (!workerProfileId) return;
+        const socket = io(import.meta.env.VITE_API_URL || 'http://localhost:3000', {
+            withCredentials: true,
+        });
+        socket.emit('joinRoom', `worker_tracking:${workerProfileId}`);
+        socket.on('worker:location_updated', (data) => {
+            if (data.workerProfileId === workerProfileId) {
+                setLocation({
+                    latitude: data.latitude,
+                    longitude: data.longitude,
+                    isOnline: data.isOnline,
+                    lastUpdated: data.lastUpdated,
+                });
+            }
+        });
+        return () => {
+            socket.disconnect();
+        };
+    }, [workerProfileId]);
+
+    return location;
 }

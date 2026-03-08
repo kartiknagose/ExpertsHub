@@ -7,10 +7,10 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Lock, Save } from 'lucide-react';
-import { MainLayout } from '../../components/layout/MainLayout';
-import { Card, CardHeader, CardTitle, CardDescription } from '../../components/common';
+import { AuthLayout } from '../../components/layout/AuthLayout';
 import { Input, Button } from '../../components/common';
 import { resetPassword } from '../../api/auth';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 const resetPasswordSchema = z.object({
   password: z.string().min(8, 'Password must be at least 8 characters'),
@@ -21,6 +21,7 @@ const resetPasswordSchema = z.object({
 });
 
 export function ResetPasswordPage() {
+    usePageTitle('Reset Password');
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [serverError, setServerError] = useState('');
@@ -55,17 +56,18 @@ export function ResetPasswordPage() {
   };
 
   return (
-    <MainLayout>
-      <div className="min-h-screen flex items-center justify-center px-4 py-12">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle>Reset Password</CardTitle>
-            <CardDescription>
-              Choose a new password for your account.
-            </CardDescription>
-          </CardHeader>
+    <AuthLayout
+      title="Set your new password"
+      subtitle="Choose a strong, unique password to keep your account secure."
+    >
+      <div className="mb-8">
+        <h2 className="text-3xl font-bold mb-2 text-gray-900 dark:text-white">Reset Password</h2>
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          Choose a new password for your account.
+        </p>
+      </div>
 
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
             <Input
               label="New Password"
               type="password"
@@ -117,8 +119,6 @@ export function ResetPasswordPage() {
               </p>
             </div>
           </form>
-        </Card>
-      </div>
-    </MainLayout>
+    </AuthLayout>
   );
 }

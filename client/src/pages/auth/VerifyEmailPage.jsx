@@ -8,8 +8,10 @@ import { verifyEmail } from '../../api/auth';
 import { MainLayout } from '../../components/layout/MainLayout';
 import { Card, CardHeader, CardTitle, CardDescription } from '../../components/common';
 import { Button } from '../../components/common';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 export function VerifyEmailPage() {
+    usePageTitle('Verify Email');
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
@@ -86,8 +88,9 @@ export function VerifyEmailPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gray-50 dark:bg-dark-900">
-      <Card className="w-full max-w-md text-center p-8 shadow-xl">
+    <MainLayout>
+      <div className="min-h-[calc(100vh-64px)] flex items-center justify-center p-4">
+        <Card className="w-full max-w-md text-center p-8 shadow-xl">
         <div className="mb-6">
           {getIcon()}
         </div>
@@ -118,6 +121,7 @@ export function VerifyEmailPage() {
           {status === 'success' ? 'Continue to Login' : 'Back to Login'}
         </Button>
       </Card>
-    </div>
+      </div>
+    </MainLayout>
   );
 }

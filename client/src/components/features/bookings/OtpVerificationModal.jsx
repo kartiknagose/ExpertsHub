@@ -118,7 +118,7 @@ export function OtpVerificationModal({ isOpen, onClose, otpAction, bookingId, in
         </div>
 
         <ImageUpload
-          label={otpAction === 'start' ? 'Before photo' : 'After photo'}
+          label={otpAction === 'start' ? 'Before photo (capture or upload)' : 'After photo (capture or upload)'}
           onUpload={setSelectedFile}
           value={selectedFile}
         />

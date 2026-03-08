@@ -1,8 +1,9 @@
 // Careers page
 
 import { MainLayout } from '../../components/layout/MainLayout';
-import { Card } from '../../components/common';
+import { Card, PageHeader } from '../../components/common';
 import { getPageLayout } from '../../constants/layout';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 const openings = [
   { title: 'Customer Success Specialist', location: 'Remote' },
@@ -11,17 +12,14 @@ const openings = [
 ];
 
 export function CareersPage() {
+    usePageTitle('Careers');
   return (
     <MainLayout>
       <div className={getPageLayout('narrow')}>
-        <div className="mb-10">
-          <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100">
-            Careers
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-3">
-            Help us build the most trusted services marketplace.
-          </p>
-        </div>
+        <PageHeader
+          title="Careers"
+          subtitle="Help us build the most trusted services marketplace."
+        />
 
         <div className="space-y-4">
           {openings.map((job) => (

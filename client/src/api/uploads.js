@@ -58,3 +58,18 @@ export const uploadBookingPhoto = async (file, bookingId, type) => {
 
   return response.data;
 };
+
+/**
+ * Upload chat attachment
+ * @param {File} file - Image or Document file
+ */
+export const uploadChatAttachment = async (file) => {
+  const formData = new FormData();
+  formData.append('attachment', file);
+
+  const response = await axiosInstance.post('/uploads/chat-attachment', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+
+  return response.data;
+};

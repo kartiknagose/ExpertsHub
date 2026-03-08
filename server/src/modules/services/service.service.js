@@ -130,6 +130,7 @@ async function getServiceWorkers(serviceId, { skip = 0, limit = 20 } = {}) {
     serviceId,
     worker: {
       isVerified: true,
+      location: { isOnline: true },
     },
   };
   const [workers, total] = await Promise.all([

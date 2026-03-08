@@ -4,21 +4,22 @@ import L from 'leaflet';
 import { Navigation, Compass, Target, Clock, Zap, Layers, Map as MapIcon, CheckCircle } from 'lucide-react';
 import { MAP_TILES } from '../../../utils/mapTiles';
 import './map-styles.css';
+import axios from 'axios';
 
 // Professional Marker Icons
-// Professional Marker Icons (INTERCHANGED PER USER REQUEST)
+// Professional Marker Icons (local self-hosted SVGs)
 const workerIcon = new L.Icon({
-    iconUrl: 'https://cdn-icons-png.flaticon.com/512/2830/2830305.png', // Worker: Now SCOOTER
+    iconUrl: '/images/marker-worker.svg',
     iconSize: [48, 48],
     iconAnchor: [24, 48],
     popupAnchor: [0, -48],
 });
 
 const customerIcon = new L.Icon({
-    iconUrl: 'https://cdn-icons-png.flaticon.com/512/149/149060.png', // Customer: Now BLUE PIN
-    iconSize: [42, 42],
-    iconAnchor: [21, 42],
-    popupAnchor: [0, -42],
+    iconUrl: '/images/marker-customer.svg',
+    iconSize: [42, 52],
+    iconAnchor: [21, 52],
+    popupAnchor: [0, -52],
 });
 
 // Calculate distance logic
@@ -67,14 +68,13 @@ export function LiveTrackingMap({
     height = "400px"
 }) {
     const [workerPos, setWorkerPos] = useState(initialWorkerLocation);
-    const [userLocation, setUserLocation] = useState(null); // Actual browser location of viewer
     const [history, setHistory] = useState(initialWorkerLocation ? [[initialWorkerLocation.lat, initialWorkerLocation.lng]] : []);
     const [lastUpdated, setLastUpdated] = useState(new Date());
     const [recenterCount, setRecenterCount] = useState(0);
-    const [tileType, setTileType] = useState('streets'); // streets, satellite, dark, terrain
+    const [tileType, setTileType] = useState('streets');
     const [showTileMenu, setShowTileMenu] = useState(false);
-
     const [lastInitial, setLastInitial] = useState(initialWorkerLocation);
+    const [eta, setEta] = useState(null);
 
     // Sync prop to state if it changes (e.g. after parent fetch)
     if (initialWorkerLocation && (
@@ -88,18 +88,6 @@ export function LiveTrackingMap({
             setHistory([[initialWorkerLocation.lat, initialWorkerLocation.lng]]);
         }
     }
-
-    useEffect(() => {
-        // Get user's current live position to show their own "Blue Dot"
-        if ("geolocation" in navigator) {
-            const watchId = navigator.geolocation.watchPosition(
-                (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-                () => { },
-                { enableHighAccuracy: true }
-            );
-            return () => navigator.geolocation.clearWatch(watchId);
-        }
-    }, []);
 
     useEffect(() => {
         const handleLocationUpdate = (event) => {
@@ -118,24 +106,45 @@ export function LiveTrackingMap({
         return () => window.removeEventListener('upro:worker-location-updated', handleLocationUpdate);
     }, [workerId]);
 
-    // Use live userLocation as site if testing on one machine
-    const effectiveSiteLocation = useMemo(() => {
-        if (userLocation && customerLocation) {
-            const distToCustomer = calculateDistance(userLocation.lat, userLocation.lng, customerLocation.lat, customerLocation.lng);
-            // If user is within 5km of the customer location, use userLocation to simulate being at the site.
-            // Otherwise, use the actual customerLocation.
-            if (distToCustomer !== null && distToCustomer < 5) { // 5 km threshold
-                return userLocation;
+    // ETA calculation using OSRM (Open Source Routing Machine) to avoid CORS issues
+    useEffect(() => {
+        let mounted = true;
+        async function fetchEta() {
+            if (!workerPos || !customerLocation || !workerPos.lat || !customerLocation.lat) {
+                if (mounted) setEta(null);
+                return;
+            }
+            try {
+                // OSRM format: lng,lat;lng,lat
+                const url = `https://router.project-osrm.org/route/v1/driving/${workerPos.lng},${workerPos.lat};${customerLocation.lng},${customerLocation.lat}?overview=false`;
+                const resp = await axios.get(url);
+                const route = resp.data.routes && resp.data.routes[0];
+                if (route && mounted) {
+                    const durationMins = Math.ceil(route.duration / 60);
+                    setEta(`${durationMins} min`);
+                } else if (mounted) {
+                    setEta(null);
+                }
+            } catch (err) {
+                console.warn('Failed to fetch ETA:', err.message);
+                if (mounted) setEta(null);
             }
         }
-        return customerLocation;
-    }, [userLocation, customerLocation]);
+        fetchEta();
+
+        // Polling ETA every 30 seconds to keep it fresh
+        const interval = setInterval(fetchEta, 30000);
+        return () => {
+            mounted = false;
+            clearInterval(interval);
+        };
+    }, [workerPos, customerLocation]);
 
     const distance = useMemo(() => {
-        if (!workerPos || !effectiveSiteLocation) return null;
-        return calculateDistance(workerPos.lat, workerPos.lng, effectiveSiteLocation.lat, effectiveSiteLocation.lng);
-    }, [workerPos, effectiveSiteLocation]);
-    const etaMins = distance ? Math.round((distance / 25) * 60 + 2) : null;
+        if (!workerPos || !customerLocation) return null;
+        return calculateDistance(workerPos.lat, workerPos.lng, customerLocation.lat, customerLocation.lng);
+    }, [workerPos, customerLocation]);
+    const etaMins = eta;
     const hasArrived = distance !== null && distance < 0.05; // 50 meters
 
     if (!customerLocation) return null;
@@ -143,8 +152,16 @@ export function LiveTrackingMap({
     return (
         <div className="relative w-full rounded-3xl overflow-hidden shadow-2xl border border-black/5" style={{ height }}>
 
+            {/* ETA Display */}
+            {eta && (
+                <div className="absolute top-4 right-4 z-[500] bg-white/90 dark:bg-dark-900/90 px-4 py-2 rounded-xl shadow-lg border border-brand-200 text-brand-700 dark:text-brand-300 text-xs font-bold pointer-events-auto">
+                    <Clock size={16} className="inline mr-1" />
+                    Worker arrives in {eta}
+                </div>
+            )}
+
             <MapContainer
-                center={[effectiveSiteLocation.lat, effectiveSiteLocation.lng]}
+                center={[customerLocation.lat, customerLocation.lng]}
                 zoom={14}
                 style={{ height: '100%', width: '100%', zIndex: 1 }}
                 zoomControl={false}
@@ -155,13 +172,13 @@ export function LiveTrackingMap({
 
                 {/* Service Area */}
                 <Circle
-                    center={[effectiveSiteLocation.lat, effectiveSiteLocation.lng]}
+                    center={[customerLocation.lat, customerLocation.lng]}
                     radius={120}
                     pathOptions={{ color: '#6366f1', fillOpacity: 0.1, weight: 2, dashArray: '6, 6' }}
                 />
 
-                {/* Customer Presence (INTERCHANGED TO PIN) */}
-                <Marker position={[effectiveSiteLocation.lat, effectiveSiteLocation.lng]} icon={customerIcon}>
+                {/* Customer Location Pin */}
+                <Marker position={[customerLocation.lat, customerLocation.lng]} icon={customerIcon}>
                     <Popup className="upro-popup" autoPan={false}>
                         <div className="p-3 text-center min-w-[120px]">
                             <span className="text-[11px] font-black uppercase tracking-[0.2em] text-indigo-600 block mb-1">Customer Location</span>
@@ -185,26 +202,6 @@ export function LiveTrackingMap({
                             </div>
                         </Popup>
                     </Marker>
-                )}
-
-                {/* User's Actual Presence (Mirror dot for same-machine testing) */}
-                {userLocation && (
-                    <>
-                        <Circle
-                            center={[userLocation.lat, userLocation.lng]}
-                            radius={20}
-                            pathOptions={{ fillColor: '#3b82f6', fillOpacity: 0.2, color: '#3b82f6', weight: 1 }}
-                        />
-                        <Marker
-                            position={[userLocation.lat, userLocation.lng]}
-                            icon={new L.DivIcon({
-                                className: 'upro-user-presence',
-                                html: `<div class="w-4 h-4 bg-blue-500 rounded-full border-2 border-white shadow-lg animate-pulse"></div>`,
-                                iconSize: [16, 16],
-                                iconAnchor: [8, 8]
-                            })}
-                        />
-                    </>
                 )}
 
                 <MapController workerPos={workerPos} customerLocation={customerLocation} triggerRecenter={recenterCount} />

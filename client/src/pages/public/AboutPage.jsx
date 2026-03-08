@@ -3,8 +3,10 @@
 import { MainLayout } from '../../components/layout/MainLayout';
 import { Card, PageHeader } from '../../components/common';
 import { getPageLayout } from '../../constants/layout';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 export function AboutPage() {
+    usePageTitle('About Us');
   return (
     <MainLayout>
       <div className={getPageLayout('default')}>

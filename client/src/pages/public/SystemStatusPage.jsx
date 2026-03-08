@@ -6,10 +6,11 @@ import { useQuery } from '@tanstack/react-query';
 import { Activity, Database, Server } from 'lucide-react';
 import { MainLayout } from '../../components/layout/MainLayout';
 import { Card, CardHeader, CardTitle, CardDescription } from '../../components/common';
-import { Badge, Spinner } from '../../components/common';
+import { Badge, Spinner, PageHeader } from '../../components/common';
 import { getAllServices } from '../../api/services';
 import { getPageLayout } from '../../constants/layout';
 import { queryKeys } from '../../utils/queryKeys';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 const getApiRoot = () => {
   const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
@@ -25,6 +26,7 @@ const fetchHealth = async () => {
 };
 
 export function SystemStatusPage() {
+    usePageTitle('System Status');
   const healthQuery = useQuery({
     queryKey: queryKeys.health.status(),
     queryFn: fetchHealth,
@@ -54,14 +56,10 @@ export function SystemStatusPage() {
   return (
     <MainLayout>
       <div className={getPageLayout('narrow')}>
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100">
-            System Status
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-2">
-            Live connection checks between frontend, backend, and database.
-          </p>
-        </div>
+        <PageHeader
+          title="System Status"
+          subtitle="Live connection checks between frontend, backend, and database."
+        />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Card>

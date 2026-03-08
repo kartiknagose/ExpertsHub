@@ -41,8 +41,10 @@ import { getServiceImage } from '../../constants/images';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcut';
 import { useSocketEvent } from '../../hooks/useSocket';
 import { toast } from 'sonner';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 export function CustomerDashboardPage() {
+    usePageTitle('Dashboard');
   const { user } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -208,8 +210,8 @@ export function CustomerDashboardPage() {
               color="success"
             />
             <StatCard
-              title="Wallet Balance"
-              value={`₹${Math.max(0, 2450 - totalSpent).toLocaleString()}`}
+              title="Pending Payments"
+              value={`₹${bookings.filter(b => b.status === 'COMPLETED' && b.paymentStatus !== 'PAID').reduce((sum, b) => sum + Number(b.totalPrice || 0), 0).toLocaleString()}`}
               icon={Wallet}
               color="info"
             />
@@ -300,13 +302,20 @@ export function CustomerDashboardPage() {
           {/* Right Column: Premium Widgets */}
           <div className="space-y-8">
 
-            {/* Referral Widget */}
+            {/* Share Widget */}
             <Card className="border-0 bg-brand-500 text-white p-8 rounded-[2.5rem] relative overflow-hidden shadow-2xl shadow-brand-500/20">
               <div className="relative z-10">
-                <h3 className="text-2xl font-black mb-4 leading-tight">Refer a Friend, <br />Get ₹250!</h3>
-                <p className="text-brand-100 text-sm font-medium mb-6 opacity-80">Help your friends find quality pros and earn rewards on every referral.</p>
-                <Button onClick={() => toast.info('Referral program coming soon!')} className="w-full h-14 bg-white text-brand-600 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-brand-50 hover:scale-[1.02] transition-all">
-                  Invite Now
+                <h3 className="text-2xl font-black mb-4 leading-tight">Share UrbanPro <br />with Friends</h3>
+                <p className="text-brand-100 text-sm font-medium mb-6 opacity-80">Know someone who needs quality home services? Spread the word!</p>
+                <Button onClick={() => {
+                  if (navigator.share) {
+                    navigator.share({ title: 'UrbanPro', text: 'Check out UrbanPro for professional home services!', url: window.location.origin });
+                  } else {
+                    navigator.clipboard.writeText(window.location.origin);
+                    toast.success('Link copied to clipboard!');
+                  }
+                }} className="w-full h-14 bg-white text-brand-600 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-brand-50 hover:scale-[1.02] transition-all">
+                  Share Now
                 </Button>
               </div>
               <Zap className="absolute -bottom-6 -right-6 w-32 h-32 opacity-10 rotate-12" />

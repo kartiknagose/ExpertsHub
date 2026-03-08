@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  # Database (PostgreSQL)
+  db:
+    image: postgres:15-alpine
+    container_name: urbanpro-db
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
+      POSTGRES_DB: ${DB_NAME:-urbanpro_v2}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # Cache (Redis)
+  redis:
+    image: redis:7-alpine
+    container_name: urbanpro-redis
+    restart: always
+    ports:
+      - "6379:6379"
+
+  # Backend API
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: urbanpro-server
+    restart: always
+    ports:
+      - "5000:5000"
+    environment:
+      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-password}@db:5432/${DB_NAME:-urbanpro_v2}?schema=public
+      REDIS_URL: redis://redis:6379
+      NODE_ENV: production
+      PORT: 5000
+      JWT_SECRET: ${JWT_SECRET:-your-super-secret-key-12345}
+    depends_on:
+      - db
+      - redis
+
+  # Frontend (Served via Nginx)
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: urbanpro-client
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - server
+
+volumes:
+  postgres_data:

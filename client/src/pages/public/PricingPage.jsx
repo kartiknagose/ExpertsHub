@@ -4,6 +4,7 @@ import { Check } from 'lucide-react';
 import { MainLayout } from '../../components/layout/MainLayout';
 import { Card, PageHeader } from '../../components/common';
 import { getPageLayout } from '../../constants/layout';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 const tiers = [
   {
@@ -27,6 +28,7 @@ const tiers = [
 ];
 
 export function PricingPage() {
+    usePageTitle('Pricing');
   return (
     <MainLayout>
       <div className={getPageLayout('default')}>

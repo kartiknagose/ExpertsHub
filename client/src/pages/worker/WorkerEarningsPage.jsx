@@ -31,14 +31,49 @@ import {
 import { getMyPayments } from '../../api/payments';
 import { getPageLayout } from '../../constants/layout';
 import { queryKeys } from '../../utils/queryKeys';
+import { usePageTitle } from '../../hooks/usePageTitle';
+import { getBankDetails, requestInstantPayout, updateBankDetails, downloadWorkerReport } from '../../api/payouts';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 
 export function WorkerEarningsPage() {
+    usePageTitle('Earnings');
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('ALL');
 
     const { data, isLoading, isError, error, refetch } = useQuery({
         queryKey: queryKeys.worker.payments(),
         queryFn: getMyPayments,
+    });
+
+    const { data: bankData, refetch: refetchBank } = useQuery({
+        queryKey: ['bank-details'],
+        queryFn: getBankDetails,
+    });
+
+    const queryClient = useQueryClient();
+
+    const instantPayoutMutation = useMutation({
+        mutationFn: requestInstantPayout,
+        onSuccess: () => {
+            toast.success('Instant payout requested successfully!');
+            refetchBank();
+            queryClient.invalidateQueries({ queryKey: queryKeys.worker.payments() });
+        },
+        onError: (err) => {
+            toast.error(err.response?.data?.message || 'Failed to request instant payout');
+        }
+    });
+
+    const updateBankMutation = useMutation({
+        mutationFn: updateBankDetails,
+        onSuccess: () => {
+            toast.success('Bank details linked successfully!');
+            refetchBank();
+        },
+        onError: (err) => {
+            toast.error(err.response?.data?.message || 'Failed to link bank details');
+        }
     });
 
     const payments = useMemo(() => data?.payments || [], [data?.payments]);
@@ -56,9 +91,10 @@ export function WorkerEarningsPage() {
             total,
             pending,
             completed,
+            walletBalance: bankData?.walletBalance || 0,
             count: payments.length
         };
-    }, [payments]);
+    }, [payments, bankData]);
 
     const filteredPayments = useMemo(() => {
         return payments.filter(p => {
@@ -101,8 +137,21 @@ export function WorkerEarningsPage() {
                     title="Earnings & Wallet"
                     subtitle="Track your income, view payment history, and manage payouts."
                     action={
-                        <Button icon={Download} variant="outline" size="sm">
-                            Export Statement
+                        <Button
+                            icon={Download}
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                                const m = new Date().getMonth() + 1;
+                                const y = new Date().getFullYear();
+                                toast.promise(downloadWorkerReport(m, y), {
+                                    loading: 'Generating Monthly Tax Report...',
+                                    success: 'ITR Report Downloaded Successfully',
+                                    error: 'Failed to generate tax report'
+                                });
+                            }}
+                        >
+                            Export Statement (ITR)
                         </Button>
                     }
                 />
@@ -124,7 +173,7 @@ export function WorkerEarningsPage() {
                             />
                             <StatCard
                                 title="Available for Payout"
-                                value={`₹${stats.completed.toLocaleString()}`}
+                                value={`₹${Number(stats.walletBalance).toLocaleString()}`}
                                 icon={TrendingUp}
                                 color="success"
                             />
@@ -163,14 +212,50 @@ export function WorkerEarningsPage() {
                                                 <IndianRupee size={20} />
                                             </div>
                                             <div>
-                                                <p className="font-bold text-sm">Direct Bank Transfer</p>
-                                                <p className="text-xs opacity-70">Primary Method</p>
+                                                <p className="font-bold text-sm">Payout Settings</p>
+                                                <p className="text-xs opacity-70">
+                                                    {bankData?.isLinked ? 'Linked with Razorpay Route' : 'Configure your payout method'}
+                                                </p>
                                             </div>
                                         </div>
-                                        <p className="text-xs font-medium mb-4 text-gray-600 dark:text-gray-400">
-                                            HDFC Bank •••• 4242
-                                        </p>
-                                        <Button fullWidth size="sm" variant="outline">Change Method</Button>
+                                        {bankData?.isLinked ? (
+                                            <>
+                                                <p className="text-sm font-medium mb-1 text-gray-900 dark:text-gray-100">
+                                                    Bank Account: {bankData.bankAccountNumber}
+                                                </p>
+                                                <p className="text-xs text-gray-500 mb-4">IFSC: {bankData.bankIfsc}</p>
+                                                <Button
+                                                    fullWidth
+                                                    size="sm"
+                                                    variant="outline"
+                                                    isLoading={instantPayoutMutation.isPending}
+                                                    onClick={() => instantPayoutMutation.mutate()}
+                                                >
+                                                    Instant Payout (2% Fee)
+                                                </Button>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <p className="text-xs font-medium mb-4 text-gray-600 dark:text-gray-400">
+                                                    No payout method configured yet.
+                                                </p>
+                                                <Button
+                                                    fullWidth
+                                                    size="sm"
+                                                    variant="outline"
+                                                    isLoading={updateBankMutation.isPending}
+                                                    onClick={() => {
+                                                        const acc = prompt('Enter Bank Account Number:');
+                                                        const ifsc = prompt('Enter Bank IFSC:');
+                                                        if (acc && ifsc) {
+                                                            updateBankMutation.mutate({ bankAccountNumber: acc, bankIfsc: ifsc });
+                                                        }
+                                                    }}
+                                                >
+                                                    Set Up Payout
+                                                </Button>
+                                            </>
+                                        )}
                                     </div>
 
                                     <div className="p-4 rounded-2xl border border-gray-100 dark:border-dark-700">

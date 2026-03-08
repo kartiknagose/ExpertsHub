@@ -37,7 +37,7 @@ export default function useSocket(user = null) {
       upgrade: false,
     };
 
-    function joinRooms(socket) {
+    function joinRooms() {
       // Role-based rooms (user:X, worker:X, customer:X, admin) are auto-joined
       // server-side on connection — no need to request them here.
     }

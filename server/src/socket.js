@@ -27,10 +27,18 @@ function init(server) {
       origin,
       credentials: true,
     },
-    // In development, accept all origins to prevent browser WS 400s caused
-    // by mismatched `Origin` values across Vite ports.
     allowRequest: isDev ? (_req, callback) => callback(null, true) : undefined,
   });
+
+  // ─── Redis Adapter for horizontal scaling ───
+  try {
+    const { createAdapter, pubClient, subClient } = require('./config/socketRedis');
+    // ioredis auto-connects, no need for .connect() calls
+    ioInstance.adapter(createAdapter(pubClient, subClient));
+    console.log('Socket.IO Redis adapter enabled');
+  } catch (err) {
+    console.warn('Socket.IO Redis adapter not enabled:', err.message);
+  }
 
   // ─── SECURITY: Authenticate ALL socket connections ───
   // Parse the JWT from the cookie header. If the token is missing or invalid,
@@ -99,6 +107,14 @@ function init(server) {
       // This prevents non-admins from joining 'admin', and users from
       // joining other users' private rooms.
       console.warn(`Socket ${socket.id} (user:${socket.user.id}) denied join to room: ${room}`);
+    });
+
+    socket.on('leaveRoom', (room) => {
+      if (typeof room !== 'string' || room.length === 0 || room.length > 100) return;
+      // Only allow leaving dynamic rooms (not their own user/role rooms)
+      if (room.startsWith('booking:') || room.startsWith('conversation:') || room.startsWith('worker_tracking:')) {
+        socket.leave(room);
+      }
     });
 
     socket.on('disconnect', () => {

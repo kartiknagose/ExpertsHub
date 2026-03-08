@@ -12,7 +12,7 @@ import {
   UserCog,
   ShieldCheck
 } from 'lucide-react';
-import { PageHeader, Card, CardHeader, CardTitle, CardDescription, Button, Badge, Spinner, StatCard, Skeleton, SimpleBarChart, SimpleDonutChart, AsyncState, StatGridSkeleton } from '../../components/common';
+import { PageHeader, Card, CardHeader, CardTitle, CardDescription, Button, Badge, Spinner, StatCard, Skeleton, SimpleBarChart, SimpleDonutChart, AsyncState, StatGridSkeleton, BookingStatusBadge } from '../../components/common';
 import { useSocketEvent } from '../../hooks/useSocket';
 import { getAdminUsers, getAdminDashboard } from '../../api/admin';
 import { getAllBookings } from '../../api/bookings';
@@ -20,8 +20,10 @@ import { getVerificationApplications } from '../../api/verification';
 import { MainLayout } from '../../components/layout/MainLayout';
 import { getPageLayout } from '../../constants/layout';
 import { queryKeys } from '../../utils/queryKeys';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 export function AdminDashboardPage() {
+    usePageTitle('Admin Dashboard');
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -208,9 +210,7 @@ export function AdminDashboardPage() {
                               {new Date(booking.scheduledAt || booking.scheduledDate).toLocaleString()}
                             </p>
                           </div>
-                          <Badge variant={booking.status === 'PENDING' ? 'warning' : 'info'}>
-                            {booking.status}
-                          </Badge>
+                          <BookingStatusBadge status={booking.status} />
                         </div>
                       ))}
                     </div>

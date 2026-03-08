@@ -108,12 +108,16 @@ export function WorkerProfileWindow({ workerId, isOpen, onClose }) {
                                         <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">• {profile.totalReviews || 0} Successful Jobs</span>
                                     </div>
                                     <div className="mt-3 flex gap-2">
-                                        <Badge variant="success" className="bg-green-500/10 text-green-600 dark:text-green-400 border-none font-black text-[10px] uppercase tracking-widest px-2">
-                                            Online & Ready
-                                        </Badge>
-                                        <Badge variant="info" className="bg-blue-500/10 text-blue-600 dark:text-blue-400 border-none font-black text-[10px] uppercase tracking-widest px-2">
-                                            Premium Pro
-                                        </Badge>
+                                        {profile.isVerified && (
+                                            <Badge variant="success" className="bg-green-500/10 text-green-600 dark:text-green-400 border-none font-black text-[10px] uppercase tracking-widest px-2">
+                                                Verified Professional
+                                            </Badge>
+                                        )}
+                                        {profile.verificationLevel === 'PREMIUM' && (
+                                            <Badge variant="info" className="bg-blue-500/10 text-blue-600 dark:text-blue-400 border-none font-black text-[10px] uppercase tracking-widest px-2">
+                                                Premium Pro
+                                            </Badge>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -208,18 +212,11 @@ export function WorkerProfileWindow({ workerId, isOpen, onClose }) {
 
                                     <div className="p-5 rounded-2xl bg-brand-500/5 border border-brand-500/20 space-y-3">
                                         <h5 className="text-[10px] font-black text-brand-600 uppercase tracking-widest flex items-center gap-2">
-                                            <Calendar size={12} /> Standard Working Hours
+                                            <Calendar size={12} /> Availability
                                         </h5>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div>
-                                                <p className="text-[10px] text-gray-400 font-bold uppercase mb-1">Mon - Fri</p>
-                                                <p className="text-xs font-black">08:00 AM - 06:00 PM</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-[10px] text-gray-400 font-bold uppercase mb-1">Weekend</p>
-                                                <p className="text-xs font-black">10:00 AM - 04:00 PM</p>
-                                            </div>
-                                        </div>
+                                        <p className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                                            {profile.city ? `Available in ${profile.city}` : 'Available in your area'}. Contact the professional for specific scheduling.
+                                        </p>
                                     </div>
                                 </div>
                             )}

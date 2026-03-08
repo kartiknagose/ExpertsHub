@@ -1,4 +1,5 @@
 const prisma = require('../../config/prisma');
+const AppError = require('../../common/errors/AppError');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Email-to-SMS Gateway map (free, no API key needed)

@@ -1,0 +1,17 @@
+{
+  "name": "UrbanPro — AI-Powered Local Services Marketplace",
+  "short_name": "UrbanPro",
+  "description": "Connect with trusted professionals for home services, repairs, and more.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#7c3aed",
+  "icons": [
+    {
+      "src": "/urbanpro-favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

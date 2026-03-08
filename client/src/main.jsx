@@ -5,6 +5,7 @@ import { Toaster } from 'sonner';
 import { AuthProvider } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext';
 import App from './App.jsx';
+import GlobalErrorBoundary from './components/common/GlobalErrorBoundary.jsx';
 import './index.css';
 import 'leaflet/dist/leaflet.css';
 import './utils/leafletSetup';
@@ -41,7 +42,9 @@ createRoot(document.getElementById('root')).render(
       <NotificationProvider>
         {/* AuthProvider - gives authentication context to entire app */}
         <AuthProvider>
-          <App />
+          <GlobalErrorBoundary>
+            <App />
+          </GlobalErrorBoundary>
           {/* Sonner Toaster - renders toast notifications */}
           <Toaster
             position="top-right"

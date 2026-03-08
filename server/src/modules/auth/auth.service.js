@@ -3,8 +3,9 @@ const { hashPassword, comparePassword } = require('../../common/utils/bcrypt');
 const { signJwt } = require('../../common/utils/jwt');
 const { generateEmailVerificationToken, generatePasswordResetToken } = require('../../common/utils/tokenGenerator');
 const AppError = require('../../common/errors/AppError');
+const GrowthService = require('../business_growth/business_growth.service');
 
-async function registerUser({ name, email, mobile, password, role = 'CUSTOMER' }) {
+async function registerUser({ name, email, mobile, password, role = 'CUSTOMER', referralCode = null }) {
   const validRoles = ['CUSTOMER', 'WORKER'];
   if (!validRoles.includes(role)) {
     throw new AppError(400, 'Invalid role. Must be CUSTOMER or WORKER.');
@@ -12,6 +13,15 @@ async function registerUser({ name, email, mobile, password, role = 'CUSTOMER' }
 
   const passwordHash = await hashPassword(password);
   const { token: verificationToken, expiresAt } = generateEmailVerificationToken();
+
+  // Process referral code if provided
+  let referrerId = null;
+  if (referralCode) {
+    const referrer = await prisma.user.findUnique({ where: { referralCode: referralCode.toUpperCase() } });
+    if (referrer) {
+      referrerId = referrer.id;
+    }
+  }
 
   // Atomic transaction: check uniqueness and create user together (prevents race condition)
   const user = await prisma.$transaction(async (tx) => {
@@ -24,13 +34,14 @@ async function registerUser({ name, email, mobile, password, role = 'CUSTOMER' }
     if (existingMobile) throw new AppError(409, 'Mobile number already registered');
 
     // Create user and email verification atomically (all or nothing)
-    return await tx.user.create({
+    const newUser = await tx.user.create({
       data: {
         name,
         email,
         mobile,
         passwordHash,
         role,
+        referredById: referrerId,
         emailVerifications: {
           create: {
             email,
@@ -41,6 +52,12 @@ async function registerUser({ name, email, mobile, password, role = 'CUSTOMER' }
       },
       include: { emailVerifications: true }
     });
+
+    // BUSINESS GROWTH: Initialize Wallet & Generate Referral Code for the new user
+    await GrowthService.initializeWallet(newUser.id, tx);
+    await GrowthService.generateReferralCode(newUser.id, tx);
+
+    return newUser;
   });
 
   const jwtToken = signJwt({ id: user.id, role: user.role });

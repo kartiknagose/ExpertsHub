@@ -8,20 +8,23 @@ import {
 import { MainLayout } from '../../components/layout/MainLayout';
 import {
   Card, Button, PageHeader, AsyncState,
-  Input, BookingCard, Badge, ConfirmDialog
+  Input, BookingCard, Badge, ConfirmDialog, Pagination
 } from '../../components/common';
 import { OtpVerificationModal } from '../../components/features/bookings/OtpVerificationModal';
 import { useBookingActions } from '../../hooks/useBookingActions';
 import { getAllBookings } from '../../api/bookings';
 import { queryKeys } from '../../utils/queryKeys';
 import { getPageLayout } from '../../constants/layout';
+import { useDebounce } from '../../hooks/useDebounce';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 const statusFilters = ['ALL', 'PENDING', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
 
 export function WorkerBookingsPage() {
+    usePageTitle('My Jobs');
   const [filter, setFilter] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
-
+  const [page, setPage] = useState(1);
   const {
     handleBookingAction,
     activeActionId,
@@ -38,12 +41,18 @@ export function WorkerBookingsPage() {
   });
 
   const bookings = data?.bookings || [];
+  const debouncedSearch = useDebounce(searchQuery);
   const filteredBookings = bookings.filter(b => {
     const matchesFilter = filter === 'ALL' || b.status === filter;
-    const matchesSearch = b.id.toString().includes(searchQuery) ||
-      b.service?.name?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = b.id.toString().includes(debouncedSearch) ||
+      b.service?.name?.toLowerCase().includes(debouncedSearch.toLowerCase());
     return matchesFilter && matchesSearch;
   });
+
+  const PAGE_SIZE = 10;
+  const totalPages = Math.max(1, Math.ceil(filteredBookings.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const paginatedBookings = filteredBookings.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   return (
     <MainLayout>
@@ -104,7 +113,7 @@ export function WorkerBookingsPage() {
           emptyMessage="Adjust your filters or standby for new missions."
         >
           <div className="grid grid-cols-1 gap-8 mb-20">
-            {filteredBookings.map((booking) => (
+            {paginatedBookings.map((booking) => (
               <BookingCard
                 key={booking.id}
                 booking={booking}
@@ -115,6 +124,7 @@ export function WorkerBookingsPage() {
               />
             ))}
           </div>
+          <Pagination page={safePage} totalPages={totalPages} onPageChange={setPage} totalItems={filteredBookings.length} pageSize={PAGE_SIZE} />
         </AsyncState>
 
         {/* Verification Modal */}

@@ -2,7 +2,7 @@ import { useMemo, memo } from 'react';
 import {
     Calendar, MapPin, CheckCircle,
     XCircle, PlayCircle, Phone, Mail,
-    ArrowRight, User, IndianRupee, CreditCard
+    ArrowRight, User, IndianRupee, CreditCard, MessageSquare, Download
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { BookingStatusBadge } from './StatusBadges';
@@ -10,6 +10,7 @@ import { Card } from '../ui/Card';
 import { useNavigate } from 'react-router-dom';
 import { QuickReview } from './QuickReview';
 import { useAuth } from '../../hooks/useAuth';
+import { ChatToggle } from '../features/chat/ChatWindow';
 
 /**
  * BookingCard Component
@@ -48,7 +49,7 @@ export const BookingCard = memo(function BookingCard({
     const hasUserReviewed = useMemo(() => {
         if (!user?.id || !booking.reviews) return true; // default to hide review if no data
         return booking.reviews.some(r => r.reviewerId === user.id);
-    }, [booking.reviews, user?.id]);
+    }, [booking.reviews, user]);
 
     // Contact info for the other party
     const otherParty = role === 'CUSTOMER'
@@ -121,10 +122,14 @@ export const BookingCard = memo(function BookingCard({
                     )}
                 </div>
 
-                {/* Worker Quick Contact — inline for confirmed/in-progress */}
-                {role === 'WORKER' && ['CONFIRMED', 'IN_PROGRESS'].includes(booking.status) && otherParty && (
+                {/* Quick Contact — inline for confirmed/in-progress */}
+                {['CONFIRMED', 'IN_PROGRESS'].includes(booking.status) && (
                     <div className="flex items-center gap-2 mb-3" onClick={(e) => e.stopPropagation()}>
-                        {otherParty.mobile && (
+                        <ChatToggle
+                            bookingId={booking.id}
+                            label={role === 'CUSTOMER' ? 'Chat with Provider' : 'Chat with Customer'}
+                        />
+                        {otherParty?.mobile && (
                             <a
                                 href={`tel:${otherParty.mobile}`}
                                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors
@@ -133,7 +138,7 @@ export const BookingCard = memo(function BookingCard({
                                 <Phone size={12} /> Call
                             </a>
                         )}
-                        {otherParty.email && (
+                        {otherParty?.email && (
                             <a
                                 href={`mailto:${otherParty.email}`}
                                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors
@@ -175,6 +180,19 @@ export const BookingCard = memo(function BookingCard({
                                         icon={CreditCard}
                                     >
                                         Pay Now
+                                    </Button>
+                                )}
+
+                                {/* Download Invoice Box */}
+                                {booking.status === 'COMPLETED' && booking.paymentStatus === 'PAID' && (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="rounded-xl px-5 h-9 text-xs border-brand-200 text-brand-700 hover:bg-brand-50 dark:border-brand-500/20 dark:text-brand-400 dark:hover:bg-brand-500/10"
+                                        onClick={(e) => handleAction(e, 'DOWNLOAD_INVOICE')}
+                                        icon={Download}
+                                    >
+                                        Invoice
                                     </Button>
                                 )}
 
@@ -237,6 +255,18 @@ export const BookingCard = memo(function BookingCard({
                                         icon={CheckCircle}
                                     >
                                         Finish Job
+                                    </Button>
+                                )}
+
+                                {booking.status === 'COMPLETED' && (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="rounded-xl px-5 h-9 text-xs border-brand-200 text-brand-700 hover:bg-brand-50 dark:border-brand-500/20 dark:text-brand-400 dark:hover:bg-brand-500/10"
+                                        onClick={(e) => handleAction(e, 'DOWNLOAD_INVOICE')}
+                                        icon={Download}
+                                    >
+                                        Invoice
                                     </Button>
                                 )}
 

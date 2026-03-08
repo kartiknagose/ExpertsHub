@@ -4,6 +4,7 @@ import { UserPlus, Search, CalendarCheck, Star } from 'lucide-react';
 import { MainLayout } from '../../components/layout/MainLayout';
 import { Card, PageHeader } from '../../components/common';
 import { getPageLayout } from '../../constants/layout';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 const steps = [
   { icon: UserPlus, title: 'Sign Up', text: 'Create an account in minutes as a customer or worker.' },
@@ -13,6 +14,7 @@ const steps = [
 ];
 
 export function HowItWorksPage() {
+    usePageTitle('How It Works');
   return (
     <MainLayout>
       <div className={getPageLayout('default')}>

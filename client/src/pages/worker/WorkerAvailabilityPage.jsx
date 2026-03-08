@@ -7,10 +7,12 @@ import { Button, Badge, AsyncState, PageHeader, Select, Input } from '../../comp
 import { createAvailability, deleteAvailability, getMyAvailability } from '../../api/availability';
 import { getPageLayout } from '../../constants/layout';
 import { queryKeys } from '../../utils/queryKeys';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 const dayLabels = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 export function WorkerAvailabilityPage() {
+    usePageTitle('Availability');
   const queryClient = useQueryClient();
   const [formState, setFormState] = useState({
     dayOfWeek: String(new Date().getDay()),

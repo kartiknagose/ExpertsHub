@@ -8,12 +8,13 @@ import {
     ShieldAlert,
     CreditCard,
     Compass,
+    Download,
 } from 'lucide-react';
 
 import { MainLayout } from '../../components/layout/MainLayout';
-import { Card, Button, AsyncState } from '../../components/common';
+import { Card, Button, AsyncState, Breadcrumbs } from '../../components/common';
 import { BookingStatusBadge } from '../../components/common';
-import { getBookingById, payBooking } from '../../api/bookings';
+import { getBookingById, payBooking, downloadInvoice } from '../../api/bookings';
 import { getWorkerLocation } from '../../api/location';
 import { queryKeys } from '../../utils/queryKeys';
 import { getPaymentDisplayText } from '../../utils/statusHelpers';
@@ -29,8 +30,10 @@ import { BookingDetailsGrid } from './components/BookingDetailsGrid';
 import { CustomerWorkerSection } from './components/CustomerWorkerSection';
 import { CustomerOTPSection } from './components/CustomerOTPSection';
 import { CustomerMobileActions } from './components/CustomerMobileActions';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 export function CustomerBookingDetailPage() {
+    usePageTitle('Booking Details');
     const { id: bookingId } = useParams();
     const { user } = useAuth();
     const navigate = useNavigate();
@@ -39,6 +42,7 @@ export function CustomerBookingDetailPage() {
     const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
     const [workerLocation, setWorkerLocation] = useState(null);
     const [activeReview, setActiveReview] = useState({ rating: 0, comment: '' });
+    const [photoModal, setPhotoModal] = useState(null);
 
     const { data, isLoading, isError, refetch } = useQuery({
         queryKey: queryKeys.bookings.detail(bookingId),
@@ -55,16 +59,53 @@ export function CustomerBookingDetailPage() {
     const booking = data?.booking;
     const workerProfileId = booking?.workerProfile?.id;
 
+    // Razorpay checkout handler
+    function launchRazorpayCheckout(order, booking, user, onSuccess, onFailure) {
+        const options = {
+            key: 'rzp_test_xxxxxxxx', // Test key
+            amount: order.amount,
+            currency: order.currency,
+            name: 'UrbanPro V2',
+            description: `Booking #${booking.id}`,
+            order_id: order.id,
+            prefill: {
+                name: user.name,
+                email: user.email,
+                contact: user.mobile,
+            },
+            handler: function (response) {
+                onSuccess(response);
+            },
+            modal: {
+                ondismiss: onFailure,
+            },
+        };
+        const rzp = new window.Razorpay(options);
+        rzp.open();
+    }
+
     const payMutation = useMutation({
-        mutationFn: () => payBooking(bookingId),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: queryKeys.bookings.detail(bookingId) });
-            queryClient.invalidateQueries({ queryKey: queryKeys.bookings.customer() });
-            toast.success('Payment successful! Thank you.');
+        mutationFn: async () => {
+            // 1. Call backend to create Razorpay order
+            const orderResp = await payBooking(bookingId, { createRazorpayOrder: true });
+            const order = orderResp.order;
+            // 2. Launch Razorpay modal
+            launchRazorpayCheckout(order, booking, user,
+                async (razorpayResponse) => {
+                    // 3. On success, update payment status
+                    await payBooking(bookingId, { paymentReference: razorpayResponse.razorpay_payment_id });
+                    queryClient.invalidateQueries({ queryKey: queryKeys.bookings.detail(bookingId) });
+                    queryClient.invalidateQueries({ queryKey: queryKeys.bookings.customer() });
+                    toast.success('Payment successful! Thank you.');
+                },
+                () => {
+                    toast.error('Payment cancelled or failed.');
+                }
+            );
         },
-        onError: (error) => {
-            toast.error(error.response?.data?.error || 'Payment failed');
-        }
+        onError: (err) => {
+            toast.error(err?.response?.data?.message || 'Payment failed.');
+        },
     });
 
     const reviewMutation = useMutation({
@@ -173,17 +214,18 @@ export function CustomerBookingDetailPage() {
     if (isError) return <MainLayout><div className={`${getPageLayout('narrow')} py-10`}><AsyncState isError={true} onRetry={refetch} /></div></MainLayout>;
     if (!booking) return <MainLayout><div className={`${getPageLayout('narrow')} py-10`}><AsyncState isEmpty={true} emptyTitle="Booking not found" /></div></MainLayout>;
 
+    // Helper: Filter booking photos
+    const beforePhotos = booking?.photos?.filter(p => p.type === 'BEFORE') || [];
+    const afterPhotos = booking?.photos?.filter(p => p.type === 'AFTER') || [];
+
     return (
         <MainLayout>
             <div className={`${getPageLayout('default')} pb-32 lg:pb-10 min-h-screen`}>
-                <Button
-                    variant="ghost"
-                    onClick={() => navigate('/bookings')}
-                    className="mb-6 group hover:pl-2 transition-all"
-                >
-                    <ArrowLeft size={18} className="mr-2 group-hover:-translate-x-1 transition-transform" />
-                    Back to Bookings
-                </Button>
+                <Breadcrumbs items={[
+                    { label: 'Dashboard', to: '/dashboard' },
+                    { label: 'Bookings', to: '/bookings' },
+                    { label: `Booking #${bookingId}` },
+                ]} />
 
                 <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                     {/* Main Content Area */}
@@ -207,6 +249,23 @@ export function CustomerBookingDetailPage() {
                                 </div>
 
                                 <div className="hidden lg:flex items-center gap-2">
+                                    {booking.status === 'COMPLETED' && booking.paymentStatus === 'PAID' && (
+                                        <Button
+                                            size="md"
+                                            variant="outline"
+                                            icon={Download}
+                                            onClick={() => {
+                                                toast.promise(downloadInvoice(booking.id), {
+                                                    loading: 'Generating Invoice...',
+                                                    success: 'Invoice Downloaded Successfully',
+                                                    error: 'Failed to generate invoice'
+                                                });
+                                            }}
+                                            className="h-12 px-6 rounded-xl font-bold"
+                                        >
+                                            Invoice
+                                        </Button>
+                                    )}
                                     {booking.status === 'COMPLETED' && booking.paymentStatus !== 'PAID' && (
                                         <Button
                                             size="md"
@@ -285,6 +344,52 @@ export function CustomerBookingDetailPage() {
                         )}
 
                         <BookingDetailsGrid booking={booking} onOpenMaps={handleOpenMaps} />
+
+                        {/* Photo Proof Review Gallery */}
+                        {(beforePhotos.length > 0 || afterPhotos.length > 0) && (
+                            <section className="mt-8">
+                                <h3 className="text-lg font-bold mb-3 text-gray-800 dark:text-gray-200">Photo Proof of Work</h3>
+                                <div className="flex flex-wrap gap-6">
+                                    <div>
+                                        <h4 className="text-sm font-semibold mb-2">Before Photos</h4>
+                                        <div className="flex gap-3">
+                                            {beforePhotos.map(photo => (
+                                                <button key={photo.id} className="w-32 h-32 rounded-lg border overflow-hidden bg-gray-50 dark:bg-dark-800 focus:outline-none" onClick={() => setPhotoModal(photo)}>
+                                                    <img src={photo.url.replace('/upload/', '/upload/f_auto,q_auto/')} alt="Before" className="w-full h-full object-cover" loading="lazy" srcSet={`${photo.url.replace('/upload/', '/upload/f_auto,q_auto/')} 1x, ${photo.url.replace('/upload/', '/upload/f_auto,q_auto/')} 2x`} />
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <h4 className="text-sm font-semibold mb-2">After Photos</h4>
+                                        <div className="flex gap-3">
+                                            {afterPhotos.map(photo => (
+                                                <button key={photo.id} className="w-32 h-32 rounded-lg border overflow-hidden bg-gray-50 dark:bg-dark-800 focus:outline-none" onClick={() => setPhotoModal(photo)}>
+                                                    <img src={photo.url.replace('/upload/', '/upload/f_auto,q_auto/')} alt="After" className="w-full h-full object-cover" loading="lazy" srcSet={`${photo.url.replace('/upload/', '/upload/f_auto,q_auto/')} 1x, ${photo.url.replace('/upload/', '/upload/f_auto,q_auto/')} 2x`} />
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                                <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">Review the photos before confirming completion. If you notice any issues, flag the booking or contact support.</p>
+                            </section>
+                        )}
+                        {/* Modal for photo preview */}
+                        {photoModal && (
+                            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60">
+                                <div className="bg-white dark:bg-dark-900 rounded-lg shadow-xl max-w-xl w-full p-6 relative">
+                                    <button
+                                        className="absolute top-3 right-3 text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white"
+                                        onClick={() => setPhotoModal(null)}
+                                        aria-label="Close"
+                                    >
+                                        <span style={{ fontSize: 24 }}>&times;</span>
+                                    </button>
+                                    <img src={photoModal.url.replace('/upload/', '/upload/f_auto,q_auto/')} alt={photoModal.type} className="w-full max-h-96 object-contain rounded" style={{ minHeight: 400 }} loading="lazy" srcSet={`${photoModal.url.replace('/upload/', '/upload/f_auto,q_auto/')} 1x, ${photoModal.url.replace('/upload/', '/upload/f_auto,q_auto/')} 2x`} />
+                                    <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">{photoModal.type === 'BEFORE' ? 'Before Work' : 'After Work'}</div>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Session Timeline for multi-day bookings */}
                         {booking.status === 'IN_PROGRESS' && (

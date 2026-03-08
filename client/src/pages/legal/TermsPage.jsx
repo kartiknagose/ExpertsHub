@@ -3,8 +3,10 @@
 import { MainLayout } from '../../components/layout/MainLayout';
 import { PageHeader } from '../../components/common';
 import { getPageLayout } from '../../constants/layout';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 export function TermsPage() {
+    usePageTitle('Terms of Service');
   return (
     <MainLayout>
       <div className={getPageLayout('narrow')}>

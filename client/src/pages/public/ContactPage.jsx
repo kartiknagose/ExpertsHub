@@ -4,8 +4,10 @@ import { Mail, Phone, MapPin, Clock } from 'lucide-react';
 import { MainLayout } from '../../components/layout/MainLayout';
 import { Card, PageHeader } from '../../components/common';
 import { getPageLayout } from '../../constants/layout';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 export function ContactPage() {
+    usePageTitle('Contact Us');
   return (
     <MainLayout>
       <div className={getPageLayout('narrow')}>

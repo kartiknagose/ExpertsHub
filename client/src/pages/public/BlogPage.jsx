@@ -1,8 +1,9 @@
 // Blog page
 
 import { MainLayout } from '../../components/layout/MainLayout';
-import { Card } from '../../components/common';
+import { Card, PageHeader } from '../../components/common';
 import { getPageLayout } from '../../constants/layout';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 const posts = [
   {
@@ -20,17 +21,14 @@ const posts = [
 ];
 
 export function BlogPage() {
+    usePageTitle('Blog');
   return (
     <MainLayout>
       <div className={getPageLayout('narrow')}>
-        <div className="mb-10">
-          <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100">
-            Blog
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-3">
-            Insights, tips, and updates from the UrbanPro team.
-          </p>
-        </div>
+        <PageHeader
+          title="Blog"
+          subtitle="Insights, tips, and updates from the UrbanPro team."
+        />
 
         <div className="space-y-4">
           {posts.map((post) => (

@@ -73,9 +73,9 @@
 - [x] 3.6 Deduplicate registration logic
 - [x] 3.7 Extract worker profile lookup helper
 - [x] 3.8 Add `scheduledAt` and `paymentStatus` indexes
-- [x] 3.9 Fix cascade rules for EmergencyContact, BookingPhoto, Payment
-- [x] 3.10 Add unique constraint on Availability
-- [x] 3.11 Create proper `SOSAlert.triggeredBy` foreign key
+- [x] 3.9 Fix cascade rules for `EmergencyContact`, `BookingPhoto`, `Payment`
+- [x] 3.10 Add unique constraint on `Availability(workerId, dayOfWeek, startTime, endTime)`
+- [x] 3.11 Create proper `SOSAlert.triggeredBy` foreign key relation
 - [x] 3.12 Add `estimatedDuration` field to Booking model
 
 ### Phase 4: Frontend Consistency & Quality
@@ -100,36 +100,49 @@
 - [x] 5.3 Create `<CancellationModal>` shared component
 - [x] 5.4 Replace manual socket boilerplate with `useSocketEvent`
 - [x] 5.5 Replace `isDark ? '...' : '...'` with Tailwind `dark:` modifier
-- [x] 5.6 Extract loading spinner from ProtectedRoute
-- [x] 5.7 Break down large components (870+ lines)
+- [x] 5.6 Extract loading spinner from ProtectedRoute to shared component
+- [x] 5.7 Break down large components (870+ lines) into sub-components
 
 ### Phase 6: Accessibility & Performance
 - [x] 6.1 Add ARIA roles to tab controls, filter chips
 - [x] 6.2 Add labels to OTP inputs
 - [x] 6.3 Add text/icon alternatives to color-only indicators
-- [x] 6.4 Add focus trap and restore-focus to Modal
-- [x] 6.5 Add skip-to-content link in MainLayout
-- [x] 6.6 Make StarRating keyboard accessible
-- [x] 6.7 Add route-level code splitting (React.lazy + Suspense)
-- [x] 6.8 Add React.memo to list-item components
-- [x] 6.9 Replace CSS dangerouslySetInnerHTML with stylesheet
+- [x] 6.4 Add focus trap and restore-focus to `Modal`
+- [x] 6.5 Add skip-to-content link in `MainLayout`
+- [x] 6.6 Make `StarRating` keyboard accessible
+- [x] 6.7 Add route-level code splitting with `React.lazy` + `Suspense`
+- [x] 6.8 Add `React.memo` to list-item components
+- [x] 6.9 Replace CSS `dangerouslySetInnerHTML` with proper stylesheet
 - [x] 6.10 Disable polling when tab is inactive
 - [x] 6.11 Only connect socket for authenticated users
 
 ### Phase 7: Session-Based Booking Architecture
-- [x] 7.1 Create BookingSession model in Prisma schema
+- [x] 7.1 Create `BookingSession` model in Prisma schema
 - [x] 7.2 Add migration and seed data
-- [x] 7.3 Implement session CRUD in booking.service.js
-- [x] 7.4 Update isWorkerAvailable to session-aware logic
+- [x] 7.3 Implement session CRUD in `booking.service.js`
+- [x] 7.4 Update `isWorkerAvailable` to session-aware logic
 - [x] 7.5 Add "Pause / Next Visit" worker action (API + UI)
 - [x] 7.6 Add daily re-verification OTP per session
 - [x] 7.7 Add overrun detection and customer notification
 - [x] 7.8 Add booking timeout / auto-expiry for PENDING
 - [x] 7.9 Add cancellation policy / penalty logic
 - [x] 7.10 Add rescheduling mechanism
-- [x] 7.11 Add booking status audit trail
+- [x] 7.11 Add booking status audit trail (`BookingStatusHistory` model)
 - [x] 7.12 Customer UI: "Next visit scheduled" display
 - [x] 7.13 Worker UI: Session management panel
+
+---
+
+## Sprint 3 Completion Summary
+
+- All core MVP features are fully implemented and error-free.
+- Trust & Safety features (OTP verification, SOS, partial KYC, partial photo proof) are integrated and working.
+- Real-time notifications, browser push, notification inbox, and preferences are complete.
+- Refund and cancellation policy logic is implemented and tested.
+- Frontend and backend are fully integrated, with no errors found in build/lint checks.
+- Docker/Redis setup is running and confirmed.
+
+**Ready to begin Sprint 4: Database & Infrastructure Hardening, Worker Location Tracking, and Payment Integration.**
 
 ---
 

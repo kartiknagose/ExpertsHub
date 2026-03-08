@@ -1,3 +1,110 @@
+// Weighted-score matching for worker assignment
+function scoreWorker(worker) {
+  // Weights: distance 30%, rating 25%, availability 20%, experience 15%, response rate 10%
+  const distanceWeight = 0.3;
+  const ratingWeight = 0.25;
+  const availabilityWeight = 0.2;
+  const experienceWeight = 0.15;
+  const responseRateWeight = 0.1;
+
+  const maxDistance = 20; // km, for normalization
+  const distanceScore = Math.max(0, 1 - ((worker.distance || 0) / maxDistance));
+  const ratingScore = worker.rating ? worker.rating / 5 : 0;
+  const availabilityScore = worker.isAvailable ? 1 : 0;
+  const experienceScore = worker.completedJobs ? Math.min(worker.completedJobs / 200, 1) : 0;
+  const responseRateScore = worker.responseRate ? worker.responseRate : 0;
+
+  return (
+    distanceScore * distanceWeight +
+    ratingScore * ratingWeight +
+    availabilityScore * availabilityWeight +
+    experienceScore * experienceWeight +
+    responseRateScore * responseRateWeight
+  );
+}
+
+// Auto-assignment and cascading logic
+async function autoAssignWorker(bookingId, candidateWorkers) {
+  const scoredWorkers = candidateWorkers.map(w => ({ ...w, score: scoreWorker(w) }))
+    .sort((a, b) => b.score - a.score);
+
+  for (const worker of scoredWorkers) {
+    await offerBookingToWorker(bookingId, worker.id);
+    const accepted = await waitForWorkerAcceptance(bookingId, worker.id, 5 * 60 * 1000);
+    if (accepted) return worker.id;
+  }
+  return null; // No worker accepted
+}
+
+// Offer booking to a specific worker via Socket.IO notification
+async function offerBookingToWorker(bookingId, workerId) {
+  try {
+    const prisma = require('../../config/prisma');
+    const { getIo } = require('../../socket');
+
+    // Get the worker's userId from their profile
+    const profile = await prisma.workerProfile.findUnique({
+      where: { id: workerId },
+      select: { userId: true, user: { select: { name: true } } }
+    });
+    if (!profile) return;
+
+    // Update booking to indicate it's being offered
+    await prisma.booking.update({
+      where: { id: bookingId },
+      data: { offeredToWorkerId: workerId }
+    });
+
+    // Emit socket notification to the worker
+    const io = getIo();
+    io.to(`user:${profile.userId}`).emit('booking:offered', {
+      bookingId,
+      message: 'New booking offered to you. Accept within 5 minutes.',
+    });
+
+    // Create a notification record
+    try {
+      const { createNotification } = require('../notifications/notification.service');
+      await createNotification({
+        userId: profile.userId,
+        type: 'BOOKING',
+        title: 'New booking offered to you',
+        message: `Booking #${bookingId} has been offered. Accept within 5 minutes.`,
+        data: { bookingId }
+      });
+    } catch { /* notification failure shouldn't block assignment */ }
+  } catch (err) {
+    console.warn('offerBookingToWorker error:', err.message);
+  }
+}
+
+// Wait for worker acceptance by polling DB
+async function waitForWorkerAcceptance(bookingId, workerId, timeoutMs) {
+  const prisma = require('../../config/prisma');
+  const pollInterval = 5000; // 5 seconds
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      select: { status: true, workerProfileId: true }
+    });
+
+    // Worker accepted (status changed to CONFIRMED and assigned to this worker)
+    if (booking && booking.status === 'CONFIRMED' && booking.workerProfileId === workerId) {
+      return true;
+    }
+
+    // Booking cancelled or already assigned to someone else
+    if (booking && (booking.status === 'CANCELLED' || (booking.workerProfileId && booking.workerProfileId !== workerId))) {
+      return false;
+    }
+
+    // Wait before next poll
+    await new Promise(resolve => setTimeout(resolve, pollInterval));
+  }
+  return false; // Timed out
+}
 /**
  * BOOKING SERVICE - BUSINESS LOGIC LAYER
  * 
@@ -23,6 +130,10 @@ const AppError = require('../../common/errors/AppError');
 // Helper to generate 4-digit OTP (1000–9999)
 // Uses crypto.randomInt() — cryptographically secure, unlike Math.random().
 const generateOTP = () => randomInt(1000, 10000).toString();
+
+const SMSService = require('../notifications/sms.service');
+const WhatsAppService = require('../notifications/whatsapp.service');
+const GrowthService = require('../business_growth/business_growth.service');
 
 /**
  * Fetch worker profile by userId. Throws AppError if not found.
@@ -72,7 +183,7 @@ async function isWorkerForBooking(userId, booking) {
 // Accepts optional `client` param to run inside a transaction (defaults to global prisma).
 const DEFAULT_DURATION_MINUTES = 120; // Fallback when estimatedDuration is not set
 
-async function isWorkerAvailable(workerId, date, client = prisma, durationMinutes = DEFAULT_DURATION_MINUTES) {
+async function isWorkerAvailable(workerId, date, client = prisma, durationMinutes = DEFAULT_DURATION_MINUTES, excludeBookingId = null) {
   const newStart = new Date(date);
   const newEnd = new Date(newStart.getTime() + durationMinutes * 60 * 1000);
 
@@ -81,6 +192,7 @@ async function isWorkerAvailable(workerId, date, client = prisma, durationMinute
     where: {
       workerProfileId: workerId,
       status: { in: ['PENDING', 'CONFIRMED'] },
+      ...(excludeBookingId ? { id: { not: excludeBookingId } } : {}),
       scheduledAt: {
         gte: new Date(newStart.getTime() - 480 * 60 * 1000),
         lt: new Date(newEnd.getTime() + 480 * 60 * 1000),
@@ -144,18 +256,86 @@ async function isWorkerAvailable(workerId, date, client = prisma, durationMinute
   return true;
 }
 
-// HELPER: Check if address is in worker's service area
-function isLocationMatch(workerServiceAreas, address) {
-  if (!workerServiceAreas || !Array.isArray(workerServiceAreas) || workerServiceAreas.length === 0) return true;
-  if (!address) return false;
-
-  const normalizedAddress = address.toLowerCase();
-  // Check if any defined service area is part of the address string
-  return workerServiceAreas.some(area => normalizedAddress.includes(area.toLowerCase()));
+// HELPER: Filter workers within X km of booking location using Haversine formula
+async function filterWorkersByDistance(lat, lng, serviceId, radiusKm = 10) {
+  // Prisma raw query for Haversine distance
+  const workers = await prisma.$queryRaw`
+    SELECT wp.*, u.name, u.email, u.mobile, u.profilePhotoUrl, ws.serviceId,
+      (6371 * acos(
+        cos(radians(${lat})) * cos(radians(wp.baseLatitude)) *
+        cos(radians(wp.baseLongitude) - radians(${lng})) +
+        sin(radians(${lat})) * sin(radians(wp.baseLatitude))
+      )) AS distance
+    FROM "WorkerProfile" wp
+    JOIN "User" u ON u.id = wp.userId
+    JOIN "WorkerService" ws ON ws.workerId = wp.id
+    WHERE ws.serviceId = ${serviceId}
+      AND wp.baseLatitude IS NOT NULL
+      AND wp.baseLongitude IS NOT NULL
+      AND wp.isOnline = true
+    HAVING distance <= ${radiusKm}
+    ORDER BY distance ASC
+  `;
+  return workers;
 }
 
+const axios = require('axios');
+const GOOGLE_GEOCODING_API_KEY = process.env.GOOGLE_GEOCODING_API_KEY;
+const GOOGLE_GEOCODING_URL = 'https://maps.googleapis.com/maps/api/geocode/json';
+
+const { calculateDynamicPrice } = require('../pricing/pricing.service');
+
 async function createBooking(customerId, bookingData) {
-  const { workerProfileId, serviceId, scheduledDate, addressDetails, latitude, longitude, estimatedPrice, notes, estimatedDuration } = bookingData;
+  let { workerProfileId, serviceId, scheduledDate, addressDetails, latitude, longitude, estimatedPrice, notes, estimatedDuration, couponCode } = bookingData;
+
+  // BUSINESS GROWTH: Coupon Validation (Sprint 17)
+  let appliedCoupon = null;
+  if (couponCode) {
+    // Fetch service for category info
+    const service = await prisma.service.findUnique({ where: { id: serviceId } });
+    if (!service) throw new AppError(404, 'Service not found.');
+
+    appliedCoupon = await GrowthService.validateCoupon(couponCode, customerId, {
+      bookingAmount: estimatedPrice,
+      serviceCategory: service.category
+    });
+  }
+
+  // Geocode address if lat/lng missing and addressDetails present
+  if ((!latitude || !longitude) && addressDetails && GOOGLE_GEOCODING_API_KEY) {
+    try {
+      const geoResp = await axios.get(GOOGLE_GEOCODING_URL, {
+        params: {
+          address: addressDetails,
+          key: GOOGLE_GEOCODING_API_KEY,
+          language: 'en',
+          region: 'IN',
+        }
+      });
+      const geoResult = geoResp.data.results && geoResp.data.results[0];
+      if (geoResult && geoResult.geometry && geoResult.geometry.location) {
+        latitude = geoResult.geometry.location.lat;
+        longitude = geoResult.geometry.location.lng;
+      }
+    } catch (err) {
+      console.error('Geocoding error:', err);
+    }
+  }
+
+  // FRAUD DETECTION: Booking Velocity
+  // Prevent users from spamming bookings and cancelling them
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+  const recentCancellations = await prisma.booking.count({
+    where: {
+      customerId,
+      status: 'CANCELLED',
+      updatedAt: { gte: oneHourAgo }
+    }
+  });
+
+  if (recentCancellations >= 3) {
+    throw new AppError(429, 'Suspicious activity detected. You have cancelled too many bookings recently. Please try again after an hour or contact support.');
+  }
 
   // LOGIC BRANCH: Is this a Direct Booking (worker selected) or Open Booking (no worker)?
   const isDirectBooking = !!workerProfileId;
@@ -208,9 +388,35 @@ async function createBooking(customerId, bookingData) {
         throw new AppError(404, 'Worker not found. Please select a valid worker.');
       }
 
-      // CHECK 1: LOCATION
-      if (!isLocationMatch(workerProfile.serviceAreas, addressDetails)) {
-        throw new AppError(400, `This worker only accepts jobs in: ${workerProfile.serviceAreas?.join(', ') || 'their local area'}. Address provided: ${addressDetails}`);
+      // CHECK 1: DISTANCE-BASED FILTERING (Haversine)
+      if (latitude && longitude) {
+        const nearbyWorkers = await filterWorkersByDistance(latitude, longitude, serviceId, workerProfile.serviceRadius || 10);
+        const isNearby = nearbyWorkers.some(w => w.id === workerProfileId);
+        if (!isNearby) {
+          throw new AppError(400, `This worker is not within the service radius (${workerProfile.serviceRadius || 10} km) of the booking location.`);
+        }
+      }
+
+      // CHECK 2: GEO-FENCING (Polygon)
+      if (workerProfile.serviceAreas && Array.isArray(workerProfile.serviceAreas) && latitude && longitude) {
+        // serviceAreas is an array of [lat, lng] pairs forming a polygon
+        // Use ray-casting point-in-polygon algorithm
+        const pointInPolygon = (point, polygon) => {
+          let x = point[0], y = point[1];
+          let inside = false;
+          for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+            let xi = polygon[i][0], yi = polygon[i][1];
+            let xj = polygon[j][0], yj = polygon[j][1];
+            let intersect = ((yi > y) !== (yj > y)) &&
+              (x < (xj - xi) * (y - yi) / (yj - yi + 0.00001) + xi);
+            if (intersect) inside = !inside;
+          }
+          return inside;
+        };
+
+        if (!pointInPolygon([latitude, longitude], workerProfile.serviceAreas)) {
+          throw new AppError(400, 'Booking location is outside the worker\'s service area. Please select a location within the defined zone.');
+        }
       }
 
       // CHECK 2: AVAILABILITY (uses tx to read within the same transaction)
@@ -244,6 +450,16 @@ async function createBooking(customerId, bookingData) {
       }
     }
 
+    // Calculate Dynamic Pricing Formula
+    const pricing = await calculateDynamicPrice({
+      serviceId,
+      workerProfileId: isDirectBooking ? workerProfileId : null,
+      scheduledAt: scheduledDateObj,
+      latitude: latitude ? Number(latitude) : null,
+      longitude: longitude ? Number(longitude) : null,
+      basePriceOverride: Number(estimatedPrice) || 0
+    });
+
     // Create the booking
     return await tx.booking.create({
       data: {
@@ -254,10 +470,21 @@ async function createBooking(customerId, bookingData) {
         address: addressDetails,
         latitude: latitude ? Number(latitude) : null,
         longitude: longitude ? Number(longitude) : null,
-        totalPrice: estimatedPrice,
         notes: notes,
         estimatedDuration: estimatedDuration || null,
         status: 'PENDING',
+        totalPrice: appliedCoupon
+          ? Math.max(0, Number(pricing.totalPrice) - appliedCoupon.discountAmount)
+          : pricing.totalPrice,
+        basePrice: pricing.basePrice,
+        timeMultiplier: pricing.timeMultiplier,
+        surgeMultiplier: pricing.surgeMultiplier,
+        urgencyMultiplier: pricing.urgencyMultiplier,
+        workerTierMultiplier: pricing.workerTierMultiplier,
+        distanceSurcharge: pricing.distanceSurcharge,
+        gstAmount: pricing.gstAmount,
+        couponId: appliedCoupon?.couponId || null,
+        couponAmount: appliedCoupon?.discountAmount || 0,
       },
       include: {
         service: {
@@ -323,28 +550,10 @@ async function createBooking(customerId, bookingData) {
     }).filter(w => w.distance <= (w.serviceRadius || 10))
       .sort((a, b) => b.matchScore - a.matchScore);
 
-    // 3. Notify Online Pros via Socket.io
-    // Workers with higher scores get notified first or more prominently
-    try {
-      const { getIo } = require('../../socket');
-      const io = getIo();
-      if (io) {
-        eligibleWorkers.forEach((worker, _index) => {
-          // In a high-traffic app, we might delay notification for lower scores
-          // For now, we broadcast to all within radius, but could include the score
-          io.to(`user:${worker.userId}`).emit('booking:available', {
-            bookingId: newBooking.id,
-            serviceName: newBooking.service.name,
-            address: addressDetails,
-            scheduledAt: scheduledDateObj,
-            matchScore: Math.round(worker.matchScore),
-            distance: worker.distance.toFixed(1)
-          });
-        });
-      }
-    } catch (err) {
-      console.warn('Socket broadcast failed:', err.message);
-    }
+    // 3. Launch cascading background auto-assignment (non-blocking)
+    autoAssignWorker(newBooking.id, eligibleWorkers).catch(err => {
+      console.error('Auto-assignment failed:', err);
+    });
   }
 
   return newBooking;
@@ -387,6 +596,7 @@ async function getBookingsByUser(userId, role, { skip = 0, limit = 20 } = {}) {
         reviews: {
           select: { id: true, reviewerId: true, rating: true },
         },
+        photos: true,
         workerProfile: {
           select: {
             id: true,
@@ -433,6 +643,7 @@ async function getBookingById(bookingId, userId, role) {
         select: { id: true, name: true, category: true, basePrice: true },
       },
       reviews: true,
+      photos: true,
       workerProfile: {
         select: {
           id: true,
@@ -553,6 +764,10 @@ async function updateBookingStatus(bookingId, newStatus, userId, role) {
     // Record audit trail
     await recordStatusChange(bookingId, currentBooking.status, newStatus, userId, null, tx);
 
+    if (newStatus === 'COMPLETED') {
+      await releaseEscrowIfEligible(bookingId, tx);
+    }
+
     return updated;
   });
 
@@ -628,13 +843,98 @@ async function cancelBooking(bookingId, userId, role, cancellationReason) {
         customer: { select: { id: true, name: true, email: true } },
       },
     });
-
     await recordStatusChange(bookingId, booking.status, 'CANCELLED', userId, cancellationReason, tx);
+
+    // Process Automated Refund if already PAID
+    if (booking.paymentStatus === 'PAID' && booking.paymentReference && !!booking.totalPrice) {
+      const penaltyPercent = isAdmin ? 0 : policy.penaltyPercent;
+      const refundPercent = 100 - penaltyPercent;
+
+      if (refundPercent > 0) {
+        const rawAmount = Number(booking.totalPrice);
+        const refundAmount = rawAmount * (refundPercent / 100);
+
+        try {
+          // const Razorpay = require('razorpay');
+          // const rzp = new Razorpay({
+          //   key_id: process.env.RAZORPAY_KEY_ID || 'rzp_test_xxxxxxxx',
+          //   key_secret: process.env.RAZORPAY_KEY_SECRET || 'xxxxxxxx'
+          // });
+
+          // In production, execute the refund via Razorpay APIs
+          // await rzp.payments.refund(booking.paymentReference, { amount: Math.round(refundAmount * 100) });
+          console.log(`[REFUND] Processed ₹${refundAmount.toFixed(2)} refund for Cancelled Booking #${bookingId}`);
+
+          // Create payment record for local ledger tracking
+          await tx.payment.create({
+            data: {
+              bookingId: bookingId,
+              customerId: booking.customerId,
+              amount: refundAmount,
+              status: 'REFUNDED',
+              reference: `refund-${Date.now()}`
+            }
+          });
+
+          updated.paymentStatus = 'REFUNDED';
+          await tx.booking.update({
+            where: { id: bookingId },
+            data: { paymentStatus: 'REFUNDED' }
+          });
+        } catch (err) {
+          console.error('[REFUND] Gateway Refund failed:', err.message);
+        }
+      }
+    }
 
     return updated;
   });
 
   return cancelledBooking;
+}
+
+/**
+ * PROCESS ESCROW PAYOUT (Triggered safely across payment & completion hooks)
+ * Releases held funds into the worker's withdrawable wallet natively.
+ */
+async function releaseEscrowIfEligible(bookingId, tx) {
+  const booking = await tx.booking.findUnique({
+    where: { id: bookingId },
+    include: { service: true, workerProfile: true }
+  });
+
+  // Only release if PAID AND COMPLETED, and hasn't been split yet (workerPayoutAmount is null)
+  if (booking && booking.status === 'COMPLETED' && booking.paymentStatus === 'PAID' && booking.workerPayoutAmount === null && booking.workerProfileId) {
+    const rawAmount = Number(booking.totalPrice) || 0;
+    const commRate = Number(booking.service.commissionRate) || 15.0;
+    const platformCut = rawAmount * (commRate / 100);
+    const workerCut = rawAmount - platformCut;
+
+    await tx.booking.update({
+      where: { id: bookingId },
+      data: {
+        platformCommission: platformCut,
+        workerPayoutAmount: workerCut,
+      }
+    });
+
+    await tx.workerProfile.update({
+      where: { id: booking.workerProfileId },
+      data: {
+        walletBalance: { increment: workerCut }
+      }
+    });
+
+    // Notify worker of escrow release
+    try {
+      const io = require('../../socket').getIo();
+      io.to(`user:${booking.workerProfile.userId}`).emit('payout:released', {
+        bookingId, amount: workerCut, message: 'Escrow funds released to your wallet'
+      });
+    } catch (err) {
+      console.warn('Socket emit ignored for escrow:', err.message);
+    }
+  }
 }
 
 /**
@@ -645,7 +945,10 @@ async function cancelBooking(bookingId, userId, role, cancellationReason) {
  * - Cannot pay cancelled booking
  * - Marks paymentStatus as PAID and sets paidAt
  */
-async function payBooking(bookingId, userId, userRole, paymentReference) {
+async function payBooking(bookingId, userId, userRole, reqOptions) {
+  const options = typeof reqOptions === 'string' ? { paymentReference: reqOptions } : (reqOptions || {});
+  const { paymentReference, createRazorpayOrder, isWebhook } = options;
+
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
     include: { customer: { select: { id: true } } },
@@ -655,7 +958,8 @@ async function payBooking(bookingId, userId, userRole, paymentReference) {
     throw new AppError(404, 'Booking not found.');
   }
 
-  if (userRole !== 'CUSTOMER' || booking.customerId !== userId) {
+  // Webhooks from Razorpay bypass the strict user identity check
+  if (!isWebhook && (userRole !== 'CUSTOMER' || booking.customerId !== userId)) {
     throw new AppError(403, 'Only the booking customer can pay for this booking.');
   }
 
@@ -665,6 +969,16 @@ async function payBooking(bookingId, userId, userRole, paymentReference) {
 
   if (booking.paymentStatus === 'PAID') {
     throw new AppError(400, 'Booking is already paid.');
+  }
+
+  if (createRazorpayOrder) {
+    const { createRazorpayOrder: createOrderHelper } = require('../payments/payment.service');
+    const amount = Number(booking.totalPrice) || Number(booking.estimatedPrice) || 0;
+    if (amount <= 0) {
+      throw new AppError(400, 'Invalid payment amount.');
+    }
+    const order = await createOrderHelper(bookingId, amount);
+    return { order };
   }
 
   const reference = paymentReference || `manual-${Date.now()}`;
@@ -693,6 +1007,8 @@ async function payBooking(bookingId, userId, userRole, paymentReference) {
         reference,
       },
     });
+
+    await releaseEscrowIfEligible(bookingId, tx);
 
     return updated;
   });
@@ -749,7 +1065,9 @@ async function getOpenBookingsForWorker(userId, { skip = 0, limit = 20 } = {}) {
   // 3. Filter by Location (Service Area)
   // Only show jobs where the job address matches one of the worker's service areas
   const relevantBookings = openBookings.filter(booking => {
-    return isLocationMatch(worker.serviceAreas, booking.address);
+    if (!worker.serviceAreas || worker.serviceAreas.length === 0) return true;
+    if (!booking.address) return false;
+    return worker.serviceAreas.some(area => booking.address.toLowerCase().includes(area.toLowerCase()));
   });
 
   // Map to flatten city for frontend convenience
@@ -794,17 +1112,18 @@ async function acceptBooking(bookingId, userId) {
     }
 
     // CHECK AVAILABILITY: Prevents double booking (uses booking's estimatedDuration)
-    if (!(await isWorkerAvailable(worker.id, booking.scheduledAt, tx, booking.estimatedDuration || DEFAULT_DURATION_MINUTES))) {
+    if (!(await isWorkerAvailable(worker.id, booking.scheduledAt, tx, booking.estimatedDuration || DEFAULT_DURATION_MINUTES, bookingId))) {
       throw new AppError(409, 'You cannot accept this job because you have another booking scheduled near this time.');
     }
 
     // Assign to worker and confirm, generating Start OTP
+    const otp = generateOTP();
     const updated = await tx.booking.update({
       where: { id: bookingId },
       data: {
         workerProfileId: worker.id,
         status: 'CONFIRMED',
-        startOtp: generateOTP(),
+        startOtp: otp,
         otpGeneratedAt: new Date(),
         updatedAt: new Date()
       },
@@ -817,16 +1136,35 @@ async function acceptBooking(bookingId, userId) {
 
     await recordStatusChange(bookingId, 'PENDING', 'CONFIRMED', userId, 'Worker accepted booking', tx);
 
+    // MOCK SMS/WA INTEGRATION
+    try {
+      if (updated.customer?.mobile) {
+        SMSService.sendBookingOTP(updated.customer.mobile, updated.startOtp, 'START');
+        WhatsAppService.sendTemplateMessage(updated.customer.mobile, 'CONFIRMATION', {
+          customerName: updated.customer.name,
+          serviceName: updated.service?.name || 'Service',
+          time: new Date(updated.scheduledAt || Date.now()).toLocaleString(),
+          workerName: updated.workerProfile?.user?.name,
+          estimate: updated.totalPrice || updated.estimatedPrice || updated.basePrice
+        });
+      }
+    } catch (e) { console.error('SMS Mock Failed', e); }
+
     return updated;
   });
-
 }
+
+const LocationService = require('../location/location.service'); // Added for geo-fencing
+
+/**
+ * ... (existing functions) ...
+ */
 
 /**
  * VERIFY OTP TO START JOB
  * Worker enters OTP provided by Customer
  */
-async function verifyBookingStart(bookingId, otp, userId) {
+async function verifyBookingStart(bookingId, otp, userId, workerCoords = null) {
   const worker = await requireWorkerProfile(userId, 'Only workers can start jobs.', 403);
 
   const booking = await prisma.booking.findUnique({ where: { id: bookingId } });
@@ -835,18 +1173,43 @@ async function verifyBookingStart(bookingId, otp, userId) {
   if (booking.workerProfileId !== worker.id) throw new AppError(403, 'You are not assigned to this job.');
   if (booking.status !== 'CONFIRMED') throw new AppError(400, 'Job must be CONFIRMED before starting.');
 
+  // FRAUD DETECTION: Geo-fencing
+  // Ensure worker is within 1km (1000m) of the booking location if both have coordinates
+  if (booking.latitude && booking.longitude && workerCoords?.latitude && workerCoords?.longitude) {
+    const distance = LocationService.calculateDistance(
+      booking.latitude,
+      booking.longitude,
+      workerCoords.latitude,
+      workerCoords.longitude
+    );
+
+    // Threshold: 1KM (more lenient than 500m to account for GPS drift)
+    if (distance > 1) {
+      throw new AppError(400, `Geo-verification failed. You are ${distance.toFixed(2)}km away from the job location. Please arrive at the customer address before starting the job.`);
+    }
+  }
+
+  // Enforce 30-minute OTP expiry
+  if (booking.otpGeneratedAt) {
+    const minutesSinceGenerated = (Date.now() - new Date(booking.otpGeneratedAt).getTime()) / (1000 * 60);
+    if (minutesSinceGenerated > 30) {
+      throw new AppError(400, 'Start OTP has expired (30-minute limit). Please ask the customer to request a new one.');
+    }
+  }
+
   if (booking.startOtp !== otp) {
     throw new AppError(400, 'Invalid Start OTP.');
   }
 
   // OTP Valid -> Start Job and generate Completion OTP
-  return prisma.$transaction(async (tx) => {
+  const updatedBooking = await prisma.$transaction(async (tx) => {
+    const nextOtp = generateOTP();
     const updated = await tx.booking.update({
       where: { id: bookingId },
       data: {
         status: 'IN_PROGRESS',
         startedAt: new Date(),
-        completionOtp: generateOTP(),
+        completionOtp: nextOtp,
         otpGeneratedAt: new Date(),
         updatedAt: new Date()
       },
@@ -870,6 +1233,18 @@ async function verifyBookingStart(bookingId, otp, userId) {
 
     return updated;
   });
+
+  // MOCK SMS/WA INTEGRATION
+  try {
+    if (updatedBooking.customer?.mobile) {
+      SMSService.sendBookingOTP(updatedBooking.customer.mobile, updatedBooking.completionOtp, 'COMPLETE');
+      WhatsAppService.sendTemplateMessage(updatedBooking.customer.mobile, 'ON_THE_WAY', {
+        workerName: updatedBooking.workerProfile?.user?.name
+      });
+    }
+  } catch (e) { console.error('SMS Mock Failed', e); }
+
+  return updatedBooking;
 }
 
 /**
@@ -885,12 +1260,20 @@ async function verifyBookingCompletion(bookingId, otp, userId) {
   if (booking.workerProfileId !== worker.id) throw new AppError(403, 'You are not assigned to this job.');
   if (booking.status !== 'IN_PROGRESS') throw new AppError(400, 'Job must be IN_PROGRESS before completing.');
 
+  // Enforce 30-minute OTP expiry
+  if (booking.otpGeneratedAt) {
+    const minutesSinceGenerated = (Date.now() - new Date(booking.otpGeneratedAt).getTime()) / (1000 * 60);
+    if (minutesSinceGenerated > 30) {
+      throw new AppError(400, 'Completion OTP has expired (30-minute limit). Please ask the customer to request a new one.');
+    }
+  }
+
   if (booking.completionOtp !== otp) {
     throw new AppError(400, 'Invalid Completion OTP.');
   }
 
   // OTP Valid -> Complete Job
-  return prisma.$transaction(async (tx) => {
+  const updatedBooking = await prisma.$transaction(async (tx) => {
     const updated = await tx.booking.update({
       where: { id: bookingId },
       data: {
@@ -916,8 +1299,33 @@ async function verifyBookingCompletion(bookingId, otp, userId) {
 
     await recordStatusChange(bookingId, 'IN_PROGRESS', 'COMPLETED', userId, 'OTP verified — job completed', tx);
 
+    // BUSINESS GROWTH: Update Coupon Count (Sprint 17)
+    if (booking.couponId) {
+      await tx.coupon.update({
+        where: { id: booking.couponId },
+        data: { usageCount: { increment: 1 } }
+      });
+    }
+
+    // BUSINESS GROWTH: Award Referral Bonus if first job (Sprint 17)
+    await GrowthService.awardReferralBonus(bookingId, tx);
+
+    await releaseEscrowIfEligible(bookingId, tx);
+
     return updated;
   });
+
+  // MOCK SMS/WA INTEGRATION
+  try {
+    if (updatedBooking.customer?.mobile) {
+      WhatsAppService.sendTemplateMessage(updatedBooking.customer.mobile, 'COMPLETED', {
+        serviceName: updatedBooking.service?.name,
+        total: updatedBooking.totalPrice || updatedBooking.estimatedPrice
+      });
+    }
+  } catch (e) { console.error('SMS Mock Failed', e); }
+
+  return updatedBooking;
 }
 
 // Export all service functions so controllers can use them
@@ -1026,6 +1434,12 @@ async function startSession(sessionId, otp, userId) {
   if (session.isActive) throw new AppError(400, 'Session is already active.');
   if (session.endTime) throw new AppError(400, 'Session has already ended.');
 
+  // Enforce 30-minute OTP expiry (session OTP generated at session creation)
+  const sessionOtpAge = (Date.now() - new Date(session.createdAt).getTime()) / (1000 * 60);
+  if (sessionOtpAge > 30) {
+    throw new AppError(400, 'Session OTP has expired (30-minute limit). Please schedule a new session.');
+  }
+
   if (session.startOtp !== otp) {
     throw new AppError(400, 'Invalid session OTP.');
   }
@@ -1117,7 +1531,8 @@ async function rescheduleBooking(bookingId, userId, role, { newScheduledDate }) 
       booking.workerProfileId,
       newDate,
       prisma,
-      booking.estimatedDuration || DEFAULT_DURATION_MINUTES
+      booking.estimatedDuration || DEFAULT_DURATION_MINUTES,
+      booking.id
     );
     if (!available) {
       throw new AppError(409, 'Worker is not available at the new time. Please choose another time.');

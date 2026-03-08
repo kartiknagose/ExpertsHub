@@ -1,0 +1,14 @@
+node_modules
+npm-debug.log*
+.env
+.env.*
+logs
+*.log
+uploads
+dist
+.git
+.gitignore
+eslint.config.mjs
+jsconfig.json
+scripts
+prisma/test.txt

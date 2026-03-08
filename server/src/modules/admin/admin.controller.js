@@ -1,8 +1,10 @@
 const asyncHandler = require('../../common/utils/asyncHandler');
 const parseId = require('../../common/utils/parseId');
 const parsePagination = require('../../common/utils/parsePagination');
-const AppError = require('../../common/errors/AppError');
-const { getDashboardStats, listUsers, listWorkers, updateUserStatus, deleteUser } = require('./admin.service');
+const {
+  getDashboardStats, listUsers, listWorkers, updateUserStatus, deleteUser, getFraudAlerts,
+  createCoupon, listCoupons, toggleCoupon, deleteCoupon
+} = require('./admin.service');
 
 let getIo;
 try {
@@ -66,4 +68,36 @@ exports.removeUser = asyncHandler(async (req, res) => {
 
   emitAdminDataChanged('admin:users_updated', { userId: id, action: 'delete' });
   emitAdminDataChanged('admin:workers_updated', { userId: id, action: 'delete' });
+});
+
+exports.getFraudAlerts = asyncHandler(async (req, res) => {
+  const alerts = await getFraudAlerts();
+  res.json(alerts);
+});
+
+// Coupon Management
+exports.getCoupons = asyncHandler(async (req, res) => {
+  const coupons = await listCoupons();
+  res.json({ coupons });
+});
+
+exports.createCoupon = asyncHandler(async (req, res) => {
+  const coupon = await createCoupon(req.body);
+  res.status(201).json({ coupon });
+  emitAdminDataChanged('admin:coupons_updated', { action: 'create' });
+});
+
+exports.updateCouponStatus = asyncHandler(async (req, res) => {
+  const id = parseId(req.params.id, 'Coupon ID');
+  const { isActive } = req.body;
+  const coupon = await toggleCoupon(id, isActive);
+  res.json({ coupon });
+  emitAdminDataChanged('admin:coupons_updated', { action: 'update', couponId: id });
+});
+
+exports.removeCoupon = asyncHandler(async (req, res) => {
+  const id = parseId(req.params.id, 'Coupon ID');
+  await deleteCoupon(id);
+  res.json({ message: 'Coupon deleted successfully' });
+  emitAdminDataChanged('admin:coupons_updated', { action: 'delete', couponId: id });
 });

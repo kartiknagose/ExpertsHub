@@ -2,6 +2,7 @@ const asyncHandler = require('../../common/utils/asyncHandler');
 const parseId = require('../../common/utils/parseId');
 const parsePagination = require('../../common/utils/parsePagination');
 const notificationService = require('./notification.service');
+const messageStore = require('./messageStore');
 
 const getNotifications = asyncHandler(async (req, res) => {
     const { page, limit, skip } = parsePagination(req.query);
@@ -21,8 +22,14 @@ const readAllNotifications = asyncHandler(async (req, res) => {
     res.json({ success: true });
 });
 
+const getMockGatewayMessages = asyncHandler(async (req, res) => {
+    // Return all mock simulated messages
+    res.json({ messages: messageStore.getAll() });
+});
+
 module.exports = {
     getNotifications,
     readNotification,
-    readAllNotifications
+    readAllNotifications,
+    getMockGatewayMessages,
 };

@@ -44,11 +44,8 @@ export const getMessages = async (conversationId, params) => {
 /**
  * Send a message in a conversation
  * @param {Object} data
- * @param {number} data.conversationId - Conversation ID
- * @param {string} data.content - Message content
- * @returns {Promise<{ message }>}
  */
-export const sendMessage = async ({ conversationId, content }) => {
-  const response = await axiosInstance.post(CHAT_ENDPOINTS.MESSAGES(conversationId), { content });
+export const sendMessage = async ({ conversationId, ...payload }) => {
+  const response = await axiosInstance.post(CHAT_ENDPOINTS.MESSAGES(conversationId), payload);
   return response.data;
 };

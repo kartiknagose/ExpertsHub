@@ -17,7 +17,11 @@ export function Avatar({
 }) {
     const [hasError, setHasError] = useState(false);
     const resolvedUrl = resolveProfilePhotoUrl(src);
-    const initial = useMemo(() => (name || 'U').charAt(0).toUpperCase(), [name]);
+    const initial = useMemo(() => {
+        const parts = (name || 'U').trim().split(/\s+/);
+        if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+        return parts[0].charAt(0).toUpperCase();
+    }, [name]);
 
     const sizeClasses = {
         xs: 'w-6 h-6 text-[10px]',

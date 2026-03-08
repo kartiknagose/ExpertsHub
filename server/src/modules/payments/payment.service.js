@@ -1,3 +1,20 @@
+const Razorpay = require('razorpay');
+const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || 'rzp_test_xxxxxxxx';
+const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || 'xxxxxxxxxxxxxx';
+const razorpay = new Razorpay({ key_id: RAZORPAY_KEY_ID, key_secret: RAZORPAY_KEY_SECRET });
+
+// Create Razorpay order for booking
+async function createRazorpayOrder(bookingId, amount, currency = 'INR') {
+  const options = {
+    amount: Math.round(amount * 100), // Razorpay expects paise
+    currency,
+    receipt: `booking_${bookingId}`,
+    notes: { bookingId },
+    payment_capture: 1,
+  };
+  const order = await razorpay.orders.create(options);
+  return order;
+}
 const prisma = require('../../config/prisma');
 
 async function listMyPayments(userId, role, { skip = 0, limit = 20 } = {}) {
@@ -44,4 +61,5 @@ async function listAllPayments({ skip = 0, limit = 20 } = {}) {
 module.exports = {
   listMyPayments,
   listAllPayments,
+  createRazorpayOrder,
 };

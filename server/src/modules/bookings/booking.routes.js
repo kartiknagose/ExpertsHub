@@ -23,6 +23,16 @@ const {
 const bookingController = require('./booking.controller');
 
 /**
+ * ROUTE 1a: PREVIEW PRICE (DYNAMIC PRICING ENGINE)
+ */
+router.post(
+  '/preview-price',
+  authenticate,
+  requireCustomer,
+  bookingController.previewPrice
+);
+
+/**
  * ROUTE 1: CREATE A NEW BOOKING
  */
 router.post(

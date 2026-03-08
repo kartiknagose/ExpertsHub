@@ -3,13 +3,27 @@
 
 import axiosInstance from './axios';
 
-// Bookings API endpoints
 const BOOKINGS_ENDPOINTS = {
   BASE: '/bookings',
   BY_ID: (id) => `/bookings/${id}`,
   UPDATE_STATUS: (id) => `/bookings/${id}/status`,
   CANCEL: (id) => `/bookings/${id}/cancel`,
   PAY: (id) => `/bookings/${id}/pay`,
+};
+
+export const downloadInvoice = async (bookingId) => {
+  const response = await axiosInstance.get(`/invoices/booking/${bookingId}`, {
+    responseType: 'blob'
+  });
+
+  const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', `invoice-${bookingId}.pdf`);
+  document.body.appendChild(link);
+  link.click();
+  link.parentNode.removeChild(link);
+  window.URL.revokeObjectURL(url);
 };
 
 /**
@@ -25,6 +39,14 @@ const BOOKINGS_ENDPOINTS = {
  */
 export const createBooking = async (data) => {
   const response = await axiosInstance.post(BOOKINGS_ENDPOINTS.BASE, data);
+  return response.data;
+};
+
+/**
+ * Preview dynamic price before booking
+ */
+export const previewPrice = async (data) => {
+  const response = await axiosInstance.post('/bookings/preview-price', data);
   return response.data;
 };
 

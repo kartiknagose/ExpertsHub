@@ -1,8 +1,25 @@
 const prisma = require('../../config/prisma');
 const AppError = require('../../common/errors/AppError');
+const Redis = require('ioredis');
+
+let redisClient = null;
+try {
+    redisClient = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
+        maxRetriesPerRequest: 1,
+        retryStrategy: () => null, // Don't retry — fall back to DB
+        lazyConnect: true,
+    });
+    redisClient.connect().catch(() => {
+        console.warn('Location service: Redis unavailable, using database only');
+        redisClient = null;
+    });
+} catch {
+    console.warn('Location service: Redis unavailable, using database only');
+    redisClient = null;
+}
 
 /**
- * Update worker real-time location
+ * Update worker real-time location and cache in Redis
  * @param {number} userId - User ID of the worker
  * @param {Object} data - { latitude, longitude, isOnline }
  */
@@ -42,13 +59,43 @@ async function updateLocation(userId, data) {
         }
     });
 
+    // Cache location in Redis (if available)
+    if (redisClient) {
+        try {
+            await redisClient.set(
+                `worker_location:${profile.id}`,
+                JSON.stringify({
+                    latitude: location.latitude,
+                    longitude: location.longitude,
+                    isOnline: location.isOnline,
+                    lastUpdated: location.lastUpdated
+                }),
+                'EX', 300 // 5 min TTL
+            );
+        } catch { /* Redis down, ignore */ }
+    }
+
     return location;
 }
 
 /**
- * Get location of a specific worker
+ * Get location of a specific worker (prefer Redis cache)
  */
 async function getWorkerLocation(workerProfileId) {
+    // Try Redis cache first (if available)
+    if (redisClient) {
+        try {
+            const cached = await redisClient.get(`worker_location:${workerProfileId}`);
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                return {
+                    workerProfileId,
+                    ...parsed
+                };
+            }
+        } catch { /* Redis down, fall through to DB */ }
+    }
+    // Fallback to DB
     return prisma.workerLocation.findUnique({
         where: { workerProfileId },
         include: {
@@ -104,8 +151,24 @@ async function getNearbyWorkers(lat, lng, radiusKm = 10) {
     });
 }
 
+/**
+ * Calculate distance between two points (Haversine formula) in KM
+ */
+function calculateDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371; // Earth's radius in KM
+    const dLat = (lat2 - lat1) * (Math.PI / 180);
+    const dLon = (lon2 - lon1) * (Math.PI / 180);
+    const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+}
+
 module.exports = {
     updateLocation,
     getWorkerLocation,
-    getNearbyWorkers
+    getNearbyWorkers,
+    calculateDistance
 };

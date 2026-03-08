@@ -44,7 +44,7 @@ async function getOrCreateConversation(bookingId, userId, role) {
 /**
  * Send a message
  */
-async function sendMessage(conversationId, senderId, content) {
+async function sendMessage(conversationId, senderId, { content, type = 'TEXT', mediaUrl, fileName, fileSize }) {
     const conversation = await prisma.conversation.findUnique({
         where: { id: Number(conversationId) }
     });
@@ -54,12 +54,19 @@ async function sendMessage(conversationId, senderId, content) {
         throw new AppError(403, 'Unauthorized to send message in this conversation');
     }
 
+    const messageData = {
+        conversationId: Number(conversationId),
+        senderId,
+        type
+    };
+
+    if (content) messageData.content = content;
+    if (mediaUrl) messageData.mediaUrl = mediaUrl;
+    if (fileName) messageData.fileName = fileName;
+    if (fileSize) messageData.fileSize = fileSize;
+
     const message = await prisma.message.create({
-        data: {
-            conversationId: Number(conversationId),
-            senderId,
-            content
-        },
+        data: messageData,
         include: {
             sender: { select: { id: true, name: true, profilePhotoUrl: true } }
         }

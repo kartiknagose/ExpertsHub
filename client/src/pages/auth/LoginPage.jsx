@@ -11,6 +11,7 @@ import { MainLayout } from '../../components/layout/MainLayout';
 import { Input, Button } from '../../components/common';
 import { useAuth } from '../../hooks/useAuth';
 import { IMAGES } from '../../constants/images';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 // Validation schema for login form
 const loginSchema = z.object({
@@ -19,6 +20,7 @@ const loginSchema = z.object({
 });
 
 export function LoginPage() {
+    usePageTitle('Log In');
   const { login, error: authError, clearError } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();

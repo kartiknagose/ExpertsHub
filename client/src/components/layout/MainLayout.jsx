@@ -64,7 +64,7 @@ export function MainLayout({ children }) {
       {/* Main content area */}
       <main
         id="main-content"
-        className={`flex-1 transition-all duration-300 ease-in-out ${isAuthenticated ? (isSidebarCollapsed ? 'lg:ml-[72px]' : 'lg:ml-64') : ''}`}
+        className={`flex-1 transition-all duration-300 ease-in-out animate-fade-in ${isAuthenticated ? (isSidebarCollapsed ? 'lg:ml-[72px]' : 'lg:ml-64') : ''}`}
       >
         {children}
       </main>

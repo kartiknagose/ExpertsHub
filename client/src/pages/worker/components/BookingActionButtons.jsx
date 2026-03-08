@@ -1,5 +1,7 @@
-import { CheckCircle, PlayCircle, XCircle, ArrowLeft } from 'lucide-react';
+import { CheckCircle, PlayCircle, XCircle, ArrowLeft, Download } from 'lucide-react';
 import { Button } from '../../../components/common';
+import { downloadInvoice } from '../../../api/bookings';
+import { toast } from 'sonner';
 
 export function WorkerDesktopActions({ booking, statusMutation, openOtpModal, openCancelModal }) {
     if (booking.status === 'PENDING') {
@@ -58,6 +60,25 @@ export function WorkerDesktopActions({ booking, statusMutation, openOtpModal, op
                 className="bg-green-600 hover:bg-green-700 text-white shadow-lg px-6 h-12 rounded-xl font-bold"
             >
                 Complete Job
+            </Button>
+        );
+    }
+    if (booking.status === 'COMPLETED') {
+        return (
+            <Button
+                size="md"
+                variant="outline"
+                icon={Download}
+                onClick={() => {
+                    toast.promise(downloadInvoice(booking.id), {
+                        loading: 'Generating Invoice...',
+                        success: 'Invoice Downloaded Successfully',
+                        error: 'Failed to generate invoice'
+                    });
+                }}
+                className="h-12 px-6 rounded-xl font-bold"
+            >
+                Download Invoice
             </Button>
         );
     }
@@ -122,7 +143,36 @@ export function WorkerMobileActions({ booking, statusMutation, openOtpModal, ope
                         </Button>
                     </div>
                 )}
-                {['COMPLETED', 'CANCELLED', 'REJECTED'].includes(booking.status) && (
+                {booking.status === 'COMPLETED' && (
+                    <div className="flex flex-col w-full gap-3">
+                        <Button
+                            fullWidth
+                            size="lg"
+                            variant="outline"
+                            icon={Download}
+                            onClick={() => {
+                                toast.promise(downloadInvoice(booking.id), {
+                                    loading: 'Generating Invoice...',
+                                    success: 'Invoice Downloaded Successfully',
+                                    error: 'Failed to generate invoice'
+                                });
+                            }}
+                            className="border-gray-200 dark:border-dark-700 text-gray-900 dark:text-white rounded-2xl font-black h-14"
+                        >
+                            Download Invoice
+                        </Button>
+                        <Button
+                            fullWidth
+                            variant="ghost"
+                            onClick={onBack}
+                            className="text-gray-500 font-black h-12"
+                            icon={ArrowLeft}
+                        >
+                            Back to Dashboard
+                        </Button>
+                    </div>
+                )}
+                {['CANCELLED', 'REJECTED'].includes(booking.status) && (
                     <Button
                         fullWidth
                         variant="ghost"

@@ -1,0 +1,8 @@
+-- AlterTable
+ALTER TABLE "Booking" ADD COLUMN     "basePrice" DECIMAL(65,30),
+ADD COLUMN     "distanceSurcharge" DECIMAL(65,30) DEFAULT 0.0,
+ADD COLUMN     "gstAmount" DECIMAL(65,30) DEFAULT 0.0,
+ADD COLUMN     "surgeMultiplier" DOUBLE PRECISION DEFAULT 1.0,
+ADD COLUMN     "timeMultiplier" DOUBLE PRECISION DEFAULT 1.0,
+ADD COLUMN     "urgencyMultiplier" DOUBLE PRECISION DEFAULT 1.0,
+ADD COLUMN     "workerTierMultiplier" DOUBLE PRECISION DEFAULT 1.0;

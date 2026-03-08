@@ -22,8 +22,11 @@ export { ErrorBoundary } from './ErrorBoundary';
 export { StatCard } from './StatCard';
 export { SimpleBarChart, SimpleDonutChart } from './SimpleChart';
 export { AsyncState } from './AsyncState';
+export { Pagination, usePagination } from './Pagination';
+export { Breadcrumbs } from './Breadcrumbs';
 export { ImageUpload } from './ImageUpload';
 export { Avatar } from './Avatar';
 export { QuickReview } from './QuickReview';
 export { BookingCard } from './BookingCard';
+export { OptimizedImage, buildCloudinaryUrl, buildSrcSet } from './OptimizedImage';
 

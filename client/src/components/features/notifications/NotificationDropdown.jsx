@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, Check, Trash2, Clock, Circle } from 'lucide-react';
+import { Bell, Check, Trash2, Clock, Circle, Settings } from 'lucide-react';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../../hooks/useAuth';
@@ -151,7 +151,16 @@ export function NotificationDropdown() {
                             )}
                         </div>
 
-                        {/* Footer (Removed dead history link) */}
+                        {/* Footer */}
+                        <div className="px-5 py-3 border-t border-gray-100 dark:border-dark-700 bg-gray-50 dark:bg-dark-800/10">
+                            <button
+                                onClick={() => { setIsOpen(false); navigate('/notifications/preferences'); }}
+                                className="flex items-center gap-2 text-xs font-medium text-gray-500 hover:text-brand-500 dark:text-gray-400 dark:hover:text-brand-400 transition-colors w-full"
+                            >
+                                <Settings size={14} />
+                                Notification Preferences
+                            </button>
+                        </div>
                     </Motion.div>
                 )}
             </AnimatePresence>

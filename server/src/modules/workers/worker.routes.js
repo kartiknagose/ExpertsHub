@@ -2,13 +2,18 @@ const { Router } = require('express');
 const auth = require('../../middleware/auth');
 const { requireWorker } = require('../../middleware/requireRole');
 const validate = require('../../middleware/validation');
-const { saveProfile, me, addService, getServices, getWorkerServices, getProfile, removeService } = require('./worker.controller');
+const { saveProfile, me, addService, getServices, getWorkerServices, removeService } = require('./worker.controller');
 const { addServiceSchema } = require('./workerService.schemas');
 
+const { workerProfileCache } = require('../cache/cache.middleware');
 const router = Router();
 
 // Create/update worker profile (requires login)
-router.post('/profile', auth, saveProfile);
+router.post('/profile', auth, async (req, res, next) => {
+	const { invalidateWorkerProfile } = require('../cache/cache.service');
+	await invalidateWorkerProfile(req.user.id);
+	return saveProfile(req, res, next);
+});
 
 // Get my worker profile (requires login)
 router.get('/me', auth, me);
@@ -23,7 +28,7 @@ router.get('/me/services', auth, requireWorker, getServices);
 router.get('/:workerId/services', getWorkerServices);
 
 // Get worker profile details (public)
-router.get('/:workerId', getProfile);
+router.get('/:workerId', workerProfileCache);
 
 // Remove a service from worker's offered services (worker only)
 router.delete('/services/:serviceId', auth, requireWorker, removeService);

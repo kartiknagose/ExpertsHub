@@ -11,6 +11,7 @@ import { MainLayout } from '../../components/layout/MainLayout';
 import { Input, Button, Badge } from '../../components/common';
 import { useAuth } from '../../hooks/useAuth';
 import { IMAGES } from '../../constants/images';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 // Validation schema for registration form
 const registerSchema = z.object({
@@ -25,6 +26,7 @@ const registerSchema = z.object({
 });
 
 export function RegisterPage() {
+    usePageTitle('Sign Up');
   const { register: registerUser, registerAsWorker, error: authError, clearError } = useAuth();
   const navigate = useNavigate();
   const routerLocation = useLocation();

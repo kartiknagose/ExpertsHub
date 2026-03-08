@@ -10,8 +10,7 @@ const getOrCreateConversation = asyncHandler(async (req, res) => {
 
 const sendMessage = asyncHandler(async (req, res) => {
     const { conversationId } = req.params;
-    const { content } = req.body;
-    const message = await chatService.sendMessage(conversationId, req.user.id, content);
+    const message = await chatService.sendMessage(conversationId, req.user.id, req.body);
     res.status(201).json({ message });
 });
 

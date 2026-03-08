@@ -13,6 +13,7 @@ import { queryKeys } from '../../utils/queryKeys';
 import { StarRating } from '../../components/features/reviews/StarRating';
 import { getRatingLabel } from '../../utils/rating';
 import { getPageLayout } from '../../constants/layout';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 
 const ratingVariant = (rating) => {
@@ -23,6 +24,7 @@ const ratingVariant = (rating) => {
 };
 
 export function WorkerReviewsPage() {
+    usePageTitle('Reviews');
   const queryClient = useQueryClient();
   const [drafts, setDrafts] = useState({});
   const [submitted, setSubmitted] = useState({});

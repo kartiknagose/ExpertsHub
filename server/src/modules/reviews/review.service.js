@@ -73,6 +73,29 @@ async function createReview(userId, userRole, data) {
     throw new AppError(409, 'You have already reviewed this booking.');
   }
 
+  // 3b. FRAUD DETECTION: Review Spam
+  if (comment) {
+    const spamKeywords = ['cheap', 'offer', 'hot', 'discount', 'free', 'win', 'cash', 'money', 'link', 'click', 'sex', 'porn'];
+    const lowerComment = comment.toLowerCase();
+
+    // Check for spam keywords
+    const hasSpamKeyword = spamKeywords.some(keyword => lowerComment.includes(keyword));
+
+    // Check for URL-like patterns
+    const hasUrl = /https?:\/\/[^\s]+/.test(lowerComment) || /www\.[^\s]+/.test(lowerComment);
+
+    // Check for repetitive characters (e.g., "aaaaa")
+    const hasRepetition = /(.)\1{4,}/.test(lowerComment);
+
+    if (hasSpamKeyword || hasUrl || hasRepetition) {
+      throw new AppError(400, 'Review comment contains suspicious or prohibited patterns. Please provide a helpful, natural review.');
+    }
+
+    if (comment.trim().length < 5) {
+      throw new AppError(400, 'Review comment is too short. Please provide a more detailed feedback (min 5 characters).');
+    }
+  }
+
   // 4-7. Create review + recalculate rating in a transaction for atomicity
   const review = await prisma.$transaction(async (tx) => {
     // 4. Create the review

@@ -33,10 +33,13 @@ const CookiesPage = lazy(() => import('../pages/legal/CookiesPage').then(m => ({
 // Customer
 const CustomerProfilePage = lazy(() => import('../pages/profile/CustomerProfilePage').then(m => ({ default: m.CustomerProfilePage })));
 const CustomerDashboardPage = lazy(() => import('../pages/customer/CustomerDashboardPage').then(m => ({ default: m.CustomerDashboardPage })));
+const CustomerWalletPage = lazy(() => import('../pages/customer/CustomerWalletPage').then(m => ({ default: m.CustomerWalletPage })));
+const CustomerReferralsPage = lazy(() => import('../pages/customer/CustomerReferralsPage').then(m => ({ default: m.CustomerReferralsPage })));
 const CustomerBookingsPage = lazy(() => import('../pages/customer/CustomerBookingsPage').then(m => ({ default: m.CustomerBookingsPage })));
 const CustomerBookingDetailPage = lazy(() => import('../pages/customer/CustomerBookingDetailPage').then(m => ({ default: m.CustomerBookingDetailPage })));
 const CustomerReviewsPage = lazy(() => import('../pages/customer/CustomerReviewsPage').then(m => ({ default: m.CustomerReviewsPage })));
 const MessagesPage = lazy(() => import('../pages/profile/MessagesPage').then(m => ({ default: m.MessagesPage })));
+const NotificationPreferencesPage = lazy(() => import('../pages/profile/NotificationPreferencesPage').then(m => ({ default: m.NotificationPreferencesPage })));
 
 // Worker
 const WorkerProfilePage = lazy(() => import('../pages/profile/WorkerProfilePage').then(m => ({ default: m.WorkerProfilePage })));
@@ -60,6 +63,9 @@ const AdminBookingsPage = lazy(() => import('../pages/admin/AdminBookingsPage').
 const AdminUsersPage = lazy(() => import('../pages/admin/AdminUsersPage').then(m => ({ default: m.AdminUsersPage })));
 const AdminVerificationPage = lazy(() => import('../pages/admin/AdminVerificationPage').then(m => ({ default: m.AdminVerificationPage })));
 const AdminSOSAlertsPage = lazy(() => import('../pages/admin/AdminSOSAlertsPage').then(m => ({ default: m.AdminSOSAlertsPage })));
+const AdminAnalyticsPage = lazy(() => import('../pages/admin/AdminAnalyticsPage').then(m => ({ default: m.AdminAnalyticsPage })));
+const AdminFraudPage = lazy(() => import('../pages/admin/AdminFraudPage').then(m => ({ default: m.AdminFraudPage })));
+const AdminCouponsPage = lazy(() => import('../pages/admin/AdminCouponsPage').then(m => ({ default: m.AdminCouponsPage })));
 
 /**
  * AppRoutes Component
@@ -98,13 +104,16 @@ export function AppRoutes() {
         <Route path="/careers" element={<CareersPage />} />
 
         {/* Customer Routes */}
-        <Route path="/profile" element={<CustomerRoute><CustomerProfilePage /></CustomerRoute>} />
-        <Route path="/bookings" element={<CustomerRoute><CustomerBookingsPage /></CustomerRoute>} />
-        <Route path="/bookings/:id" element={<CustomerRoute><CustomerBookingDetailPage /></CustomerRoute>} />
-        <Route path="/reviews" element={<CustomerRoute><CustomerReviewsPage /></CustomerRoute>} />
-        <Route path="/dashboard" element={<CustomerRoute><CustomerDashboardPage /></CustomerRoute>} />
-        <Route path="/safety/contacts" element={<CustomerRoute><EmergencyContactsPage /></CustomerRoute>} />
+        <Route path="/customer/profile" element={<CustomerRoute><CustomerProfilePage /></CustomerRoute>} />
+        <Route path="/customer/dashboard" element={<CustomerRoute><CustomerDashboardPage /></CustomerRoute>} />
+        <Route path="/customer/wallet" element={<CustomerRoute><CustomerWalletPage /></CustomerRoute>} />
+        <Route path="/customer/referrals" element={<CustomerRoute><CustomerReferralsPage /></CustomerRoute>} />
+        <Route path="/customer/bookings" element={<CustomerRoute><CustomerBookingsPage /></CustomerRoute>} />
+        <Route path="/customer/bookings/:id" element={<CustomerRoute><CustomerBookingDetailPage /></CustomerRoute>} />
+        <Route path="/customer/reviews" element={<CustomerRoute><CustomerReviewsPage /></CustomerRoute>} />
+        <Route path="/customer/safety/contacts" element={<CustomerRoute><EmergencyContactsPage /></CustomerRoute>} />
         <Route path="/messages" element={<ProtectedRoute><MessagesPage /></ProtectedRoute>} />
+        <Route path="/notifications/preferences" element={<ProtectedRoute><NotificationPreferencesPage /></ProtectedRoute>} />
 
         {/* Worker Routes */}
         <Route path="/worker/profile" element={<WorkerRoute><WorkerProfilePage /></WorkerRoute>} />
@@ -126,6 +135,9 @@ export function AppRoutes() {
         <Route path="/admin/workers" element={<AdminRoute><AdminWorkersPage /></AdminRoute>} />
         <Route path="/admin/verification" element={<AdminRoute><AdminVerificationPage /></AdminRoute>} />
         <Route path="/admin/sos-alerts" element={<AdminRoute><AdminSOSAlertsPage /></AdminRoute>} />
+        <Route path="/admin/analytics" element={<AdminRoute><AdminAnalyticsPage /></AdminRoute>} />
+        <Route path="/admin/fraud" element={<AdminRoute><AdminFraudPage /></AdminRoute>} />
+        <Route path="/admin/coupons" element={<AdminRoute><AdminCouponsPage /></AdminRoute>} />
 
         {/* 404 - Wildcard */}
         <Route path="*" element={<NotFoundPage />} />

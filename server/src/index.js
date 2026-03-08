@@ -13,13 +13,18 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const cookieParser = require('cookie-parser');
 const cors = require('cors');
+const compression = require('compression');
 
 // ── Config ──
 const { PORT, CORS_ORIGIN } = require('./config/env');
 const { corsOptions } = require('./config/cors');
 const i18n = require('./config/i18n');
+const logger = require('./config/logger');
+const { register, metricsMiddleware } = require('./config/monitoring');
+const { globalLimiter } = require('./config/rateLimit');
 
 // ── Middleware ──
+const requestIdMiddleware = require('./middleware/requestId');
 const notFoundHandler = require('./middleware/notFoundHandler');
 const errorHandler = require('./middleware/errorHandler');
 
@@ -39,6 +44,11 @@ const serviceRoutes = require('./modules/services/service.routes');
 const uploadRoutes = require('./modules/uploads/upload.routes');
 const verificationRoutes = require('./modules/verification/verification.routes');
 const workerRoutes = require('./modules/workers/worker.routes');
+const growthRoutes = require('./modules/business_growth/growth.routes'); // Referrals, Wallet, Coupons
+const payoutRoutes = require('./modules/payouts/payout.routes');
+const invoiceRoutes = require('./modules/invoices/invoice.routes');
+const analyticsRoutes = require('./modules/analytics/analytics.routes');
+const systemRoutes = require('./modules/system/system.routes'); // Observability (Sprint 15)
 
 // Create Express application instance
 const app = express();
@@ -57,10 +67,39 @@ app.use(
   })
 );
 app.use(cors(corsOptions));
-app.use(morgan('dev'));
+app.use(compression());
+app.use(globalLimiter);
+app.use(morgan('dev', { stream: { write: (msg) => logger.info(msg.trim()) } }));
 app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
+app.use(requestIdMiddleware);
+app.use(metricsMiddleware); // PROMETHEUS METRICS (Sprint 15)
 app.use(i18n);
+
+// Performance / Monitoring Middleware (Standard for Sprint 15)
+app.use((req, res, next) => {
+  const start = process.hrtime();
+  res.on('finish', () => {
+    const [sec, nanosec] = process.hrtime(start);
+    const durationMs = (sec * 1000 + nanosec / 1e6).toFixed(2);
+    const logData = {
+      id: req.id,
+      method: req.method,
+      url: req.originalUrl,
+      status: res.statusCode,
+      duration: `${durationMs}ms`,
+      ip: req.ip,
+      userAgent: req.get('user-agent')
+    };
+
+    if (res.statusCode >= 400) {
+      logger.error(`HTTP request failed: ${req.method} ${req.originalUrl}`, logData);
+    } else {
+      logger.info(`HTTP request completed: ${req.method} ${req.originalUrl}`, logData);
+    }
+  });
+  next();
+});
 
 const authenticate = require('./middleware/auth');
 
@@ -77,15 +116,37 @@ app.use('/uploads/verification-docs', authenticate, express.static(path.resolve(
 // Booking photos — authenticated (private booking evidence)
 app.use('/uploads/booking-photos', authenticate, express.static(path.resolve(__dirname, 'uploads/booking-photos')));
 
+// Chat attachments — authenticated (private chat media)
+app.use('/uploads/chat-attachments', authenticate, express.static(path.resolve(__dirname, 'uploads/chat-attachments')));
+
 // Health check
 // Simple healthcheck used by monitoring or manual smoke tests.
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', locale: req.locale });
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    id: req.id,
+    uptime: process.uptime(),
+    memory: process.memoryUsage(),
+    node: process.version
+  });
+});
+
+// METRICS ENDPOINT (Sprint 15 - For Grafana / Prometheus)
+app.get('/metrics', async (req, res) => {
+  try {
+    res.set('Content-Type', register.contentType);
+    res.end(await register.metrics());
+  } catch (err) {
+    res.status(500).end(err);
+  }
 });
 
 // API routes
 // Mount modularized route handlers under `/api/*`.
 // Each route module keeps its own validation and controller logic.
+const registerCacheRoutes = require('./modules/cache');
+registerCacheRoutes(app);
 app.use('/api/auth', authRoutes);
 app.use('/api/workers', workerRoutes);
 app.use('/api/services', serviceRoutes);
@@ -101,6 +162,11 @@ app.use('/api/safety', safetyRoutes);
 app.use('/api/location', locationRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/growth', growthRoutes);
+app.use('/api/payouts', payoutRoutes);
+app.use('/api/invoices', invoiceRoutes);
+app.use('/api/analytics', analyticsRoutes);
+app.use('/api/system', systemRoutes);
 
 // 404 and error handlers
 app.use(notFoundHandler);
@@ -119,32 +185,48 @@ if (require.main === module) {
   try {
     const { init } = require('./socket');
     init(server);
-    console.log('Socket.IO initialized');
+    logger.info('Socket.IO initialized');
   } catch (_err) {
-    console.warn('Socket.IO not initialized:', _err.message);
+    logger.warn('Socket.IO not initialized: %s', _err.message);
   }
 
+  // Initialize Background Jobs
+  try {
+    const { initCronJobs } = require('./cron');
+    initCronJobs();
+  } catch (err) {
+    logger.warn('Cron jobs not initialized: %s', err.message);
+  }
+
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      logger.error('Port %d is already in use. Kill the other process or use a different port.', PORT);
+      process.exit(1);
+    }
+    throw err;
+  });
+
   server.listen(PORT, () => {
-    console.log(`Server listening on http://localhost:${PORT}`);
-    console.log(`CORS origin: ${CORS_ORIGIN}`);
+    logger.info('Server listening on http://localhost:%d', PORT);
+    logger.info('CORS origin: %s', CORS_ORIGIN);
   });
 
   // Graceful shutdown — close HTTP server, disconnect Prisma, close Socket.IO
   const prisma = require('./config/prisma');
   const shutdown = async (signal) => {
-    console.log(`\n${signal} received. Shutting down gracefully...`);
+    logger.info('%s received. Shutting down gracefully...', signal);
     server.close(async () => {
       try {
         await prisma.$disconnect();
-        console.log('Prisma disconnected');
+        logger.info('Prisma disconnected');
       } catch (err) {
-        console.error('Error disconnecting Prisma:', err.message);
+        logger.error('Error disconnecting Prisma: %s', err.message);
       }
       process.exit(0);
     });
     // Force exit after 10s if graceful shutdown hangs
     setTimeout(() => {
-      console.error('Forced shutdown after timeout');
+      logger.error('Forced shutdown after timeout');
       process.exit(1);
     }, 10_000);
   };

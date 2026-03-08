@@ -8,8 +8,10 @@ import { getAdminWorkers } from '../../api/admin';
 import { getPageLayout } from '../../constants/layout';
 import { queryKeys } from '../../utils/queryKeys';
 import { useSocketEvent } from '../../hooks/useSocket';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 export function AdminWorkersPage() {
+    usePageTitle('Manage Workers');
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
 

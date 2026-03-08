@@ -18,12 +18,14 @@ import { getEmergencyContacts, addEmergencyContact, deleteEmergencyContact } fro
 import { getPageLayout } from '../../constants/layout';
 import { toast } from 'sonner';
 import { queryKeys } from '../../utils/queryKeys';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 const RELATIONS = ['Spouse', 'Parent', 'Sibling', 'Friend', 'Colleague', 'Child', 'Other'];
 
 const MAX_CONTACTS = 5;
 
 export function EmergencyContactsPage() {
+    usePageTitle('Emergency Contacts');
     const navigate = useNavigate();
     const queryClient = useQueryClient();
 
@@ -81,7 +83,7 @@ export function EmergencyContactsPage() {
                 <PageHeader
                     title="Emergency Contacts"
                     subtitle="People who will be instantly notified via SMS when you trigger an SOS alert."
-                    action={
+                    actions={
                         <Button variant="ghost" icon={ArrowLeft} onClick={() => navigate(-1)}>
                             Back
                         </Button>

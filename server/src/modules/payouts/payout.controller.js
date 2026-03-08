@@ -1,0 +1,27 @@
+const asyncHandler = require('../../common/utils/asyncHandler');
+const payoutService = require('./payout.service');
+
+exports.getBankDetails = asyncHandler(async (req, res) => {
+    const details = await payoutService.getWorkerBankDetails(req.user.id);
+    res.json(details);
+});
+
+exports.updateBankDetails = asyncHandler(async (req, res) => {
+    const { bankAccountNumber, bankIfsc } = req.body;
+    const details = await payoutService.updateWorkerBankDetails(req.user.id, bankAccountNumber, bankIfsc);
+    res.json({ message: 'Bank details updated successfully', data: details });
+});
+
+exports.requestInstantPayout = asyncHandler(async (req, res) => {
+    const payout = await payoutService.processInstantPayout(req.user.id);
+    res.json({ message: 'Instant payout initiated successfully', data: payout });
+});
+
+exports.getPayoutHistory = asyncHandler(async (req, res) => {
+    const { skip, limit } = req.query;
+    const history = await payoutService.getWorkerPayoutHistory(req.user.id, {
+        skip: parseInt(skip) || 0,
+        limit: parseInt(limit) || 20
+    });
+    res.json(history);
+});

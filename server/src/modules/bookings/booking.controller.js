@@ -23,6 +23,7 @@ const AppError = require('../../common/errors/AppError');
 const bookingService = require('./booking.service');
 const prisma = require('../../config/prisma');
 const notificationService = require('../notifications/notification.service');
+const { sendBookingStatusEmail } = require('../../common/utils/mailer');
 
 // Socket.IO accessor (optional) - will throw if not initialized, so guard usage
 let getIo;
@@ -87,6 +88,9 @@ async function emitBookingStatusUpdated(booking) {
       });
       io.to(`user:${workerUserId}`).emit('booking:status_updated', booking);
     }
+
+    // Fire-and-forget booking status email
+    sendBookingStatusEmail(booking);
 
   } catch (err) {
     console.warn('Notification/Socket emit failed:', err.message);
@@ -163,9 +167,33 @@ const createBooking = asyncHandler(async (req, res) => {
         io.emit('booking:created', newBooking);
       }
     }
+
+    // Fire-and-forget booking created email
+    sendBookingStatusEmail(newBooking);
   } catch (err) {
     console.warn('Notification failed (booking:created):', err.message);
   }
+});
+
+/**
+ * PREVIEW DYNAMIC PRICE BEFORE BOOKING
+ */
+const previewPrice = asyncHandler(async (req, res) => {
+  const { calculateDynamicPrice } = require('../pricing/pricing.service');
+  const { serviceId, workerProfileId, scheduledDate, latitude, longitude, estimatedPrice } = req.body;
+
+  const scheduledDateObj = new Date(scheduledDate || Date.now() + 60 * 60 * 1000); // fallback +1 hr
+
+  const pricing = await calculateDynamicPrice({
+    serviceId: parseInt(serviceId),
+    workerProfileId: workerProfileId ? parseInt(workerProfileId) : null,
+    scheduledAt: scheduledDateObj,
+    latitude: latitude ? Number(latitude) : null,
+    longitude: longitude ? Number(longitude) : null,
+    basePriceOverride: estimatedPrice ? Number(estimatedPrice) : 0
+  });
+
+  res.status(200).json(pricing);
 });
 
 /**
@@ -358,23 +386,30 @@ const cancelBooking = asyncHandler(async (req, res) => {
  */
 const payBooking = asyncHandler(async (req, res) => {
   const bookingId = parseId(req.params.id, 'Booking ID');
-  const { paymentReference } = req.body;
+  const { paymentReference, createRazorpayOrder } = req.body;
   const userId = req.user.id;
   const userRole = req.user.role;
 
-  const paidBooking = await bookingService.payBooking(
+  const result = await bookingService.payBooking(
     bookingId,
     userId,
     userRole,
-    paymentReference
+    { paymentReference, createRazorpayOrder }
   );
+
+  if (createRazorpayOrder) {
+    return res.status(200).json({
+      message: 'Razorpay order created successfully.',
+      order: result.order,
+    });
+  }
 
   res.status(200).json({
     message: 'Payment recorded successfully.',
-    booking: paidBooking,
+    booking: result,
   });
 
-  emitBookingStatusUpdated(paidBooking);
+  emitBookingStatusUpdated(result);
 });
 
 /**
@@ -473,13 +508,16 @@ const acceptBooking = asyncHandler(async (req, res) => {
 const verifyBookingStart = asyncHandler(async (req, res) => {
   const bookingId = parseId(req.params.id, 'Booking ID');
   const userId = req.user.id;
-  const { otp } = req.body;
+  const { otp, latitude, longitude } = req.body;
 
   if (!otp) {
     throw new AppError(400, 'OTP is required.');
   }
 
-  const updatedBooking = await bookingService.verifyBookingStart(bookingId, otp, userId);
+  // Pass coordinates if provided for geo-fencing (Sprint 14)
+  const workerCoords = (latitude && longitude) ? { latitude: Number(latitude), longitude: Number(longitude) } : null;
+
+  const updatedBooking = await bookingService.verifyBookingStart(bookingId, otp, userId, workerCoords);
 
   res.status(200).json({
     message: 'OTP verified! Job started successfully.',
@@ -665,6 +703,7 @@ module.exports = {
   createSession,
   startSession,
   endSession,
+  previewPrice,
   rescheduleBooking,
   getBookingStatusHistory,
   getCancellationPolicy,

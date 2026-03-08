@@ -21,9 +21,9 @@ export function WorkerSessionPanel({ bookingId, bookingStatus }) {
     const [nextDate, setNextDate] = useState('');
     const [notes, setNotes] = useState('');
     const [otpInput, setOtpInput] = useState('');
-    const [activeSessionId, setActiveSessionId] = useState(null);
 
-    const { data, isLoading } = useQuery({
+
+    const { data } = useQuery({
         queryKey: queryKeys.bookings.sessions(bookingId),
         queryFn: () => getBookingSessions(bookingId),
         enabled: !!bookingId,
@@ -55,7 +55,6 @@ export function WorkerSessionPanel({ bookingId, bookingStatus }) {
         onSuccess: () => {
             toast.success('Session started!');
             setOtpInput('');
-            setActiveSessionId(null);
             invalidateAll();
         },
         onError: (err) => toast.error(err.response?.data?.error || 'Failed to start session'),

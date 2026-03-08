@@ -3,18 +3,24 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CalendarClock, CheckCircle, XCircle, PlayCircle } from 'lucide-react';
 import { MainLayout } from '../../components/layout/MainLayout';
 import { Card, CardHeader, CardTitle, CardDescription } from '../../components/common';
-import { Badge, Button, PageHeader, AsyncState } from '../../components/common';
+import { Badge, Button, PageHeader, AsyncState, Pagination, ConfirmDialog } from '../../components/common';
 import { BookingStatusBadge } from '../../components/common';
 import { cancelBooking, getAllBookings, updateBookingStatus } from '../../api/bookings';
 import { queryKeys } from '../../utils/queryKeys';
 import { getPageLayout } from '../../constants/layout';
 import { useSocketEvent } from '../../hooks/useSocket';
+import { toast } from 'sonner';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 
 const statusFilters = ['ALL', 'PENDING', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
 
 export function AdminBookingsPage() {
+  usePageTitle('Manage Bookings');
   const [filter, setFilter] = useState('ALL');
+  const [page, setPage] = useState(1);
+  const [cancelTarget, setCancelTarget] = useState(null);
+  const [photoModal, setPhotoModal] = useState(null);
   const queryClient = useQueryClient();
 
   const bookingsQuery = useQuery({
@@ -24,12 +30,20 @@ export function AdminBookingsPage() {
 
   const updateMutation = useMutation({
     mutationFn: ({ bookingId, status }) => updateBookingStatus(bookingId, { status }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.bookings.admin() }),
+    onSuccess: (_, { status }) => {
+      toast.success(`Booking status updated to ${status}`);
+      queryClient.invalidateQueries({ queryKey: queryKeys.bookings.admin() });
+    },
+    onError: (err) => toast.error(err.response?.data?.message || 'Failed to update booking'),
   });
 
   const cancelMutation = useMutation({
     mutationFn: (bookingId) => cancelBooking(bookingId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.bookings.admin() }),
+    onSuccess: () => {
+      toast.success('Booking cancelled');
+      queryClient.invalidateQueries({ queryKey: queryKeys.bookings.admin() });
+    },
+    onError: (err) => toast.error(err.response?.data?.message || 'Failed to cancel booking'),
   });
 
   const bookings = useMemo(() => bookingsQuery.data?.bookings || [], [bookingsQuery.data?.bookings]);
@@ -47,6 +61,11 @@ export function AdminBookingsPage() {
     if (filter === 'ALL') return bookings;
     return bookings.filter((booking) => booking.status === filter);
   }, [bookings, filter]);
+
+  const PAGE_SIZE = 10;
+  const totalPages = Math.max(1, Math.ceil(filteredBookings.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const paginatedBookings = filteredBookings.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   const getActions = (booking) => {
     const actions = [];
@@ -80,7 +99,7 @@ export function AdminBookingsPage() {
         label: 'Cancel',
         icon: XCircle,
         variant: 'outline',
-        action: () => cancelMutation.mutate(booking.id),
+        action: () => setCancelTarget(booking.id),
       });
     }
 
@@ -119,7 +138,7 @@ export function AdminBookingsPage() {
           emptyMessage="Try a different status filter to see more results."
         >
           <div className="grid grid-cols-1 gap-5">
-            {filteredBookings.map((booking) => (
+            {paginatedBookings.map((booking) => (
               <Card key={booking.id}>
                 <CardHeader>
                   <div className="flex items-center justify-between">
@@ -144,6 +163,25 @@ export function AdminBookingsPage() {
                   <div className="text-gray-600 dark:text-gray-400">
                     Customer: {booking.customer?.name || 'Customer'} · Worker: {booking.workerProfile?.user?.name || 'Unassigned'}
                   </div>
+
+                  {booking.photos && booking.photos.length > 0 && (
+                    <div className="mt-4 p-4 border rounded-xl bg-gray-50 dark:bg-dark-800/50">
+                      <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                        <PlayCircle size={14} className="text-brand-500" />
+                        Visual Proof of Work
+                      </h4>
+                      <div className="flex gap-3 overflow-x-auto pb-2">
+                        {booking.photos.map(photo => (
+                          <button key={photo.id} className="relative w-20 h-20 rounded-lg shrink-0 overflow-hidden border focus:outline-none focus:ring-2 focus:ring-brand-500" onClick={() => setPhotoModal(photo)}>
+                            <img src={photo.url.replace('/upload/', '/upload/f_auto,q_auto,w_200/')} alt={photo.type} className="w-full h-full object-cover" />
+                            <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[9px] font-bold text-center py-0.5">
+                              {photo.type}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="mt-5 flex flex-wrap gap-2">
@@ -163,7 +201,42 @@ export function AdminBookingsPage() {
               </Card>
             ))}
           </div>
+          <Pagination page={safePage} totalPages={totalPages} onPageChange={setPage} totalItems={filteredBookings.length} pageSize={PAGE_SIZE} />
         </AsyncState>
+
+        <ConfirmDialog
+          isOpen={cancelTarget !== null}
+          onCancel={() => setCancelTarget(null)}
+          onConfirm={() => {
+            cancelMutation.mutate(cancelTarget);
+            setCancelTarget(null);
+          }}
+          title="Cancel Booking"
+          message={`Are you sure you want to cancel booking #${cancelTarget}? This action cannot be undone.`}
+          confirmText="Yes, Cancel"
+          cancelText="Keep Booking"
+          variant="danger"
+          loading={cancelMutation.isPending}
+        />
+
+        {photoModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={() => setPhotoModal(null)}>
+            <div className="bg-white dark:bg-dark-900 rounded-2xl shadow-2xl max-w-2xl w-full mx-4 overflow-hidden relative" onClick={e => e.stopPropagation()}>
+              <div className="px-6 py-4 border-b dark:border-dark-700 flex items-center justify-between">
+                <h3 className="text-lg font-bold flex items-center gap-2 text-gray-900 dark:text-white">
+                  <span className="w-2 h-2 rounded-full bg-brand-500"></span>
+                  {photoModal.type === 'BEFORE' ? 'Before Work' : 'After Completion'} Proof
+                </h3>
+                <button className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-full hover:bg-gray-100 dark:hover:bg-dark-800 transition-colors" onClick={() => setPhotoModal(null)}>
+                  <XCircle size={24} />
+                </button>
+              </div>
+              <div className="bg-gray-100 dark:bg-dark-950/50 flex items-center justify-center p-6" style={{ minHeight: '50vh' }}>
+                <img src={photoModal.url.replace('/upload/', '/upload/f_auto,q_auto/')} alt={photoModal.type} className="max-w-full max-h-[60vh] object-contain rounded-lg shadow-sm" />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </MainLayout>
   );

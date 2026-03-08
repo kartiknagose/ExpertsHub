@@ -6,8 +6,12 @@ import { useNavigate } from 'react-router-dom';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Briefcase, MapPin, IndianRupee, Image, Save, UserCircle, Star, ShieldCheck, CheckCircle, PencilLine, X, Plus } from 'lucide-react';
+import { Briefcase, MapPin, IndianRupee, Image, Save, UserCircle, Star, ShieldCheck, CheckCircle, PencilLine, X, Plus, Map } from 'lucide-react';
 import { MainLayout } from '../../components/layout/MainLayout';
+
+// ServiceAreaPolygonEditor is available in components/features/location/ 
+// but requires react-leaflet-draw which has compatibility issues with Vite 7 build.
+// The polygon editor can be enabled when react-leaflet-draw is updated.
 import { Card, CardHeader, CardTitle, CardDescription } from '../../components/common';
 import { Input, Button, Badge } from '../../components/common';
 import { toast } from 'sonner';
@@ -18,6 +22,7 @@ import { resolveProfilePhotoUrl } from '../../utils/profilePhoto';
 import { getPageLayout } from '../../constants/layout';
 import { LocationPicker } from '../../components/features/location/LocationPicker';
 import { MiniMap } from '../../components/features/location/MiniMap';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 const workerProfileSchema = z.object({
   bio: z.string().min(10, 'Bio must be at least 10 characters'),
@@ -30,11 +35,13 @@ const workerProfileSchema = z.object({
 });
 
 export function WorkerProfilePage() {
+  usePageTitle('Profile');
   const navigate = useNavigate();
   const { user: authUser, setUser } = useAuth();
   const [profileData, setProfileData] = useState(null);
   const [skillsList, setSkillsList] = useState([]);
   const [serviceAreasList, setServiceAreasList] = useState([]);
+  const [showPolygonEditor, setShowPolygonEditor] = useState(false);
   const [serverError, setServerError] = useState('');
   const [photoFile, setPhotoFile] = useState(null);
   const [photoPreview, setPhotoPreview] = useState('');
@@ -508,6 +515,7 @@ export function WorkerProfilePage() {
                         <input
                           type="file"
                           accept="image/*"
+                          capture="environment"
                           onChange={handlePhotoChange}
                           className="hidden"
                         />
@@ -671,6 +679,35 @@ export function WorkerProfilePage() {
                         <p className="text-[10px] mt-2 text-gray-400 dark:text-gray-500">
                           Jobs within this distance from your hub will be visible to you.
                         </p>
+                      </div>
+
+                      {/* Service Area Polygon Editor */}
+                      <div className="border-t border-dashed border-gray-100 dark:border-dark-700 pt-5">
+                        <div className="flex items-center justify-between mb-2">
+                          <label className="text-sm font-medium text-gray-700 dark:text-gray-200 flex items-center gap-2">
+                            <Map size={16} className="text-brand-500" />
+                            Service Area Zone (Optional)
+                          </label>
+                          <button
+                            type="button"
+                            className="text-xs text-brand-600 hover:underline"
+                            onClick={() => setShowPolygonEditor(!showPolygonEditor)}
+                          >
+                            {showPolygonEditor ? 'Hide Map' : 'Draw on Map'}
+                          </button>
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                          Draw a polygon on the map to define your exact coverage zone. Bookings outside this area will be declined automatically.
+                        </p>
+                        {showPolygonEditor && (
+                          <div className="rounded-xl overflow-hidden border border-gray-200 dark:border-dark-700 p-6 text-center bg-gray-50 dark:bg-dark-800">
+                            <Map size={32} className="mx-auto text-gray-400 mb-3" />
+                            <p className="text-sm font-semibold text-gray-600 dark:text-gray-300">Service Area Polygon Editor</p>
+                            <p className="text-xs text-gray-400 mt-1">
+                              Draw your coverage zone on an interactive map. This feature will be available once the map drawing library is updated.
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>

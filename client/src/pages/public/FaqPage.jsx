@@ -3,6 +3,7 @@
 import { MainLayout } from '../../components/layout/MainLayout';
 import { Card, PageHeader } from '../../components/common';
 import { getPageLayout } from '../../constants/layout';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 const faqs = [
   {
@@ -24,6 +25,7 @@ const faqs = [
 ];
 
 export function FaqPage() {
+    usePageTitle('FAQ');
   return (
     <MainLayout>
       <div className={getPageLayout('narrow')}>

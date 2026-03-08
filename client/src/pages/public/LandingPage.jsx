@@ -20,12 +20,14 @@ import { Button } from '../../components/common';
 import { MainLayout } from '../../components/layout/MainLayout';
 import { IMAGES, getServiceImage } from '../../constants/images';
 import { getPageLayout } from '../../constants/layout';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 /**
  * Landing Page Component
  * Homepage for unauthenticated users
  */
 export function LandingPage() {
+    usePageTitle();
   const navigate = useNavigate();
 
   // Feature cards data

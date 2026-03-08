@@ -1,20 +1,29 @@
 // Admin verification management page
-// Review worker verification applications
+// Review worker verification applications with inline document viewer
 
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ShieldCheck, XCircle, AlertTriangle, FileText, ExternalLink } from 'lucide-react';
+import { ShieldCheck, XCircle, AlertTriangle, FileText, ExternalLink, ZoomIn, X } from 'lucide-react';
 import { MainLayout } from '../../components/layout/MainLayout';
 import { Card, CardHeader, CardTitle, CardDescription, Input } from '../../components/common';
-import { Badge, Button, AsyncState, PageHeader, VerificationStatusBadge } from '../../components/common';
+import { Badge, Button, AsyncState, PageHeader, VerificationStatusBadge, Pagination } from '../../components/common';
 import { getVerificationApplications, reviewVerificationApplication } from '../../api/verification';
 import { resolveProfilePhotoUrl } from '../../utils/profilePhoto';
 import { getPageLayout } from '../../constants/layout';
 import { queryKeys } from '../../utils/queryKeys';
 import { useSocketEvent } from '../../hooks/useSocket';
+import { toast } from 'sonner';
+import { usePageTitle } from '../../hooks/usePageTitle';
+
+const statusFilters = ['ALL', 'PENDING', 'APPROVED', 'REJECTED'];
+
 export function AdminVerificationPage() {
+  usePageTitle('Verification Requests');
   const queryClient = useQueryClient();
   const [notes, setNotes] = useState({});
+  const [modalDoc, setModalDoc] = useState(null);
+  const [statusFilter, setStatusFilter] = useState('PENDING');
+  const [page, setPage] = useState(1);
 
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: queryKeys.verification.applications(),
@@ -23,12 +32,22 @@ export function AdminVerificationPage() {
 
   const reviewMutation = useMutation({
     mutationFn: ({ id, payload }) => reviewVerificationApplication(id, payload),
-    onSuccess: () => {
+    onSuccess: (_, { payload }) => {
+      toast.success(`Verification ${payload.status.toLowerCase()}`);
       queryClient.invalidateQueries({ queryKey: queryKeys.verification.applications() });
     },
+    onError: (err) => toast.error(err.response?.data?.message || 'Failed to review application'),
   });
 
   const applications = data?.applications || [];
+  const filteredApplications = statusFilter === 'ALL'
+    ? applications
+    : applications.filter((app) => app.status === statusFilter);
+
+  const PAGE_SIZE = 10;
+  const totalPages = Math.max(1, Math.ceil(filteredApplications.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const paginatedApplications = filteredApplications.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   const refreshVerificationData = () => {
     queryClient.invalidateQueries({ queryKey: queryKeys.verification.applications() });
@@ -57,13 +76,28 @@ export function AdminVerificationPage() {
           subtitle="Review worker verification applications and update status."
         />
 
+        <div role="radiogroup" aria-label="Verification status filter" className="flex flex-wrap gap-2 mb-6">
+          {statusFilters.map((s) => (
+            <Button
+              key={s}
+              size="sm"
+              role="radio"
+              aria-checked={statusFilter === s}
+              variant={statusFilter === s ? 'primary' : 'outline'}
+              onClick={() => { setStatusFilter(s); setPage(1); }}
+            >
+              {s}
+            </Button>
+          ))}
+        </div>
+
         <AsyncState
           isLoading={isLoading}
           isError={isError}
           error={error}
           onRetry={refetch}
-          isEmpty={!isLoading && !isError && applications.length === 0}
-          emptyTitle="No verification requests"
+          isEmpty={!isLoading && !isError && filteredApplications.length === 0}
+          emptyTitle={statusFilter === 'ALL' ? "No verification requests" : `No ${statusFilter.toLowerCase()} requests`}
           emptyMessage="Worker applications will appear here once submitted."
           errorFallback={
             <Card className="p-6">
@@ -81,7 +115,7 @@ export function AdminVerificationPage() {
           }
         >
           <div className="grid grid-cols-1 gap-6">
-            {applications.map((application) => (
+            {paginatedApplications.map((application) => (
               <Card key={application.id}>
                 <CardHeader>
                   <div className="flex justify-between items-start">
@@ -112,7 +146,7 @@ export function AdminVerificationPage() {
                     </div>
                   </div>
 
-                  {/* Documents Section */}
+                  {/* Documents Section — Inline Document Viewer */}
                   {application.documents && application.documents.length > 0 && (
                     <div>
                       <h4 className="text-sm font-semibold mb-3 text-gray-800 dark:text-gray-200">Submitted Documents</h4>
@@ -122,14 +156,10 @@ export function AdminVerificationPage() {
                           const isPdf = doc.url.toLowerCase().endsWith('.pdf');
                           return (
                             <div key={doc.id} className="group relative">
-                              <a
-                                href={docUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="block w-32 h-32 rounded-lg border overflow-hidden relative border-gray-200 bg-gray-50 dark:border-dark-600 dark:bg-dark-800"
-                                onClick={(e) => {
-                                  if (!docUrl) e.preventDefault();
-                                }}
+                              <button
+                                type="button"
+                                className="block w-32 h-32 rounded-lg border overflow-hidden relative border-gray-200 bg-gray-50 dark:border-dark-600 dark:bg-dark-800 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all hover:shadow-lg"
+                                onClick={() => setModalDoc({ ...doc, url: docUrl, isPdf })}
                               >
                                 {isPdf ? (
                                   <div className="flex flex-col items-center justify-center w-full h-full text-gray-400">
@@ -141,14 +171,15 @@ export function AdminVerificationPage() {
                                     src={docUrl}
                                     alt={doc.type}
                                     className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                    loading="lazy"
                                   />
                                 )}
-                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-                                  <ExternalLink size={20} className="text-white drop-shadow-md" />
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                  <ZoomIn size={24} className="text-white drop-shadow-md" />
                                 </div>
-                              </a>
+                              </button>
                               <p className="text-xs mt-1.5 font-medium truncate w-32 text-gray-600 dark:text-gray-400">
-                                {doc.type.replace('_', ' ')}
+                                {doc.type.replace(/_/g, ' ')}
                               </p>
                             </div>
                           );
@@ -217,8 +248,64 @@ export function AdminVerificationPage() {
               </Card>
             ))}
           </div>
+          <Pagination page={safePage} totalPages={totalPages} onPageChange={setPage} totalItems={filteredApplications.length} pageSize={PAGE_SIZE} />
         </AsyncState>
       </div>
+
+      {/* Document Preview Modal — Inline Viewer for KYC Documents */}
+      {modalDoc && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setModalDoc(null)}>
+          <div className="bg-white dark:bg-dark-900 rounded-xl shadow-2xl max-w-3xl w-full mx-4 relative animate-in fade-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-dark-700">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
+                  {modalDoc.type.replace(/_/g, ' ')}
+                </h3>
+                <p className="text-xs text-gray-400">Click outside or press × to close</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <a
+                  href={modalDoc.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-2 hover:bg-gray-100 dark:hover:bg-dark-700 rounded-lg transition-colors"
+                  title="Open in new tab"
+                >
+                  <ExternalLink size={18} className="text-gray-500" />
+                </a>
+                <button
+                  className="p-2 hover:bg-gray-100 dark:hover:bg-dark-700 rounded-lg transition-colors"
+                  onClick={() => setModalDoc(null)}
+                  aria-label="Close"
+                >
+                  <X size={18} className="text-gray-500" />
+                </button>
+              </div>
+            </div>
+            {/* Content */}
+            <div className="p-4">
+              {modalDoc.isPdf ? (
+                <iframe
+                  src={modalDoc.url}
+                  title="Document PDF"
+                  className="w-full border rounded-lg"
+                  style={{ minHeight: 500 }}
+                />
+              ) : (
+                <div className="flex items-center justify-center bg-gray-50 dark:bg-dark-800 rounded-lg p-2">
+                  <img
+                    src={modalDoc.url}
+                    alt={modalDoc.type}
+                    className="max-w-full max-h-[70vh] object-contain rounded"
+                    loading="lazy"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </MainLayout>
   );
 }

@@ -7,8 +7,11 @@ import { Button, AsyncState, ConfirmDialog, PageHeader } from '../../components/
 import { createService, getAllServices, updateService, deleteService } from '../../api/services';
 import { getPageLayout } from '../../constants/layout';
 import { queryKeys } from '../../utils/queryKeys';
+import { toast } from 'sonner';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 export function AdminServicesPage() {
+    usePageTitle('Manage Services');
   const queryClient = useQueryClient();
   const [formState, setFormState] = useState({
     name: '',
@@ -28,24 +31,30 @@ export function AdminServicesPage() {
   const createMutation = useMutation({
     mutationFn: (payload) => createService(payload),
     onSuccess: () => {
+      toast.success('Service created successfully');
       queryClient.invalidateQueries({ queryKey: queryKeys.services.all() });
       resetForm();
     },
+    onError: (err) => toast.error(err.response?.data?.message || 'Failed to create service'),
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, payload }) => updateService(id, payload),
     onSuccess: () => {
+      toast.success('Service updated successfully');
       queryClient.invalidateQueries({ queryKey: queryKeys.services.all() });
       resetForm();
     },
+    onError: (err) => toast.error(err.response?.data?.message || 'Failed to update service'),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id) => deleteService(id),
     onSuccess: () => {
+      toast.success('Service deleted');
       queryClient.invalidateQueries({ queryKey: queryKeys.services.all() });
     },
+    onError: (err) => toast.error(err.response?.data?.message || 'Failed to delete service'),
   });
 
   const services = servicesQuery.data?.services || servicesQuery.data || [];

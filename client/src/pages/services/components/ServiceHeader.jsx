@@ -27,15 +27,17 @@ export function ServiceHeader({ service }) {
       <div className="flex flex-wrap gap-6 mt-6 pt-6 border-t border-gray-200 dark:border-dark-800">
         <div className="flex items-center gap-2">
           <CheckCircle2 className="text-green-500" size={20} />
-          <span className="font-medium text-gray-700 dark:text-gray-300">Verified Experts</span>
+          <span className="font-medium text-gray-700 dark:text-gray-300">Background-Verified Professionals</span>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="text-yellow-500"><Star size={20} fill="currentColor" /></div>
-          <span className="font-medium text-gray-700 dark:text-gray-300">4.8+ Rated</span>
-        </div>
+        {service.avgRating && (
+          <div className="flex items-center gap-2">
+            <div className="text-yellow-500"><Star size={20} fill="currentColor" /></div>
+            <span className="font-medium text-gray-700 dark:text-gray-300">{service.avgRating.toFixed(1)} Avg Rating</span>
+          </div>
+        )}
         <div className="flex items-center gap-2">
           <Clock className="text-blue-500" size={20} />
-          <span className="font-medium text-gray-700 dark:text-gray-300">On-time Guarantee</span>
+          <span className="font-medium text-gray-700 dark:text-gray-300">Satisfaction Guarantee</span>
         </div>
       </div>
     </div>

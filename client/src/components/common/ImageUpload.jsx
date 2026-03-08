@@ -53,9 +53,15 @@ export const ImageUpload = ({ label, onUpload, value, error, className = '' }) =
                 {preview ? (
                     <div className="relative group p-2">
                         <img
-                            src={preview}
+                            src={preview && preview.startsWith('https://res.cloudinary.com') ? preview.replace('/upload/', '/upload/f_auto,q_auto/') : preview}
                             alt="Preview"
                             className="w-full h-40 object-cover rounded-lg shadow-sm"
+                            loading="lazy"
+                            srcSet={preview && preview.startsWith('https://res.cloudinary.com') ? `
+                                ${preview.replace('/upload/', '/upload/f_auto,q_auto,w_300/')} 300w,
+                                ${preview.replace('/upload/', '/upload/f_auto,q_auto,w_600/')} 600w
+                            ` : undefined}
+                            sizes="(max-width: 600px) 300px, 600px"
                         />
                         <button
                             onClick={clearImage}
@@ -82,6 +88,7 @@ export const ImageUpload = ({ label, onUpload, value, error, className = '' }) =
                     ref={fileInputRef}
                     className="hidden"
                     accept="image/*"
+                    capture="environment"
                     onChange={handleFileChange}
                 />
             </div>

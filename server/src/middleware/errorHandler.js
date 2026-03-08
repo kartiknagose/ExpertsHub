@@ -1,39 +1,35 @@
 /**
  * GLOBAL ERROR HANDLER MIDDLEWARE
- * 
- * Catches all errors thrown in routes/controllers
- * Logs them for debugging and returns appropriate HTTP response
+ * Catches all errors thrown in routes/controllers.
+ * Logs via Winston and returns appropriate HTTP response.
  */
+
+const logger = require('../config/logger');
+const { captureException } = require('../config/monitoring');
 
 module.exports = (err, _req, res, _next) => {
   // Determine HTTP status code
   const status = err.statusCode || err.status || 500;
-  
+
   // Use custom message if available, otherwise generic message
   const message = err.message || 'Internal Server Error';
 
-  // Log error details in development and production
-  const isDevelopment = process.env.NODE_ENV === 'development';
-  
-  if (isDevelopment) {
-    // In development, log full error with stack trace
-    console.error('❌ ERROR:', {
-      status,
-      message,
-      stack: err.stack,
+  if (status >= 500) {
+    // CRASH REPORTING (Sprint 15)
+    captureException(err, {
       url: _req.originalUrl,
       method: _req.method,
-    });
-  } else {
-    // In production, log without sensitive stack details
-    console.error('❌ ERROR:', {
-      status,
-      message,
-      url: _req.originalUrl,
-      method: _req.method,
-      // Could be sent to monitoring service like Sentry here
+      id: _req.id
     });
   }
+
+  const isDevelopment = process.env.NODE_ENV === 'development';
+
+  // Log via Winston — error level for 5xx, warn for 4xx
+  const logLevel = status >= 500 ? 'error' : 'warn';
+  logger[logLevel]('%s %s → %d: %s', _req.method, _req.originalUrl, status, message, {
+    ...(isDevelopment && { stack: err.stack }),
+  });
 
   // Send error response to client
   res.status(status).json({

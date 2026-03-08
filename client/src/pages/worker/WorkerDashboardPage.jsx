@@ -55,8 +55,10 @@ import { useWorkerLocation } from '../../hooks/useWorkerLocation';
 import { useBookingActions } from '../../hooks/useBookingActions';
 import { useSocketEvent } from '../../hooks/useSocket';
 import { toast } from 'sonner';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 export function WorkerDashboardPage() {
+    usePageTitle('Dashboard');
   const { user } = useAuth();
   const navigate = useNavigate();
 

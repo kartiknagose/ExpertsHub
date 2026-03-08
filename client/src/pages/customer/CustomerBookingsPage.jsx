@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Search, Filter, CalendarCheck, Star } from 'lucide-react';
+import { toast } from 'sonner';
 
 import { MainLayout } from '../../components/layout/MainLayout';
 import {
@@ -11,18 +12,23 @@ import {
   BookingCard,
   Input,
   Card,
-  ConfirmDialog
+  ConfirmDialog,
+  Pagination
 } from '../../components/common';
 import { cancelBooking, getAllBookings } from '../../api/bookings';
 import { createReview } from '../../api/reviews';
 import { queryKeys } from '../../utils/queryKeys';
 import { getPageLayout } from '../../constants/layout';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcut';
+import { useDebounce } from '../../hooks/useDebounce';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 export function CustomerBookingsPage() {
+    usePageTitle('My Bookings');
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
+  const [page, setPage] = useState(1);
   const [activeActionId, setActiveActionId] = useState(null);
   const [cancelConfirmId, setCancelConfirmId] = useState(null);
 
@@ -43,6 +49,14 @@ export function CustomerBookingsPage() {
     mutationFn: (id) => cancelBooking(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.bookings.customer() });
+      toast.success('Booking cancelled successfully.');
+    },
+    onError: (error) => {
+      toast.error(
+        error.response?.data?.message ||
+          error.response?.data?.error ||
+          'Failed to cancel booking',
+      );
     },
   });
 
@@ -68,10 +82,16 @@ export function CustomerBookingsPage() {
   };
 
   const bookings = data?.bookings || [];
+  const debouncedSearch = useDebounce(searchQuery);
   const filteredBookings = bookings.filter(b =>
-    b.service?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    b.id.toString().includes(searchQuery)
+    b.service?.name?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+    b.id.toString().includes(debouncedSearch)
   );
+
+  const PAGE_SIZE = 10;
+  const totalPages = Math.max(1, Math.ceil(filteredBookings.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const paginatedBookings = filteredBookings.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   return (
     <MainLayout>
@@ -116,7 +136,7 @@ export function CustomerBookingsPage() {
           }
         >
           <div className="grid grid-cols-1 gap-8 mb-20">
-            {filteredBookings.map((booking) => (
+            {paginatedBookings.map((booking) => (
               <BookingCard
                 key={booking.id}
                 booking={booking}
@@ -127,6 +147,7 @@ export function CustomerBookingsPage() {
               />
             ))}
           </div>
+          <Pagination page={safePage} totalPages={totalPages} onPageChange={setPage} totalItems={filteredBookings.length} pageSize={PAGE_SIZE} />
         </AsyncState>
 
         {/* Global Stats Summary */}

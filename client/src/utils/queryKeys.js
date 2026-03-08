@@ -77,6 +77,8 @@ export const queryKeys = {
   // ── Notifications ─────────────────────────────────────────
   notifications: {
     all: () => ['notifications'],
+    preferences: () => ['notifications', 'preferences'],
+    pushSubscriptions: () => ['notifications', 'push-subscriptions'],
   },
 
   // ── Profile ───────────────────────────────────────────────

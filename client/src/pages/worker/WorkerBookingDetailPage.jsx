@@ -49,8 +49,10 @@ import { WorkerContactSidebar } from './components/WorkerContactSidebar';
 import { WorkerDesktopActions, WorkerMobileActions } from './components/BookingActionButtons';
 import { WorkerSessionPanel } from './components/WorkerSessionPanel';
 import { BookingSessionsTimeline } from '../../components/features/bookings/BookingSessionsTimeline';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 export function WorkerBookingDetailPage() {
+    usePageTitle('Job Details');
     const { id } = useParams();
     const { user } = useAuth();
     const navigate = useNavigate();
@@ -155,14 +157,11 @@ export function WorkerBookingDetailPage() {
     return (
         <MainLayout>
             <div className={`${getPageLayout('default')} pb-32 lg:pb-10`}>
-                <Button
-                    variant="ghost"
-                    onClick={() => navigate('/worker/dashboard')}
-                    className="mb-6 -ml-4 text-gray-500 hover:text-brand-600 transition-colors"
-                    icon={ArrowLeft}
-                >
-                    Return to Dashboard
-                </Button>
+                <Breadcrumbs items={[
+                    { label: 'Dashboard', to: '/worker/dashboard' },
+                    { label: 'Bookings', to: '/worker/bookings' },
+                    { label: `Booking #${id}` },
+                ]} />
 
                 <AsyncState
                     isLoading={isLoading}

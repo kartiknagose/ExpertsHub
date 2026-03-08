@@ -18,6 +18,11 @@ import {
   LayoutDashboard,
   ClipboardList,
   MessageSquare,
+  Gift,
+  Shield,
+  Activity,
+  Tag,
+  AlertTriangle,
   Users,
   Wallet,
   X,
@@ -27,12 +32,14 @@ import { resolveProfilePhotoUrl } from '../../utils/profilePhoto';
 
 const navConfig = {
   CUSTOMER: [
-    { label: 'Dashboard', to: '/dashboard', icon: Home },
+    { label: 'Dashboard', to: '/customer/dashboard', icon: Home },
     { label: 'Browse Services', to: '/services', icon: Briefcase },
-    { label: 'My Bookings', to: '/bookings', icon: Calendar },
+    { label: 'My Bookings', to: '/customer/bookings', icon: Calendar },
     { label: 'Messages', to: '/messages', icon: MessageSquare },
-    { label: 'Reviews', to: '/reviews', icon: Star },
-    { label: 'Emergency Contacts', to: '/safety/contacts', icon: ShieldAlert },
+    { label: 'My Reviews', to: '/customer/reviews', icon: Star },
+    { label: 'My Wallet', to: '/customer/wallet', icon: Wallet },
+    { label: 'Refer & Earn', to: '/customer/referrals', icon: Gift },
+    { label: 'Safety Settings', to: '/customer/safety/contacts', icon: Shield },
   ],
   WORKER: [
     { label: 'Dashboard', to: '/worker/dashboard', icon: LayoutDashboard },
@@ -48,12 +55,15 @@ const navConfig = {
   ],
   ADMIN: [
     { label: 'Dashboard', to: '/admin/dashboard', icon: LayoutDashboard },
+    { label: 'Analytics', to: '/admin/analytics', icon: Activity },
     { label: 'Services', to: '/admin/services', icon: Briefcase },
     { label: 'Bookings', to: '/admin/bookings', icon: Calendar },
     { label: 'Users', to: '/admin/users', icon: User },
     { label: 'Workers', to: '/admin/workers', icon: Users },
     { label: 'Verification', to: '/admin/verification', icon: ShieldCheck },
-    { label: 'SOS Alerts', to: '/admin/sos-alerts', icon: ShieldAlert, highlight: true },
+    { label: 'Fraud Detection', to: '/admin/fraud', icon: ShieldAlert },
+    { label: 'Coupons', to: '/admin/coupons', icon: Tag },
+    { label: 'SOS Alerts', to: '/admin/sos-alerts', icon: AlertTriangle, highlight: true },
   ],
 };
 

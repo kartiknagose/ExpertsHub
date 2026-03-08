@@ -7,16 +7,17 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useNavigate } from 'react-router-dom';
 import { Mail, ArrowRight } from 'lucide-react';
-import { MainLayout } from '../../components/layout/MainLayout';
-import { Card, CardHeader, CardTitle, CardDescription } from '../../components/common';
+import { AuthLayout } from '../../components/layout/AuthLayout';
 import { Input, Button } from '../../components/common';
 import { requestPasswordReset } from '../../api/auth';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 const forgotPasswordSchema = z.object({
   email: z.string().email('Please enter a valid email'),
 });
 
 export function ForgotPasswordPage() {
+    usePageTitle('Forgot Password');
   const navigate = useNavigate();
   const [serverError, setServerError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
@@ -48,17 +49,18 @@ export function ForgotPasswordPage() {
   };
 
   return (
-    <MainLayout>
-      <div className="min-h-screen flex items-center justify-center px-4 py-12">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle>Forgot Password</CardTitle>
-            <CardDescription>
-              Enter your email and we will send a reset link.
-            </CardDescription>
-          </CardHeader>
+    <AuthLayout
+      title="Forgot your password?"
+      subtitle="No worries — we'll help you get back into your account securely."
+    >
+      <div className="mb-8">
+        <h2 className="text-3xl font-bold mb-2 text-gray-900 dark:text-white">Reset Password</h2>
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          Enter your email and we'll send a reset link.
+        </p>
+      </div>
 
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
             <Input
               label="Email"
               type="email"
@@ -78,9 +80,9 @@ export function ForgotPasswordPage() {
               </p>
             )}
 
-            {resetLink && (
+            {import.meta.env.DEV && resetLink && (
               <div className="text-sm text-gray-700 dark:text-gray-300">
-                <p>Reset link (dev):</p>
+                <p>Reset link (dev only):</p>
                 <button
                   type="button"
                   onClick={() => {
@@ -120,8 +122,6 @@ export function ForgotPasswordPage() {
               </p>
             </div>
           </form>
-        </Card>
-      </div>
-    </MainLayout>
+    </AuthLayout>
   );
 }

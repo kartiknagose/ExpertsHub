@@ -11,8 +11,10 @@ import { getUserConversations } from '../../api';
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '../../utils/queryKeys';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 export function MessagesPage() {
+    usePageTitle('Messages');
     const { user } = useAuth();
     const navigate = useNavigate();
     const queryClient = useQueryClient();
@@ -26,7 +28,7 @@ export function MessagesPage() {
     useEffect(() => {
         const handleNewMessage = () => {
             // New message received, refresh list to show latest message/timestamp
-            queryClient.invalidateQueries(['chat', 'conversations']);
+            queryClient.invalidateQueries({ queryKey: queryKeys.chat.conversations() });
         };
 
         window.addEventListener('upro:chat-message', handleNewMessage);

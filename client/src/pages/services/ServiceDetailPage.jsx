@@ -8,16 +8,18 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, useWatch } from 'react-hook-form';
 import { FileText } from 'lucide-react';
 import { MainLayout } from '../../components/layout/MainLayout';
-import { Button, Spinner, ConfirmDialog } from '../../components/common';
+import { Button, Spinner, ConfirmDialog, Breadcrumbs } from '../../components/common';
 import { useAuth } from '../../hooks/useAuth';
 import { getServiceById, getServiceWorkers } from '../../api/services';
-import { createBooking } from '../../api/bookings';
+import { createBooking, previewPrice } from '../../api/bookings';
 import { queryKeys } from '../../utils/queryKeys';
 import { getPageLayout } from '../../constants/layout';
 import { WorkerProfileWindow } from '../../components/features/workers/WorkerProfileWindow';
 import { ServiceHeader } from './components/ServiceHeader';
-import { WorkerSelectionPanel, bookingModes } from './components/WorkerSelectionPanel';
+import { WorkerSelectionPanel } from './components/WorkerSelectionPanel';
+import { bookingModes } from './components/bookingModes';
 import { BookingFormPanel } from './components/BookingFormPanel';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 const bookingSchema = z.object({
   workerProfileId: z.preprocess((val) => (val === '' || val === undefined ? undefined : Number(val)), z.number().int().positive().optional()), // Optional for Auto-Assign
@@ -25,9 +27,11 @@ const bookingSchema = z.object({
   addressDetails: z.string().min(10, 'Address must be at least 10 characters'),
   estimatedPrice: z.preprocess((val) => (val === '' || val === undefined ? undefined : Number(val)), z.number().nonnegative().optional()),
   notes: z.string().max(1000).optional(),
+  couponCode: z.string().optional(),
 });
 
 export function ServiceDetailPage() {
+  usePageTitle('Service Details');
   const queryClient = useQueryClient();
   const { isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
@@ -74,17 +78,34 @@ export function ServiceDetailPage() {
   });
 
   // Auto-select worker from query param (from Worker Profile Window's Book Now)
+  const preselectedWorker = searchParams.get('worker');
   useEffect(() => {
-    const preselectedWorker = searchParams.get('worker');
     if (preselectedWorker) {
-      setBookingMode('DIRECT');
       setValue('workerProfileId', Number(preselectedWorker), { shouldValidate: true, shouldDirty: true });
     }
-  }, [searchParams, setValue]);
+  }, [preselectedWorker, setValue]);
 
   const selectedWorkerId = useWatch({ control, name: 'workerProfileId' });
+  const scheduledDate = useWatch({ control, name: 'scheduledDate' });
   const estimatedPrice = useWatch({ control, name: 'estimatedPrice' });
   const selectedWorker = workers.find((worker) => String(worker.id) === String(selectedWorkerId));
+
+  const hasValidSelectedLocation = Number.isFinite(Number(selectedLocation?.lat)) && Number.isFinite(Number(selectedLocation?.lng));
+  const tempPrice = estimatedPrice || (selectedWorker ? selectedWorker.hourlyRate : service?.basePrice);
+
+  const { data: pricingData, isFetching: isPricing } = useQuery({
+    queryKey: ['preview-price', id, selectedWorkerId, scheduledDate, selectedLocation?.lat, tempPrice],
+    queryFn: () => previewPrice({
+      serviceId: id,
+      workerProfileId: selectedWorkerId || null,
+      scheduledDate: scheduledDate,
+      latitude: hasValidSelectedLocation ? selectedLocation.lat : undefined,
+      longitude: hasValidSelectedLocation ? selectedLocation.lng : undefined,
+      estimatedPrice: tempPrice
+    }),
+    enabled: !!service && !!id, // Only run once the service is known
+    staleTime: 1000 * 30, // 30s
+  });
   const normalizedQuery = workerSearch.trim().toLowerCase();
   const filteredWorkers = normalizedQuery
     ? workers.filter((worker) => {
@@ -126,8 +147,6 @@ export function ServiceDetailPage() {
       // For Auto-Assign, send null as workerProfileId
       const workerIdToSend = bookingMode === 'DIRECT' ? data.workerProfileId : null;
 
-      const hasValidSelectedLocation = Number.isFinite(Number(selectedLocation?.lat)) && Number.isFinite(Number(selectedLocation?.lng));
-
       if (bookingMode === 'AUTO_ASSIGN' && !hasValidSelectedLocation) {
         setServerError('Please select a service location on the map.');
         return;
@@ -145,6 +164,7 @@ export function ServiceDetailPage() {
         longitude: hasValidSelectedLocation ? Number(selectedLocation.lng) : undefined,
         estimatedPrice: finalEstimate ? Number(finalEstimate) : undefined,
         notes: data.notes,
+        couponCode: data.couponCode || null,
       });
 
       setSuccessMessage('Booking placed successfully! Workers will be notified.');
@@ -175,6 +195,11 @@ export function ServiceDetailPage() {
         </div>
 
         <div className={`${getPageLayout('wide')} relative z-10`}>
+
+          <Breadcrumbs items={[
+            { label: 'Services', to: '/services' },
+            { label: service?.name || 'Service Details' },
+          ]} />
 
           {/* Loading State */}
           {isLoading && (
@@ -238,6 +263,8 @@ export function ServiceDetailPage() {
                     setValue={setValue}
                     serverError={serverError}
                     successMessage={successMessage}
+                    pricingData={pricingData}
+                    isPricing={isPricing}
                   />
                 </div>
               </div>

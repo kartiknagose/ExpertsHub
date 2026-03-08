@@ -6,7 +6,7 @@
  * Route: /admin/sos-alerts
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
     ShieldAlert, MapPin, Phone, CheckCircle, Clock, XCircle,
@@ -20,6 +20,7 @@ import { getPageLayout } from '../../constants/layout';
 import { queryKeys } from '../../utils/queryKeys';
 import { toast } from 'sonner';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 const STATUS_COLORS = {
     ACTIVE: { badge: 'error', icon: AlertTriangle, label: 'Active Emergency', pulse: true },
@@ -166,6 +167,7 @@ function AlertCard({ alert, onAcknowledge, onResolve, isUpdating }) {
 }
 
 export function AdminSOSAlertsPage() {
+    usePageTitle('SOS Alerts');
     const queryClient = useQueryClient();
     const [filter, setFilter] = useState('ACTIVE');
 

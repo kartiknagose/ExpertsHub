@@ -2,11 +2,14 @@ import { useState } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { UserX, UserCheck, Trash2, Search } from 'lucide-react';
 import { MainLayout } from '../../components/layout/MainLayout';
-import { Card, Badge, Button, AsyncState, ConfirmDialog, PageHeader, RoleBadge } from '../../components/common';
+import { Card, Badge, Button, AsyncState, ConfirmDialog, PageHeader, RoleBadge, Pagination } from '../../components/common';
 import { getAdminUsers, updateUserStatus, deleteUser } from '../../api/admin';
 import { getPageLayout } from '../../constants/layout';
 import { queryKeys } from '../../utils/queryKeys';
 import { useSocketEvent } from '../../hooks/useSocket';
+import { useDebounce } from '../../hooks/useDebounce';
+import { toast } from 'sonner';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 const roleFilters = [
   { label: 'All', value: '' },
@@ -17,19 +20,29 @@ const roleFilters = [
 
 
 export function AdminUsersPage() {
+    usePageTitle('Manage Users');
   const queryClient = useQueryClient();
   const [roleFilter, setRoleFilter] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [page, setPage] = useState(1);
   const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, type: null, user: null });
 
   const statusMutation = useMutation({
     mutationFn: ({ id, isActive }) => updateUserStatus(id, isActive),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.admin.users() }),
+    onSuccess: (_, { isActive }) => {
+      toast.success(`User ${isActive ? 'activated' : 'suspended'}`);
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.users() });
+    },
+    onError: (err) => toast.error(err.response?.data?.message || 'Failed to update user status'),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id) => deleteUser(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.admin.users() }),
+    onSuccess: () => {
+      toast.success('User deleted');
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.users() });
+    },
+    onError: (err) => toast.error(err.response?.data?.message || 'Failed to delete user'),
   });
 
   const handleStatusChange = (user) => {
@@ -68,11 +81,18 @@ export function AdminUsersPage() {
 
   const users = data?.users || [];
 
+  const debouncedSearch = useDebounce(searchTerm);
+
   const filteredUsers = users.filter((user) =>
-    user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.mobile.includes(searchTerm)
+    user.name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+    user.email.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+    user.mobile.includes(debouncedSearch)
   );
+
+  const PAGE_SIZE = 10;
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const paginatedUsers = filteredUsers.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   return (
     <MainLayout>
@@ -84,11 +104,13 @@ export function AdminUsersPage() {
         />
 
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Role filter">
             {roleFilters.map((filter) => (
               <Button
                 key={filter.label}
                 size="sm"
+                role="radio"
+                aria-checked={roleFilter === filter.value}
                 variant={roleFilter === filter.value ? 'primary' : 'outline'}
                 onClick={() => setRoleFilter(filter.value)}
               >
@@ -129,7 +151,7 @@ export function AdminUsersPage() {
           }
         >
           <div className="space-y-4">
-            {filteredUsers.map((user) => (
+            {paginatedUsers.map((user) => (
               <Card key={user.id} className="p-6">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
@@ -186,9 +208,8 @@ export function AdminUsersPage() {
               </Card>
             ))}
           </div>
+          <Pagination page={safePage} totalPages={totalPages} onPageChange={setPage} totalItems={filteredUsers.length} pageSize={PAGE_SIZE} />
         </AsyncState>
-
-        {/* Confirmation Dialog */}
         <ConfirmDialog
           isOpen={confirmDialog.isOpen}
           onConfirm={handleConfirm}

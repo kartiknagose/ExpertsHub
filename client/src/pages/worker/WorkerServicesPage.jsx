@@ -12,8 +12,10 @@ import { getMyServices, addServiceToWorker, removeServiceFromWorker } from '../.
 import { getPageLayout } from '../../constants/layout';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcut';
 import { queryKeys } from '../../utils/queryKeys';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 export function WorkerServicesPage() {
+    usePageTitle('My Services');
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');

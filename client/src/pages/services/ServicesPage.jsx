@@ -11,6 +11,7 @@ import { getServiceImage } from '../../constants/images';
 import { getPageLayout } from '../../constants/layout';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcut';
 import { queryKeys } from '../../utils/queryKeys';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 const categoryIconMap = {
   cleaning: Sparkles,
@@ -38,8 +39,7 @@ const ServiceCard = memo(({ service }) => {
   const iconType = getCategoryIcon(service.category);
   const bgImage = getServiceImage(service.name || service.category);
 
-  // Simulated rating (normally from DB)
-  const rating = (4.0 + (service.id % 10) / 10).toFixed(1);
+  const rating = service.avgRating?.toFixed(1) || null;
 
   return (
     <Card hoverable className="h-full flex flex-col relative overflow-hidden group border-0 shadow-2xl ring-1 ring-gray-200 dark:ring-white/10 rounded-[2.5rem]">
@@ -56,10 +56,12 @@ const ServiceCard = memo(({ service }) => {
 
         {/* Rating Badge */}
         <div className="absolute top-5 right-5 z-20">
-          <div className="flex items-center gap-1.5 bg-white text-gray-900 px-3.5 py-2 rounded-2xl text-[10px] font-black shadow-2xl ring-1 ring-black/5">
-            <Star size={10} className="fill-yellow-400 text-yellow-400" />
-            {rating}
-          </div>
+          {rating && (
+            <div className="flex items-center gap-1.5 bg-white text-gray-900 px-3.5 py-2 rounded-2xl text-[10px] font-black shadow-2xl ring-1 ring-black/5">
+              <Star size={10} className="fill-yellow-400 text-yellow-400" />
+              {rating}
+            </div>
+          )}
         </div>
 
         {/* Category Icon */}
@@ -106,6 +108,7 @@ const ServiceCard = memo(({ service }) => {
 });
 
 export function ServicesPage() {
+    usePageTitle('Services');
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('');
@@ -227,8 +230,10 @@ export function ServicesPage() {
           </div>
 
           {/* Quick Category Chips */}
-          <div className="mt-8 flex flex-wrap justify-center gap-2 px-4">
+          <div className="mt-8 flex flex-wrap justify-center gap-2 px-4" role="radiogroup" aria-label="Service category filter">
             <button
+              role="radio"
+              aria-checked={category === ''}
               onClick={() => setCategory('')}
               className={`px-6 py-2 rounded-full text-xs font-black uppercase tracking-widest transition-all ${category === ''
                 ? 'bg-brand-500 text-white shadow-lg shadow-brand-500/20'
@@ -239,6 +244,8 @@ export function ServicesPage() {
             {categories.map((cat) => (
               <button
                 key={cat}
+                role="radio"
+                aria-checked={category === cat}
                 onClick={() => setCategory(cat)}
                 className={`px-6 py-2 rounded-full text-xs font-black uppercase tracking-widest transition-all ${category === cat
                   ? 'bg-brand-500 text-white shadow-lg shadow-brand-500/20'

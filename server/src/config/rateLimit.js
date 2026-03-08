@@ -1,5 +1,14 @@
 const rateLimit = require('express-rate-limit');
 
+// Global rate limiter — applies to ALL routes as a safety net
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 300, // 300 requests per 15 min per IP (generous for normal use)
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Please try again later.' },
+});
+
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // limit each IP to 100 requests per windowMs
@@ -45,4 +54,4 @@ const otpLimiter = rateLimit({
   },
 });
 
-module.exports = { authLimiter, bookingLimiter, otpLimiter };
+module.exports = { globalLimiter, authLimiter, bookingLimiter, otpLimiter };

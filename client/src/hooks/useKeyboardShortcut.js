@@ -17,7 +17,7 @@ import { useEffect, useRef } from 'react';
 export function useKeyboardShortcuts(shortcuts = []) {
   // Store shortcuts in ref to avoid infinite re-render from new array references
   const shortcutsRef = useRef(shortcuts);
-  shortcutsRef.current = shortcuts;
+  useEffect(() => { shortcutsRef.current = shortcuts; });
 
   useEffect(() => {
     const handleKeyPress = (event) => {

@@ -4,8 +4,11 @@ import { AppRoutes } from './routes/AppRoutes';
 import { ThemeProvider } from './context/ThemeContext';
 import { SOSProvider } from './context/SOSContext';
 import { GlobalSOSButton } from './components/features/safety/GlobalSOSButton';
+import { PWAReloadPrompt } from './components/features/pwa/PWAReloadPrompt';
+import { PWAInstallPrompt } from './components/features/pwa/PWAInstallPrompt';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { GlobalSocketListener } from './components/common/GlobalSocketListener';
+import { MockPhoneGateway } from './components/common/MockPhone';
 import { useAuth } from './hooks/useAuth';
 
 /**
@@ -53,6 +56,9 @@ function App() {
             <GlobalSocketListener />
             <AppRoutes />
             <GlobalSOSButton />
+            <PWAReloadPrompt />
+            <PWAInstallPrompt />
+            <MockPhoneGateway />
           </SOSProvider>
         </BrowserRouter>
       </ThemeProvider>

@@ -1,6 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { Search, MapPin, Loader2, X } from 'lucide-react';
+// Google Places API integration
 import axios from 'axios';
+
+const GOOGLE_PLACES_API_KEY = import.meta.env.VITE_GOOGLE_PLACES_API_KEY;
+const GOOGLE_PLACES_AUTOCOMPLETE_URL = 'https://maps.googleapis.com/maps/api/place/autocomplete/json';
+const GOOGLE_PLACES_DETAILS_URL = 'https://maps.googleapis.com/maps/api/place/details/json';
 
 /**
  * AddressAutocomplete
@@ -57,27 +62,19 @@ export function AddressAutocomplete({ value, onChange, placeholder = "Search for
 
         try {
             const response = await axios.get(
-                `https://nominatim.openstreetmap.org/search`,
+                GOOGLE_PLACES_AUTOCOMPLETE_URL,
                 {
                     params: {
-                        q: searchQuery,
-                        format: 'json',
-                        addressdetails: 1,
-                        limit: 5,
-                        countrycodes: 'in' // Target India for this app
+                        input: searchQuery,
+                        key: GOOGLE_PLACES_API_KEY,
+                        language: 'en',
+                        components: 'country:in', // restrict to India
                     },
                     signal: abortControllerRef.current.signal
                 }
             );
-
-            const mapped = response.data.map(item => ({
-                display_name: item.display_name,
-                lat: parseFloat(item.lat),
-                lon: parseFloat(item.lon),
-                address: item.address
-            }));
-
-            setSuggestions(mapped);
+            const predictions = response.data.predictions || [];
+            setSuggestions(predictions);
             setShowDropdown(true);
         } catch (err) {
             if (!axios.isCancel(err) && err.name !== 'CanceledError' && err.code !== 'ERR_CANCELED') {
@@ -116,15 +113,38 @@ export function AddressAutocomplete({ value, onChange, placeholder = "Search for
         };
     }, [query]);
 
-    const handleSelect = (item) => {
-        setQuery(item.display_name);
+    const handleSelect = async (item) => {
+        setQuery(item.description);
         setShowDropdown(false);
-        onChange({
-            address: item.display_name,
-            lat: item.lat,
-            lng: item.lon,
-            details: item.address
-        });
+        // Fetch place details for lat/lng and structured address
+        try {
+            const detailsResp = await axios.get(
+                GOOGLE_PLACES_DETAILS_URL,
+                {
+                    params: {
+                        place_id: item.place_id,
+                        key: GOOGLE_PLACES_API_KEY,
+                        language: 'en',
+                    }
+                }
+            );
+            const details = detailsResp.data.result;
+            const location = details.geometry?.location || {};
+            onChange({
+                address: details.formatted_address || item.description,
+                lat: location.lat || null,
+                lng: location.lng || null,
+                details: details.address_components || {},
+            });
+        } catch (err) {
+            console.error('Place details error:', err);
+            onChange({
+                address: item.description,
+                lat: null,
+                lng: null,
+                details: {},
+            });
+        }
     };
 
     const clearInput = () => {
@@ -167,8 +187,7 @@ export function AddressAutocomplete({ value, onChange, placeholder = "Search for
 
             {showDropdown && suggestions.length > 0 && (
                 <div
-                    className="absolute z-[100] mt-2 w-full rounded-2xl border shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 bg-white dark:bg-dark-800 border-gray-100 dark:border-dark-700
-                        "
+                    className="absolute z-[100] mt-2 w-full rounded-2xl border shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 bg-white dark:bg-dark-800 border-gray-100 dark:border-dark-700"
                 >
                     <div className="max-h-64 overflow-y-auto">
                         {suggestions.map((item, index) => (
@@ -185,17 +204,17 @@ export function AddressAutocomplete({ value, onChange, placeholder = "Search for
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <p className="text-sm font-semibold truncate text-gray-900 dark:text-gray-100">
-                                        {item.display_name.split(',')[0]}
+                                        {item.description.split(',')[0]}
                                     </p>
                                     <p className="text-xs truncate text-gray-500 dark:text-gray-400">
-                                        {item.display_name.split(',').slice(1).join(',').trim()}
+                                        {item.description.split(',').slice(1).join(',').trim()}
                                     </p>
                                 </div>
                             </button>
                         ))}
                     </div>
                     <div className="px-4 py-2 border-t text-[10px] text-gray-400 text-right bg-gray-50 dark:bg-dark-900/50 border-gray-100 dark:border-dark-700">
-                        Data by OpenStreetMap
+                        Data by Google Places
                     </div>
                 </div>
             )}
