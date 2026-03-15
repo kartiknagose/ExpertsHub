@@ -260,20 +260,23 @@ async function isWorkerAvailable(workerId, date, client = prisma, durationMinute
 async function filterWorkersByDistance(lat, lng, serviceId, radiusKm = 10) {
   // Prisma raw query for Haversine distance
   const workers = await prisma.$queryRaw`
-    SELECT wp.*, u.name, u.email, u.mobile, u.profilePhotoUrl, ws.serviceId,
-      (6371 * acos(
-        cos(radians(${lat})) * cos(radians(wp.baseLatitude)) *
-        cos(radians(wp.baseLongitude) - radians(${lng})) +
-        sin(radians(${lat})) * sin(radians(wp.baseLatitude))
-      )) AS distance
-    FROM "WorkerProfile" wp
-    JOIN "User" u ON u.id = wp.userId
-    JOIN "WorkerService" ws ON ws.workerId = wp.id
-    WHERE ws.serviceId = ${serviceId}
-      AND wp.baseLatitude IS NOT NULL
-      AND wp.baseLongitude IS NOT NULL
-      AND wp.isOnline = true
-    HAVING distance <= ${radiusKm}
+    SELECT * FROM (
+      SELECT wp.*, u.name, u.email, u.mobile, u."profilePhotoUrl", ws."serviceId",
+        (6371 * acos(
+          cos(radians(${lat})) * cos(radians(wp."baseLatitude")) *
+          cos(radians(wp."baseLongitude") - radians(${lng})) +
+          sin(radians(${lat})) * sin(radians(wp."baseLatitude"))
+        )) AS distance
+      FROM "WorkerProfile" wp
+      JOIN "User" u ON u.id = wp."userId"
+      JOIN "WorkerService" ws ON ws."workerId" = wp.id
+      LEFT JOIN "WorkerLocation" wl ON wl."workerProfileId" = wp.id
+      WHERE ws."serviceId" = ${serviceId}
+        AND wp."baseLatitude" IS NOT NULL
+        AND wp."baseLongitude" IS NOT NULL
+        AND (wl."isOnline" IS NULL OR wl."isOnline" = true)
+    ) AS worker_results
+    WHERE distance <= ${radiusKm}
     ORDER BY distance ASC
   `;
   return workers;
@@ -286,7 +289,7 @@ const GOOGLE_GEOCODING_URL = 'https://maps.googleapis.com/maps/api/geocode/json'
 const { calculateDynamicPrice } = require('../pricing/pricing.service');
 
 async function createBooking(customerId, bookingData) {
-  let { workerProfileId, serviceId, scheduledDate, addressDetails, latitude, longitude, estimatedPrice, notes, estimatedDuration, couponCode } = bookingData;
+  let { workerProfileId, serviceId, scheduledDate, addressDetails, latitude, longitude, estimatedPrice, notes, estimatedDuration, couponCode, frequency } = bookingData;
 
   // BUSINESS GROWTH: Coupon Validation (Sprint 17)
   let appliedCoupon = null;
@@ -485,6 +488,7 @@ async function createBooking(customerId, bookingData) {
         gstAmount: pricing.gstAmount,
         couponId: appliedCoupon?.couponId || null,
         couponAmount: appliedCoupon?.discountAmount || 0,
+        frequency: frequency || 'ONE_TIME',
       },
       include: {
         service: {
@@ -876,13 +880,22 @@ async function cancelBooking(bookingId, userId, role, cancellationReason) {
             }
           });
 
+          // BUSINESS GROWTH: Refund to Wallet (Sprint 17 - #83)
+          await GrowthService.depositCredits(
+            booking.customerId,
+            refundAmount,
+            `Refund for cancelled booking #${booking.id}`,
+            `REFUND-${booking.id}`,
+            tx
+          );
+
           updated.paymentStatus = 'REFUNDED';
           await tx.booking.update({
             where: { id: bookingId },
             data: { paymentStatus: 'REFUNDED' }
           });
         } catch (err) {
-          console.error('[REFUND] Gateway Refund failed:', err.message);
+          console.error('[REFUND] Gateway Refund/Wallet Deposit failed:', err.message);
         }
       }
     }
@@ -947,7 +960,13 @@ async function releaseEscrowIfEligible(bookingId, tx) {
  */
 async function payBooking(bookingId, userId, userRole, reqOptions) {
   const options = typeof reqOptions === 'string' ? { paymentReference: reqOptions } : (reqOptions || {});
-  const { paymentReference, createRazorpayOrder, isWebhook } = options;
+  const {
+    paymentReference,
+    paymentOrderId,
+    paymentSignature,
+    createRazorpayOrder,
+    isWebhook,
+  } = options;
 
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
@@ -958,9 +977,26 @@ async function payBooking(bookingId, userId, userRole, reqOptions) {
     throw new AppError(404, 'Booking not found.');
   }
 
+  const isCashPayment = paymentReference === 'CASH';
+
   // Webhooks from Razorpay bypass the strict user identity check
-  if (!isWebhook && (userRole !== 'CUSTOMER' || booking.customerId !== userId)) {
-    throw new AppError(403, 'Only the booking customer can pay for this booking.');
+  if (!isWebhook) {
+    if (isCashPayment) {
+      if (userRole !== 'WORKER') {
+        throw new AppError(403, 'Only the assigned worker can verify cash collection.');
+      }
+      const isWorker = await isWorkerForBooking(userId, booking);
+      if (!isWorker) {
+        throw new AppError(403, 'You are not assigned to this booking to collect cash.');
+      }
+      if (booking.status !== 'COMPLETED' && booking.status !== 'IN_PROGRESS') {
+        throw new AppError(400, 'Cash can only be collected during or after the service is started.');
+      }
+    } else {
+      if (userRole !== 'CUSTOMER' || booking.customerId !== userId) {
+        throw new AppError(403, 'Only the booking customer can pay for this booking.');
+      }
+    }
   }
 
   if (booking.status === 'CANCELLED') {
@@ -972,6 +1008,7 @@ async function payBooking(bookingId, userId, userRole, reqOptions) {
   }
 
   if (createRazorpayOrder) {
+    if (isCashPayment) throw new AppError(400, 'Cannot create online order for cash payment.');
     const { createRazorpayOrder: createOrderHelper } = require('../payments/payment.service');
     const amount = Number(booking.totalPrice) || Number(booking.estimatedPrice) || 0;
     if (amount <= 0) {
@@ -981,7 +1018,44 @@ async function payBooking(bookingId, userId, userRole, reqOptions) {
     return { order };
   }
 
-  const reference = paymentReference || `manual-${Date.now()}`;
+  if (!isCashPayment && !isWebhook) {
+    if (!paymentReference || !paymentOrderId || !paymentSignature) {
+      throw new AppError(400, 'Missing payment verification details.');
+    }
+
+    const {
+      verifyRazorpayPaymentSignature,
+      fetchRazorpayOrder,
+    } = require('../payments/payment.service');
+
+    const isSignatureValid = verifyRazorpayPaymentSignature({
+      orderId: paymentOrderId,
+      paymentId: paymentReference,
+      signature: paymentSignature,
+    });
+
+    if (!isSignatureValid) {
+      throw new AppError(400, 'Invalid payment signature.');
+    }
+
+    const razorpayOrder = await fetchRazorpayOrder(paymentOrderId);
+    const expectedAmount = Math.round((Number(booking.totalPrice) || Number(booking.estimatedPrice) || 0) * 100);
+
+    if (!razorpayOrder || razorpayOrder.status !== 'paid') {
+      throw new AppError(400, 'Payment has not been captured yet.');
+    }
+
+    if (Number(razorpayOrder.amount) !== expectedAmount) {
+      throw new AppError(400, 'Payment amount mismatch.');
+    }
+
+    const notedBookingId = Number(razorpayOrder.notes?.bookingId);
+    if (notedBookingId !== Number(bookingId)) {
+      throw new AppError(400, 'Payment does not belong to this booking.');
+    }
+  }
+
+  const reference = paymentReference || 'CASH';
 
   return prisma.$transaction(async (tx) => {
     const updated = await tx.booking.update({
@@ -992,7 +1066,7 @@ async function payBooking(bookingId, userId, userRole, reqOptions) {
         paidAt: new Date(),
       },
       include: {
-        service: { select: { id: true, name: true, category: true } },
+        service: { select: { id: true, name: true, category: true, commissionRate: true } },
         workerProfile: { select: { id: true, userId: true, user: { select: { id: true, name: true, profilePhotoUrl: true, rating: true, totalReviews: true } } } },
         customer: { select: { id: true, name: true, email: true, mobile: true, profilePhotoUrl: true, rating: true, totalReviews: true } },
       },
@@ -1001,14 +1075,47 @@ async function payBooking(bookingId, userId, userRole, reqOptions) {
     await tx.payment.create({
       data: {
         bookingId: bookingId,
-        customerId: userId,
+        customerId: booking.customerId,
         amount: updated.totalPrice || null,
         status: 'PAID',
         reference,
       },
     });
 
-    await releaseEscrowIfEligible(bookingId, tx);
+    if (isCashPayment && booking.workerProfileId) {
+      // CASH: Worker keeps physical cash, so we deduct the platform's cut from their digital wallet
+      const rawAmount = Number(updated.totalPrice) || 0;
+      const commRate = Number(updated.service.commissionRate) || 15.0;
+      const platformCut = rawAmount * (commRate / 100);
+      const workerCut = rawAmount - platformCut;
+
+      await tx.booking.update({
+        where: { id: bookingId },
+        data: {
+          platformCommission: platformCut,
+          workerPayoutAmount: workerCut,
+        }
+      });
+
+      await tx.workerProfile.update({
+        where: { id: booking.workerProfileId },
+        data: {
+          walletBalance: { decrement: platformCut }
+        }
+      });
+
+      try {
+        const io = require('../../socket').getIo();
+        io.to(`user:${updated.workerProfile.userId}`).emit('payout:deducted', {
+          bookingId, amount: platformCut, message: `Platform fee deducted since you collected cash.`
+        });
+      } catch (_err) {
+        // Ignore socket error
+      }
+    } else {
+      // Normal Online Payment
+      await releaseEscrowIfEligible(bookingId, tx);
+    }
 
     return updated;
   });
@@ -1310,6 +1417,14 @@ async function verifyBookingCompletion(bookingId, otp, userId) {
     // BUSINESS GROWTH: Award Referral Bonus if first job (Sprint 17)
     await GrowthService.awardReferralBonus(bookingId, tx);
 
+    // BUSINESS GROWTH: Award Loyalty Points (Sprint 17 - #75)
+    if (updated.totalPrice) {
+      await GrowthService.awardLoyaltyPoints(updated.customerId, Number(updated.totalPrice), tx);
+    }
+
+    // BUSINESS GROWTH: Handle Recurring Bookings (Sprint 17 - #78)
+    await handleRecurringBooking(updated, tx);
+
     await releaseEscrowIfEligible(bookingId, tx);
 
     return updated;
@@ -1328,6 +1443,81 @@ async function verifyBookingCompletion(bookingId, otp, userId) {
   return updatedBooking;
 }
 
+/**
+ * Refresh booking OTP for start/completion verification.
+ * Only assigned worker can request a refresh; OTP is sent to customer mobile.
+ */
+async function refreshBookingOtp(bookingId, userId, otpType) {
+  const worker = await requireWorkerProfile(userId, 'Only workers can request OTP refresh.', 403);
+
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    include: {
+      customer: { select: { id: true, name: true, mobile: true } },
+      service: { select: { name: true } },
+    },
+  });
+
+  if (!booking) throw new AppError(404, 'Booking not found.');
+  if (booking.workerProfileId !== worker.id) throw new AppError(403, 'You are not assigned to this job.');
+
+  const normalizedType = typeof otpType === 'string' ? otpType.trim().toUpperCase() : '';
+
+  let resolvedType;
+  if (normalizedType === 'START' || normalizedType === 'COMPLETE') {
+    resolvedType = normalizedType;
+  } else if (booking.status === 'CONFIRMED') {
+    resolvedType = 'START';
+  } else if (booking.status === 'IN_PROGRESS') {
+    resolvedType = 'COMPLETE';
+  } else {
+    throw new AppError(400, 'OTP refresh is only available for CONFIRMED or IN_PROGRESS bookings.');
+  }
+
+  if (resolvedType === 'START' && booking.status !== 'CONFIRMED') {
+    throw new AppError(400, 'Start OTP can only be refreshed while booking is CONFIRMED.');
+  }
+  if (resolvedType === 'COMPLETE' && booking.status !== 'IN_PROGRESS') {
+    throw new AppError(400, 'Completion OTP can only be refreshed while booking is IN_PROGRESS.');
+  }
+
+  if (booking.otpGeneratedAt) {
+    const secondsSinceLastOtp = Math.floor((Date.now() - new Date(booking.otpGeneratedAt).getTime()) / 1000);
+    if (secondsSinceLastOtp < 30) {
+      throw new AppError(429, `Please wait ${30 - secondsSinceLastOtp} seconds before requesting another OTP.`);
+    }
+  }
+
+  const nextOtp = generateOTP();
+  const updated = await prisma.booking.update({
+    where: { id: bookingId },
+    data: {
+      ...(resolvedType === 'START' ? { startOtp: nextOtp } : { completionOtp: nextOtp }),
+      otpGeneratedAt: new Date(),
+      updatedAt: new Date(),
+    },
+    include: {
+      customer: { select: { id: true, name: true, mobile: true } },
+      service: { select: { name: true } },
+    },
+  });
+
+  try {
+    if (updated.customer?.mobile) {
+      SMSService.sendBookingOTP(updated.customer.mobile, nextOtp, resolvedType);
+    }
+  } catch (err) {
+    console.error('OTP refresh SMS failed:', err.message);
+  }
+
+  return {
+    bookingId: updated.id,
+    otpType: resolvedType,
+    otpCode: nextOtp,
+    expiresInMinutes: 30,
+  };
+}
+
 // Export all service functions so controllers can use them
 module.exports = {
   createBooking,
@@ -1340,9 +1530,11 @@ module.exports = {
   acceptBooking,
   verifyBookingStart,
   verifyBookingCompletion,
+  refreshBookingOtp,
   // Session management (Phase 7)
   getBookingSessions,
   createSession,
+  handleRecurringBooking,
   startSession,
   endSession,
   // Audit trail (Phase 7)
@@ -1687,3 +1879,66 @@ function getCancellationPolicy(booking) {
   }
   return { allowed: true, penaltyPercent: 100, reason: 'Full charge — cancellation less than 2 hours before scheduled time.' };
 }
+
+/**
+ * Handle recurring bookings (Sprint 17 - #78)
+ * Creates the next scheduled booking if the original had a frequency.
+ */
+async function handleRecurringBooking(booking, tx) {
+  if (!booking.frequency || booking.frequency === 'ONE_TIME') return;
+
+  const nextScheduledAt = new Date(booking.scheduledAt);
+  
+  if (booking.frequency === 'WEEKLY') {
+    nextScheduledAt.setDate(nextScheduledAt.getDate() + 7);
+  } else if (booking.frequency === 'BI_WEEKLY') {
+    nextScheduledAt.setDate(nextScheduledAt.getDate() + 14);
+  } else if (booking.frequency === 'MONTHLY') {
+    nextScheduledAt.setMonth(nextScheduledAt.getMonth() + 1);
+  } else {
+    return; // Safety for unknown frequencies
+  }
+
+  // Create the next booking object
+  // Auto-assign to same worker for continuity
+  const nextBooking = await tx.booking.create({
+    data: {
+      customerId: booking.customerId,
+      workerProfileId: booking.workerProfileId,
+      serviceId: booking.serviceId,
+      scheduledAt: nextScheduledAt,
+      address: booking.address,
+      latitude: booking.latitude,
+      longitude: booking.longitude,
+      notes: booking.notes,
+      estimatedDuration: booking.estimatedDuration,
+      status: 'PENDING',
+      totalPrice: booking.totalPrice,
+      basePrice: booking.basePrice,
+      timeMultiplier: booking.timeMultiplier,
+      surgeMultiplier: booking.surgeMultiplier,
+      urgencyMultiplier: booking.urgencyMultiplier,
+      workerTierMultiplier: booking.workerTierMultiplier,
+      distanceSurcharge: booking.distanceSurcharge,
+      gstAmount: booking.gstAmount,
+      frequency: booking.frequency, // Multi-instance chain
+    }
+  });
+
+  console.log(`[RECURRING] Chain created: Booking #${booking.id} -> #${nextBooking.id} (${booking.frequency})`);
+  
+  // Notify customer about the next instance
+  try {
+    const { createNotification } = require('../notifications/notification.service');
+    await createNotification({
+      userId: booking.customerId,
+      type: 'BOOKING',
+      title: 'Next Recurring Booking Scheduled',
+      message: `Your next ${booking.frequency.toLowerCase().replace('_', ' ')} booking is scheduled for ${nextScheduledAt.toLocaleDateString()}.`,
+      data: { bookingId: nextBooking.id }
+    }, tx);
+  } catch (err) {
+    console.warn('Recurring notification failed:', err.message);
+  }
+}
+

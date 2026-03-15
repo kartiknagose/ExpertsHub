@@ -1,9 +1,11 @@
+import { useTranslation } from 'react-i18next';
 import { CheckCircle, PlayCircle, XCircle, ArrowLeft, Download } from 'lucide-react';
 import { Button } from '../../../components/common';
 import { downloadInvoice } from '../../../api/bookings';
 import { toast } from 'sonner';
 
 export function WorkerDesktopActions({ booking, statusMutation, openOtpModal, openCancelModal }) {
+    const { t } = useTranslation();
     if (booking.status === 'PENDING') {
         return (
             <>
@@ -14,7 +16,7 @@ export function WorkerDesktopActions({ booking, statusMutation, openOtpModal, op
                     loading={statusMutation.isPending}
                     className="bg-brand-600 hover:bg-brand-700 text-white shadow-lg px-6 h-12 rounded-xl font-bold"
                 >
-                    Accept Job
+                    {t('Accept Job')}
                 </Button>
                 <Button
                     size="md"
@@ -23,7 +25,7 @@ export function WorkerDesktopActions({ booking, statusMutation, openOtpModal, op
                     onClick={openCancelModal}
                     className="text-error-500 hover:bg-error-50 h-12 px-6 rounded-xl font-bold"
                 >
-                    Reject
+                    {t('Reject')}
                 </Button>
             </>
         );
@@ -37,7 +39,7 @@ export function WorkerDesktopActions({ booking, statusMutation, openOtpModal, op
                     onClick={() => openOtpModal('start')}
                     className="bg-brand-600 hover:bg-brand-700 text-white shadow-lg px-6 h-12 rounded-xl font-bold"
                 >
-                    Start Job
+                    {t('Start Job')}
                 </Button>
                 <Button
                     size="md"
@@ -46,7 +48,7 @@ export function WorkerDesktopActions({ booking, statusMutation, openOtpModal, op
                     onClick={openCancelModal}
                     className="text-error-500 hover:bg-error-50 h-12 px-6 rounded-xl font-bold"
                 >
-                    Cancel Job
+                    {t('Cancel Job')}
                 </Button>
             </>
         );
@@ -59,7 +61,7 @@ export function WorkerDesktopActions({ booking, statusMutation, openOtpModal, op
                 onClick={() => openOtpModal('complete')}
                 className="bg-green-600 hover:bg-green-700 text-white shadow-lg px-6 h-12 rounded-xl font-bold"
             >
-                Complete Job
+                {t('Complete Job')}
             </Button>
         );
     }
@@ -71,14 +73,14 @@ export function WorkerDesktopActions({ booking, statusMutation, openOtpModal, op
                 icon={Download}
                 onClick={() => {
                     toast.promise(downloadInvoice(booking.id), {
-                        loading: 'Generating Invoice...',
-                        success: 'Invoice Downloaded Successfully',
-                        error: 'Failed to generate invoice'
+                        loading: t('Generating Invoice...'),
+                        success: t('Invoice Downloaded Successfully'),
+                        error: t('Failed to generate invoice')
                     });
                 }}
                 className="h-12 px-6 rounded-xl font-bold"
             >
-                Download Invoice
+                {t('Download Invoice')}
             </Button>
         );
     }
@@ -86,6 +88,7 @@ export function WorkerDesktopActions({ booking, statusMutation, openOtpModal, op
 }
 
 export function WorkerMobileActions({ booking, statusMutation, openOtpModal, openCancelModal, onBack }) {
+    const { t } = useTranslation();
     return (
         <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 p-4 pb-8 border-t backdrop-blur-xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] bg-white/80 border-gray-100 dark:bg-dark-900/80 dark:border-dark-700">
             <div className="flex gap-3">
@@ -99,14 +102,14 @@ export function WorkerMobileActions({ booking, statusMutation, openOtpModal, ope
                             loading={statusMutation.isPending}
                             className="bg-brand-600 text-white rounded-2xl font-black h-14"
                         >
-                            Accept
+                            {t('Accept')}
                         </Button>
                         <Button
                             variant="ghost"
                             onClick={openCancelModal}
                             className="text-error-500 font-black px-4"
                         >
-                            Reject
+                            {t('Reject')}
                         </Button>
                     </>
                 )}
@@ -119,14 +122,14 @@ export function WorkerMobileActions({ booking, statusMutation, openOtpModal, ope
                             onClick={() => openOtpModal('start')}
                             className="bg-brand-600 text-white rounded-2xl font-black h-14"
                         >
-                            Start Job
+                            {t('Start Job')}
                         </Button>
                         <Button
                             variant="ghost"
                             onClick={openCancelModal}
                             className="text-error-500 font-black px-4"
                         >
-                            Cancel
+                            {t('Cancel')}
                         </Button>
                     </>
                 )}
@@ -139,7 +142,7 @@ export function WorkerMobileActions({ booking, statusMutation, openOtpModal, ope
                             onClick={() => openOtpModal('complete')}
                             className="bg-green-600 text-white rounded-2xl font-black h-14 shadow-lg shadow-green-500/20"
                         >
-                            Finish Job
+                            {t('Finish Job')}
                         </Button>
                     </div>
                 )}
@@ -152,14 +155,14 @@ export function WorkerMobileActions({ booking, statusMutation, openOtpModal, ope
                             icon={Download}
                             onClick={() => {
                                 toast.promise(downloadInvoice(booking.id), {
-                                    loading: 'Generating Invoice...',
-                                    success: 'Invoice Downloaded Successfully',
-                                    error: 'Failed to generate invoice'
+                                    loading: t('Generating Invoice...'),
+                                    success: t('Invoice Downloaded Successfully'),
+                                    error: t('Failed to generate invoice')
                                 });
                             }}
                             className="border-gray-200 dark:border-dark-700 text-gray-900 dark:text-white rounded-2xl font-black h-14"
                         >
-                            Download Invoice
+                            {t('Download Invoice')}
                         </Button>
                         <Button
                             fullWidth
@@ -168,7 +171,7 @@ export function WorkerMobileActions({ booking, statusMutation, openOtpModal, ope
                             className="text-gray-500 font-black h-12"
                             icon={ArrowLeft}
                         >
-                            Back to Dashboard
+                            {t('Back to Dashboard')}
                         </Button>
                     </div>
                 )}
@@ -180,7 +183,7 @@ export function WorkerMobileActions({ booking, statusMutation, openOtpModal, ope
                         className="text-gray-500 font-black h-14"
                         icon={ArrowLeft}
                     >
-                        Back to Dashboard
+                        {t('Back to Dashboard')}
                     </Button>
                 )}
             </div>

@@ -60,7 +60,23 @@ async function sendMessage(conversationId, senderId, { content, type = 'TEXT', m
         type
     };
 
-    if (content) messageData.content = content;
+    if (content) {
+        messageData.content = content;
+        
+        // FRAUD DETECTION: Off-platform sharing (Sprint 17 - #226)
+        const lowerContent = content.toLowerCase();
+        const contactPatterns = [
+            /[0-9]{10}/, // Phone numbers
+            /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/, // Emails
+            /whatsapp/, /gpay/, /paytm/, /phonepe/, /upi/
+        ];
+        
+        const isSuspicious = contactPatterns.some(p => p.test(lowerContent));
+        if (isSuspicious) {
+            messageData.metadata = { flagged: true, reason: 'POTENTIAL_OFFPLATFORM_SHARING' };
+            messageData.type = 'SUSPICIOUS'; // Can be used to highlight for admin
+        }
+    }
     if (mediaUrl) messageData.mediaUrl = mediaUrl;
     if (fileName) messageData.fileName = fileName;
     if (fileSize) messageData.fileSize = fileSize;

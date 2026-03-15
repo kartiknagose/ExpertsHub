@@ -18,6 +18,12 @@ const SERVICES_ENDPOINTS = {
  * @returns {Promise} Response with array of services
  */
 export const getAllServices = async (filters = {}) => {
+  // If city is provided, used specialized endpoint
+  if (filters.city) {
+      const res = await axiosInstance.get(`/location/cities/${filters.city}/services`);
+      return res.data;
+  }
+
   const params = new URLSearchParams();
 
   // Add filters to query params if provided

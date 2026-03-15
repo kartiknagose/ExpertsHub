@@ -3,12 +3,12 @@ import { BrowserRouter, useNavigate } from 'react-router-dom';
 import { AppRoutes } from './routes/AppRoutes';
 import { ThemeProvider } from './context/ThemeContext';
 import { SOSProvider } from './context/SOSContext';
+import { CityProvider } from './context/CityContext';
 import { GlobalSOSButton } from './components/features/safety/GlobalSOSButton';
 import { PWAReloadPrompt } from './components/features/pwa/PWAReloadPrompt';
 import { PWAInstallPrompt } from './components/features/pwa/PWAInstallPrompt';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { GlobalSocketListener } from './components/common/GlobalSocketListener';
-import { MockPhoneGateway } from './components/common/MockPhone';
 import { useAuth } from './hooks/useAuth';
 
 /**
@@ -51,15 +51,16 @@ function App() {
     <ErrorBoundary>
       <ThemeProvider>
         <BrowserRouter>
-          <SOSProvider>
-            <SessionExpiredHandler />
-            <GlobalSocketListener />
-            <AppRoutes />
-            <GlobalSOSButton />
-            <PWAReloadPrompt />
-            <PWAInstallPrompt />
-            <MockPhoneGateway />
-          </SOSProvider>
+          <CityProvider>
+            <SOSProvider>
+              <SessionExpiredHandler />
+              <GlobalSocketListener />
+              <AppRoutes />
+              <GlobalSOSButton />
+              <PWAReloadPrompt />
+              <PWAInstallPrompt />
+            </SOSProvider>
+          </CityProvider>
         </BrowserRouter>
       </ThemeProvider>
     </ErrorBoundary>

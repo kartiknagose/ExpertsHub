@@ -1,5 +1,5 @@
 const messageStore = require('./messageStore');
-const logger = require('../../common/utils/logger'); // assuming logger exists
+const logger = require('../../config/logger');
 
 /**
  * Service to handle SMS Notifications

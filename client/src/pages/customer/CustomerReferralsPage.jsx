@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
     Gift, Share2, Copy, Check, Users,
-    Smartphone, Mail, MessageCircle, AlertTriangle
+    Smartphone
 } from 'lucide-react';
 import { PageHeader, Card, Button, Badge, AsyncState, Spinner } from '../../components/common';
 import { MainLayout } from '../../components/layout/MainLayout';

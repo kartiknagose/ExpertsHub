@@ -17,6 +17,7 @@ const {
   updateBookingStatusSchema,
   cancelBookingSchema,
   payBookingSchema,
+  refreshOtpSchema,
 } = require('./booking.schemas');
 
 // Import controller functions
@@ -136,6 +137,18 @@ router.post(
   requireWorker,
   otpLimiter,
   bookingController.verifyBookingCompletion
+);
+
+/**
+ * ROUTE 10a: REFRESH OTP (assigned worker only)
+ */
+router.post(
+  '/:id/otp/refresh',
+  authenticate,
+  requireWorker,
+  refreshOtpSchema,
+  validate,
+  bookingController.refreshBookingOtp
 );
 
 // ─── SESSION MANAGEMENT ROUTES (Phase 7) ───────────────────────────

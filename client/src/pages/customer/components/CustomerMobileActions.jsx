@@ -3,6 +3,15 @@ import { Button } from '../../../components/common';
 import { downloadInvoice } from '../../../api/bookings';
 import { toast } from 'sonner';
 
+const formatInrAmount = (value) => {
+    const amount = Number(value);
+    if (!Number.isFinite(amount)) return '0';
+    return amount.toLocaleString('en-IN', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2,
+    });
+};
+
 export function CustomerMobileActions({ booking, navigate, payMutation, onCancelOpen }) {
     return (
         <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 p-4 pb-8 border-t backdrop-blur-xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] bg-white/80 border-gray-100 dark:bg-dark-900/80 dark:border-dark-700">
@@ -18,7 +27,7 @@ export function CustomerMobileActions({ booking, navigate, payMutation, onCancel
                                 loading={payMutation.isPending}
                                 className="bg-brand-600 text-white rounded-2xl font-black h-14"
                             >
-                                Pay Now (₹{booking.totalPrice})
+                                Pay Now (₹{formatInrAmount(booking.totalPrice)})
                             </Button>
                         ) : (
                             <Button
@@ -41,7 +50,7 @@ export function CustomerMobileActions({ booking, navigate, payMutation, onCancel
                         <Button
                             fullWidth
                             variant="ghost"
-                            onClick={() => navigate('/dashboard')}
+                            onClick={() => navigate('/customer/dashboard')}
                             className="text-gray-500 font-black h-12"
                             icon={ArrowLeft}
                         >
@@ -78,7 +87,7 @@ export function CustomerMobileActions({ booking, navigate, payMutation, onCancel
                     <Button
                         fullWidth
                         variant="ghost"
-                        onClick={() => navigate('/dashboard')}
+                        onClick={() => navigate('/customer/dashboard')}
                         className="text-gray-500 font-black h-14"
                         icon={ArrowLeft}
                     >

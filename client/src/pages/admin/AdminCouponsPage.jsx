@@ -3,10 +3,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
     Tag, Plus, Trash2, Power
 } from 'lucide-react';
-import { PageHeader, Card, Button, Badge, AsyncState } from '../../components/common';
+import { PageHeader, Card, Button, Badge, AsyncState, Input, Select, Checkbox } from '../../components/common';
+
 import { MainLayout } from '../../components/layout/MainLayout';
 import { getPageLayout } from '../../constants/layout';
-import axiosInstance from '../../api/axiosConfig';
+import axiosInstance from '../../api/axios';
 import { toast } from 'sonner';
 
 export function AdminCouponsPage() {
@@ -88,42 +89,70 @@ export function AdminCouponsPage() {
 
                 {isAdding && (
                     <Card className="mb-8 p-6">
-                        <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div className="space-y-2">
-                                <label className="text-xs font-black uppercase text-gray-400">Coupon Code</label>
-                                <input name="code" required placeholder="URBAN50" className="w-full h-12 px-4 rounded-xl border border-gray-100 dark:border-dark-700 bg-gray-50 dark:bg-dark-900 font-bold uppercase" />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-xs font-black uppercase text-gray-400">Discount Type</label>
-                                <select name="discountType" className="w-full h-12 px-4 rounded-xl border border-gray-100 dark:border-dark-700 bg-gray-50 dark:bg-dark-900 font-bold">
+                        <form onSubmit={handleSubmit} className="space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <Input 
+                                    label="Coupon Code" 
+                                    name="code" 
+                                    required 
+                                    placeholder="URBAN50" 
+                                    inputClassName="uppercase"
+                                />
+                                <Select label="Discount Type" name="discountType">
                                     <option value="PERCENTAGE">Percentage (%)</option>
                                     <option value="FIXED">Fixed Amount (₹)</option>
-                                </select>
+                                </Select>
+                                <Input 
+                                    label="Value" 
+                                    name="discountValue" 
+                                    required 
+                                    type="number" 
+                                    step="0.01" 
+                                />
+                                <Input 
+                                    label="Min Order Value (₹)" 
+                                    name="minOrderValue" 
+                                    type="number" 
+                                    step="0.01" 
+                                />
+                                <Input 
+                                    label="Max Discount (₹)" 
+                                    name="maxDiscount" 
+                                    type="number" 
+                                    step="0.01" 
+                                />
+                                <Input 
+                                    label="Usage Limit" 
+                                    name="usageLimit" 
+                                    type="number" 
+                                />
+                                <div className="flex items-end pb-2">
+                                    <Checkbox 
+                                        label="First Time User Only" 
+                                        name="firstTimeOnly" 
+                                        id="firstTime" 
+                                    />
+                                </div>
                             </div>
-                            <div className="space-y-2">
-                                <label className="text-xs font-black uppercase text-gray-400">Value</label>
-                                <input name="discountValue" required type="number" step="0.01" className="w-full h-12 px-4 rounded-xl border border-gray-100 dark:border-dark-700 bg-gray-50 dark:bg-dark-900 font-bold" />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-xs font-black uppercase text-gray-400">Min Order Value (₹)</label>
-                                <input name="minOrderValue" type="number" step="0.01" className="w-full h-12 px-4 rounded-xl border border-gray-100 dark:border-dark-700 bg-gray-50 dark:bg-dark-900 font-bold" />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-xs font-black uppercase text-gray-400">Max Discount (₹)</label>
-                                <input name="maxDiscount" type="number" step="0.01" className="w-full h-12 px-4 rounded-xl border border-gray-100 dark:border-dark-700 bg-gray-50 dark:bg-dark-900 font-bold" />
-                            </div>
-                            <div className="flex items-center gap-2 pt-8">
-                                <input type="checkbox" name="firstTimeOnly" id="firstTime" className="w-5 h-5 accent-brand-500" />
-                                <label htmlFor="firstTime" className="text-sm font-bold">First Time User Only</label>
-                            </div>
-                            <div className="md:col-span-3 flex justify-end gap-2">
-                                <Button type="submit" variant="primary" loading={createMutation.isPending}>
+                            <div className="flex justify-end gap-3 pt-4 border-t border-gray-50 dark:border-dark-800">
+                                <Button 
+                                    variant="secondary" 
+                                    onClick={() => setIsAdding(false)}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button 
+                                    type="submit" 
+                                    variant="primary" 
+                                    loading={createMutation.isPending}
+                                >
                                     Save Coupon
                                 </Button>
                             </div>
                         </form>
                     </Card>
                 )}
+
 
                 <AsyncState
                     isLoading={isLoading}

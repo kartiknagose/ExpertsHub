@@ -1,30 +1,31 @@
 import { useState } from "react";
 import { Search, CheckCircle2, Star, MessageSquare, User, ShieldCheck, Filter } from "lucide-react";
-import { Input, Badge } from "../../../components/common";
-import { resolveProfilePhotoUrl } from "../../../utils/profilePhoto";
-import { toast } from "sonner";
+import { Input, Badge, Button, Avatar } from "../../../components/common";
 import { bookingModes } from "./bookingModes";
+import { motion as Motion, AnimatePresence } from "framer-motion";
 
 const getVerificationLevelVariant = (level) => {
   switch (level) {
-    case "VERIFIED":
-      return "success";
-    case "PREMIUM":
-      return "warning";
-    case "DOCUMENTS":
-      return "default";
-    case "BASIC":
-      return "secondary";
-    default:
-      return "secondary";
+    case "VERIFIED": return "success";
+    case "PREMIUM": return "warning";
+    case "DOCUMENTS": return "info";
+    default: return "neutral";
   }
 };
 
+const getSkillBadge = (completions) => {
+  if (completions >= 100) return { label: "Master", color: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 border-purple-200 dark:border-purple-800" };
+  if (completions >= 50) return { label: "Top Rated", color: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-800" };
+  if (completions >= 10) return { label: "Pro", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800" };
+  if (completions >= 1) return { label: "Rising Star", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800" };
+  return null;
+};
+
 const VERIFICATION_FILTERS = [
-  { id: "ALL", label: "All Workers", icon: null },
+  { id: "ALL", label: "All Pros", icon: null },
   { id: "PREMIUM", label: "Premium", icon: ShieldCheck },
   { id: "VERIFIED", label: "Verified", icon: CheckCircle2 },
-  { id: "DOCUMENTS", label: "Docs Submitted", icon: null },
+  { id: "DOCUMENTS", label: "Docs Verified", icon: null },
   { id: "BASIC", label: "Basic", icon: null },
 ];
 
@@ -39,222 +40,207 @@ export function WorkerSelectionPanel({
 }) {
   const [verificationFilter, setVerificationFilter] = useState("ALL");
 
-  // Apply the verification filter
   const displayWorkers = filteredWorkers
-    ? filteredWorkers.filter(
-      (worker) =>
-        verificationFilter === "ALL" ||
-        worker.verificationLevel === verificationFilter
-    )
+    ? filteredWorkers.filter((worker) => verificationFilter === "ALL" || worker.verificationLevel === verificationFilter)
     : [];
 
   return (
-    <>
+    <div className="space-y-10">
+      
       {/* Step 1: Booking Mode */}
-      <div className="space-y-4">
-        <h3 className="text-xl font-bold flex items-center gap-2">
-          <span className="flex items-center justify-center w-7 h-7 rounded-full bg-brand-600 text-white text-sm">
-            1
-          </span>
-          Choose Your Preference
-        </h3>
-
-        <div className="p-1.5 rounded-2xl flex gap-1 bg-white border">
-          {bookingModes
-            .filter((m) => m.enabled)
-            .map((mode) => {
-              const isActive = bookingMode === mode.id;
-
-              return (
-                <button
-                  key={mode.id}
-                  onClick={() => setBookingMode(mode.id)}
-                  className={`flex-1 flex items-center justify-center gap-2 py-4 px-4 rounded-xl transition ${isActive
-                      ? "bg-brand-600 text-white"
-                      : "text-gray-500 hover:bg-gray-100"
-                    }`}
-                >
-                  <mode.icon size={20} />
-                  <span>{mode.title}</span>
-                </button>
-              );
-            })}
+      <section>
+        <div className="mb-4">
+          <h3 className="text-xl font-black text-neutral-900 dark:text-white flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-brand-100 dark:bg-brand-500/20 text-brand-600 dark:text-brand-400 flex items-center justify-center text-sm font-black">1</div>
+            Booking Preference
+          </h3>
+          <p className="text-sm text-neutral-500 dark:text-neutral-400 ml-11">How would you like us to assign your service professional?</p>
         </div>
-      </div>
 
-      {/* Verification Level Filter */}
-      <div className="mt-5">
-        <div className="flex items-center gap-2 mb-3">
-          <Filter size={14} className="text-gray-500" />
-          <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">Filter by Verification</span>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {VERIFICATION_FILTERS.map((filter) => {
-            const isActive = verificationFilter === filter.id;
+        <div className="ml-11 p-1.5 rounded-2xl bg-neutral-100/50 dark:bg-dark-800/30 border border-neutral-200/50 dark:border-dark-700/50 flex flex-col sm:flex-row gap-1.5">
+          {bookingModes.filter((m) => m.enabled).map((mode) => {
+            const isActive = bookingMode === mode.id;
             return (
               <button
-                key={filter.id}
-                onClick={() => setVerificationFilter(filter.id)}
-                className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all duration-200 border ${isActive
-                    ? "bg-brand-600 text-white border-brand-600 shadow-sm shadow-brand-500/20"
-                    : "bg-white text-gray-600 border-gray-200 hover:border-brand-300 hover:bg-brand-50 dark:bg-dark-800 dark:text-gray-300 dark:border-dark-600 dark:hover:border-brand-700"
-                  }`}
+                key={mode.id}
+                onClick={() => setBookingMode(mode.id)}
+                className={`relative flex-1 flex items-center justify-center gap-2.5 py-3.5 px-4 rounded-xl font-bold text-sm transition-all duration-300 ${
+                  isActive
+                    ? "bg-white dark:bg-dark-900 text-brand-600 dark:text-brand-400 shadow-sm border border-neutral-200/50 dark:border-dark-600"
+                    : "text-neutral-500 hover:text-neutral-700 hover:bg-white/50 dark:text-neutral-400 dark:hover:bg-dark-700/50"
+                }`}
               >
-                {filter.icon && <filter.icon size={13} />}
-                {filter.label}
-                {isActive && verificationFilter !== "ALL" && (
-                  <span className="ml-1 bg-white/20 text-white text-[10px] px-1.5 py-0.5 rounded-full">
-                    {displayWorkers.length}
+                <mode.icon size={18} strokeWidth={isActive ? 2.5 : 2} />
+                {mode.title}
+                {isActive && mode.id === 'AUTO_ASSIGN' && (
+                  <span className="absolute -top-2 -right-2 flex">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-success-500"></span>
                   </span>
                 )}
               </button>
             );
           })}
         </div>
-      </div>
+      </section>
 
-      {/* Worker Cards */}
-      <div className="mt-6">
-        {workersLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {[1, 2, 3, 4].map((i) => (
-              <div
-                key={i}
-                className="h-40 rounded-2xl animate-pulse bg-gray-100"
-              ></div>
-            ))}
-          </div>
-        ) : displayWorkers.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {displayWorkers.map((worker) => {
-              const isSelected =
-                String(worker.id) === String(selectedWorkerId);
+      {/* Step 2: Worker Selection (Only if DIRECT mode is selected) */}
+      <AnimatePresence mode="popLayout">
+        {bookingMode === 'DIRECT' && (
+          <Motion.section
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="mb-4">
+              <h3 className="text-xl font-black text-neutral-900 dark:text-white flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-brand-100 dark:bg-brand-500/20 text-brand-600 dark:text-brand-400 flex items-center justify-center text-sm font-black">2</div>
+                Select Expert
+              </h3>
+              <p className="text-sm text-neutral-500 dark:text-neutral-400 ml-11">Choose a verified professional that matches your needs.</p>
+            </div>
 
-              return (
-                <div
-                  key={worker.id}
-                  onClick={() => onQuickPick(worker.id)}
-                  className={`relative cursor-pointer rounded-2xl border p-5 transition ${isSelected
-                      ? "border-brand-500 bg-brand-50"
-                      : "border-gray-200 bg-white hover:shadow-lg"
-                    }`}
-                >
-                  <div className="flex gap-4">
-                    <div className="relative">
-                      <div
-                        className="w-16 h-16 rounded-2xl bg-gray-200 bg-cover bg-center flex items-center justify-center"
-                        style={{
-                          backgroundImage: worker.user?.profilePhotoUrl
-                            ? `url(${resolveProfilePhotoUrl(
-                              worker.user.profilePhotoUrl
-                            )})`
-                            : undefined,
-                        }}
-                      >
-                        {!worker.user?.profilePhotoUrl && (
-                          <User className="w-8 h-8 text-gray-400" />
-                        )}
-                      </div>
-
-                      {worker.verificationLevel && (
-                        <div className="absolute -bottom-2 -right-2">
-                          <Badge
-                            variant={getVerificationLevelVariant(
-                              worker.verificationLevel
-                            )}
-                          >
-                            <ShieldCheck size={12} />{" "}
-                            {worker.verificationLevel}
-                          </Badge>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex-1">
-                      <div className="flex justify-between">
-                        <h4 className="font-bold">
-                          {worker.user?.name || "Worker"}
-                        </h4>
-
-                        <span className="font-bold">
-                          ₹{worker.hourlyRate}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-2 mt-1">
-                        <Star size={12} fill="currentColor" />
-                        <span>
-                          {worker.rating?.toFixed(1) || "N/A"}
-                        </span>
-                        <span className="text-xs text-gray-400">
-                          • {worker.totalReviews} jobs
-                        </span>
-                      </div>
-
-                      <div className="mt-4 grid grid-cols-2 gap-2">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onOpenWorkerProfile(worker.id);
-                          }}
-                          className="border rounded-xl py-2 text-xs"
-                        >
-                          Profile
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toast.info(
-                              `Chat with ${worker.user?.name} after booking`
-                            );
-                          }}
-                          className="border rounded-xl py-2 text-xs"
-                        >
-                          <MessageSquare size={14} />
-                          Chat
-                        </button>
-
-                        <button
-                          type="button"
-                          className={`col-span-2 py-3 rounded-xl text-xs ${isSelected
-                              ? "bg-brand-600 text-white"
-                              : "bg-brand-50 text-brand-700"
-                            }`}
-                        >
-                          {isSelected
-                            ? "Selected for Hire"
-                            : "Choose This Expert"}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+            <div className="ml-11">
+              {/* Filters */}
+              <div className="mb-6 flex flex-col sm:flex-row sm:items-center gap-3">
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-neutral-100 dark:bg-dark-800 text-neutral-500 dark:text-neutral-400">
+                  <Filter size={14} />
+                  <span className="text-xs font-black uppercase tracking-widest">Filter</span>
                 </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="text-center py-16">
-            <Search className="mx-auto text-gray-400 mb-4" size={48} />
-            <h4 className="font-semibold text-gray-700 dark:text-gray-300">
-              {verificationFilter !== "ALL"
-                ? `No ${verificationFilter.toLowerCase()} workers found`
-                : "No workers found"
-              }
-            </h4>
-            {verificationFilter !== "ALL" && (
-              <button
-                onClick={() => setVerificationFilter("ALL")}
-                className="mt-3 text-sm text-brand-600 hover:underline"
-              >
-                Clear filter to see all workers
-              </button>
-            )}
-          </div>
+                <div className="flex flex-wrap gap-2">
+                  {VERIFICATION_FILTERS.map((filter) => {
+                    const isActive = verificationFilter === filter.id;
+                    return (
+                      <button
+                        key={filter.id}
+                        onClick={() => setVerificationFilter(filter.id)}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 border ${
+                          isActive
+                            ? "bg-brand-50 dark:bg-brand-500/20 text-brand-700 dark:text-brand-400 border-brand-200 dark:border-brand-500/30"
+                            : "bg-white dark:bg-dark-900 text-neutral-600 dark:text-neutral-400 border-neutral-200 dark:border-dark-700 hover:border-brand-300 dark:hover:border-brand-700"
+                        }`}
+                      >
+                       {filter.icon && <filter.icon size={12} strokeWidth={2.5} />}
+                       {filter.label}
+                       {isActive && verificationFilter !== "ALL" && (
+                         <span className="ml-1 bg-brand-200 text-brand-800 dark:bg-brand-500/40 dark:text-brand-200 text-[9px] px-1.5 py-0.5 rounded-full">
+                           {displayWorkers.length}
+                         </span>
+                       )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {workersLoading ? (
+                  [1, 2, 3, 4].map((i) => (
+                    <div key={i} className="h-44 rounded-2xl animate-pulse bg-neutral-100 dark:bg-dark-800" />
+                  ))
+                ) : displayWorkers.length > 0 ? (
+                  displayWorkers.map((worker) => {
+                    const isSelected = String(worker.id) === String(selectedWorkerId);
+
+                    return (
+                      <div
+                        key={worker.id}
+                        onClick={() => onQuickPick(worker.id)}
+                        className={`relative cursor-pointer rounded-2xl p-5 transition-all duration-300 border ${
+                          isSelected
+                            ? "border-brand-500 bg-brand-50/50 dark:bg-brand-500/5 shadow-brand-md transform scale-[1.02]"
+                            : "border-neutral-200 dark:border-dark-700 bg-white dark:bg-dark-900 hover:shadow-card-hover hover:border-brand-300 dark:hover:border-brand-500/50"
+                        }`}
+                      >
+                        <div className="flex gap-4">
+                          <div className="relative shrink-0">
+                            <Avatar src={worker.user?.profilePhotoUrl} name={worker.user?.name} size="lg" className="ring-2 ring-white dark:ring-dark-900 shadow-sm" />
+                            {worker.verificationLevel && (
+                              <div className="absolute -bottom-2 -right-2">
+                                <Badge variant={getVerificationLevelVariant(worker.verificationLevel)} size="xs" className="shadow-sm border border-white dark:border-dark-900">
+                                  <ShieldCheck size={10} strokeWidth={3} className="mr-0.5" />
+                                  {worker.verificationLevel.charAt(0) + worker.verificationLevel.slice(1).toLowerCase()}
+                                </Badge>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="flex-1 min-w-0">
+                            <div className="flex justify-between items-start mb-1">
+                              <h4 className="font-bold text-neutral-900 dark:text-white truncate pr-2">
+                                {worker.user?.name || "Professional"}
+                              </h4>
+                              <span className="font-black text-brand-600 dark:text-brand-400 shrink-0">
+                                ₹{worker.hourlyRate}<span className="text-[10px] text-neutral-400 uppercase">/hr</span>
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-2 mb-4 text-xs font-semibold text-neutral-500 dark:text-neutral-400">
+                              <div className="flex items-center gap-1 text-warning-500">
+                                <Star size={12} className="fill-warning-400" />
+                                <span>{worker.rating?.toFixed(1) || "New"}</span>
+                              </div>
+                              <span className="w-1 h-1 rounded-full bg-neutral-300 dark:bg-dark-700" />
+                              <span>{worker.totalReviews} jobs</span>
+
+                              {/* Skill Badge (Sprint 17 - #82) */}
+                              {(() => {
+                                const badge = getSkillBadge(worker.totalReviews || 0);
+                                if (!badge) return null;
+                                return (
+                                  <>
+                                    <span className="w-1 h-1 rounded-full bg-neutral-300 dark:bg-dark-700 hidden sm:block" />
+                                    <span className={`hidden sm:inline-flex px-1.5 py-0.5 rounded border text-[10px] font-black uppercase tracking-widest ${badge.color}`}>
+                                      {badge.label}
+                                    </span>
+                                  </>
+                                );
+                              })()}
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2 mt-auto">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={(e) => { e.stopPropagation(); onOpenWorkerProfile(worker.id); }}
+                                className="h-9 px-0 text-[11px] font-bold"
+                              >
+                                View Profile
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant={isSelected ? "primary" : "secondary"}
+                                className={`h-9 px-0 text-[11px] font-black uppercase tracking-widest ${isSelected ? 'shadow-brand-sm' : ''}`}
+                              >
+                                {isSelected ? "Selected" : "Pick"}
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="col-span-1 md:col-span-2 text-center py-16 rounded-2xl border-2 border-dashed border-neutral-200 dark:border-dark-700 bg-neutral-50/50 dark:bg-dark-800/20">
+                    <Search className="mx-auto text-neutral-300 dark:text-dark-600 mb-4" size={48} />
+                    <h4 className="font-bold text-neutral-700 dark:text-neutral-300 mb-1">
+                      {verificationFilter !== "ALL" ? `No ${verificationFilter.toLowerCase()} workers found` : "No workers available"}
+                    </h4>
+                    <p className="text-sm text-neutral-500 mb-4">Try adjusting your filters or search criteria.</p>
+                    {verificationFilter !== "ALL" && (
+                      <Button size="sm" variant="outline" onClick={() => setVerificationFilter("ALL")}>
+                        Clear Filters
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </Motion.section>
         )}
-      </div>
-    </>
+      </AnimatePresence>
+    </div>
   );
 }

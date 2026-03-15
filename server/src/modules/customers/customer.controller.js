@@ -7,14 +7,15 @@ const { upsertCustomerProfile, getCustomerProfile } = require('./customer.servic
 // Create or update customer profile (address + optional profile photo)
 exports.saveProfile = asyncHandler(async (req, res) => {
   const userId = req.user.id;
-  const { line1, line2, city, state, postalCode, country, profilePhotoUrl } = req.body;
+  const { name, line1, line2, city, state, postalCode, country, profilePhotoUrl } = req.body;
 
   // Validate profilePhotoUrl if provided — only accept URLs from our upload endpoint
   if (profilePhotoUrl && !isValidUploadUrl(profilePhotoUrl, ['/uploads/profile-photos/'])) {
     throw new AppError(400, 'Invalid profile photo URL. Please use the upload endpoint.');
   }
 
-  const address = await upsertCustomerProfile(userId, {
+  await upsertCustomerProfile(userId, {
+    name,
     line1,
     line2,
     city,
@@ -24,7 +25,8 @@ exports.saveProfile = asyncHandler(async (req, res) => {
     profilePhotoUrl,
   });
 
-  res.status(201).json({ address });
+  const user = await getCustomerProfile(userId);
+  res.status(200).json({ user });
 });
 
 // GET /api/customers/profile

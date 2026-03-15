@@ -1,7 +1,7 @@
 const asyncHandler = require('../../common/utils/asyncHandler');
 const AppError = require('../../common/errors/AppError');
 const prisma = require('../../config/prisma');
-const { registerUser, loginUser, verifyEmailToken, requestPasswordReset, resetPasswordWithToken } = require('./auth.service');
+const { registerUser, loginUser, verifyEmailToken, requestPasswordReset, resetPasswordWithToken, changePassword } = require('./auth.service');
 const { sendVerificationEmail, sendPasswordResetEmail } = require('../../common/utils/mailer');
 
 const COOKIE_OPTIONS = {
@@ -134,4 +134,11 @@ exports.resetPassword = asyncHandler(async (req, res) => {
   const { token, password } = req.body;
   await resetPasswordWithToken({ token, password });
   res.json({ message: 'Password reset successfully' });
+});
+
+exports.changePassword = asyncHandler(async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  const userId = req.user.id;
+  await changePassword(userId, { currentPassword, newPassword });
+  res.json({ message: 'Password updated successfully' });
 });

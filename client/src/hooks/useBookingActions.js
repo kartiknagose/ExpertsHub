@@ -2,8 +2,9 @@ import { useState, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
-import { acceptBooking, cancelBooking, downloadInvoice } from '../api/bookings';
+import { acceptBooking, cancelBooking, downloadInvoice, payBooking } from '../api/bookings';
 import { createReview } from '../api/reviews';
+import { ensureRazorpayLoaded, getRazorpayKeyId } from '../utils/razorpay';
 
 /**
  * Shared hook for booking action handling across worker pages.
@@ -23,6 +24,7 @@ import { createReview } from '../api/reviews';
  */
 export function useBookingActions({ invalidateKeys = [] } = {}) {
   const queryClient = useQueryClient();
+  const razorpayKeyId = getRazorpayKeyId();
 
   // ── UI state ──────────────────────────────────────────────
   const [activeActionId, setActiveActionId] = useState(null);
@@ -43,7 +45,6 @@ export function useBookingActions({ invalidateKeys = [] } = {}) {
     mutationFn: (id) => acceptBooking(id),
     onSuccess: () => {
       invalidateAll();
-      toast.success('Job accepted successfully!');
     },
     onError: (error) => {
       toast.error(
@@ -105,8 +106,20 @@ export function useBookingActions({ invalidateKeys = [] } = {}) {
       } else if (type === 'PAY') {
         // Razorpay checkout handler
         function launchRazorpayCheckout(order, booking, user, onSuccess, onFailure) {
+          if (!window?.Razorpay) {
+            toast.error('Payment system unavailable. Please try again in a moment.');
+            onFailure?.();
+            return;
+          }
+
+          if (!razorpayKeyId) {
+            toast.error('Payment is not configured. Please contact support.');
+            onFailure?.();
+            return;
+          }
+
           const options = {
-            key: 'rzp_test_xxxxxxxx', // Test key
+            key: razorpayKeyId,
             amount: order.amount,
             currency: order.currency,
             name: 'UrbanPro V2',
@@ -124,17 +137,41 @@ export function useBookingActions({ invalidateKeys = [] } = {}) {
               ondismiss: onFailure,
             },
           };
-          const rzp = new window.Razorpay(options);
-          rzp.open();
+
+          try {
+            const rzp = new window.Razorpay(options);
+            rzp.open();
+          } catch (_error) {
+            toast.error('Unable to open payment window. Please try again.');
+            onFailure?.();
+          }
         }
+
+        if (!razorpayKeyId) {
+          toast.error('Payment is not configured. Please contact support.');
+          return;
+        }
+
+        await ensureRazorpayLoaded();
+
         // 1. Call backend to create Razorpay order
-        const orderResp = await window.payBooking(payload.id, { createRazorpayOrder: true });
+        const orderResp = await payBooking(payload.id, { createRazorpayOrder: true });
         const order = orderResp.order;
+
+        if (!order) {
+           toast.error('Failed to initiate payment. Please try again.');
+           return;
+        }
+
         // 2. Launch Razorpay modal
-        launchRazorpayCheckout(order, payload.booking, payload.user,
+        launchRazorpayCheckout(order, payload.booking || { id: payload.id }, payload.user || {},
           async (razorpayResponse) => {
             // 3. On success, update payment status
-            await window.payBooking(payload.id, { paymentReference: razorpayResponse.razorpay_payment_id });
+            await payBooking(payload.id, {
+              paymentReference: razorpayResponse.razorpay_payment_id,
+              paymentOrderId: razorpayResponse.razorpay_order_id,
+              paymentSignature: razorpayResponse.razorpay_signature,
+            });
             invalidateAll();
             toast.success('Payment successful! Thank you.');
           },

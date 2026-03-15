@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 import { ShieldAlert, AlertCircle } from 'lucide-react';
 import { Modal, Button, Input } from '../../common';
 import { cancelBooking } from '../../../api/bookings';
@@ -32,15 +33,9 @@ const ROLE_CONFIG = {
 
 /**
  * Shared cancellation modal with reason input.
- * Self-contained: manages internal cancelReason state and cancel mutation.
- *
- * @param {boolean}  isOpen          - Whether modal is visible
- * @param {function} onClose         - Close handler (also resets reason)
- * @param {number}   bookingId       - Booking to cancel
- * @param {string}   role            - 'WORKER' | 'CUSTOMER' — drives copy/icon
- * @param {Array}    invalidateKeys  - Query key arrays to invalidate on success
  */
 export function CancellationModal({ isOpen, onClose, bookingId, role = 'CUSTOMER', invalidateKeys = [] }) {
+    const { t } = useTranslation();
     const queryClient = useQueryClient();
     const [cancelReason, setCancelReason] = useState('');
     const config = ROLE_CONFIG[role] || ROLE_CONFIG.CUSTOMER;
@@ -52,12 +47,12 @@ export function CancellationModal({ isOpen, onClose, bookingId, role = 'CUSTOMER
             invalidateKeys.forEach((key) => {
                 queryClient.invalidateQueries({ queryKey: key });
             });
-            toast.success(config.successMessage);
+            toast.success(t(config.successMessage));
             setCancelReason('');
             onClose();
         },
         onError: (error) => {
-            toast.error(error?.response?.data?.error || 'Failed to cancel');
+            toast.error(error?.response?.data?.error || t('Failed to cancel'));
         },
     });
 
@@ -72,19 +67,19 @@ export function CancellationModal({ isOpen, onClose, bookingId, role = 'CUSTOMER
     };
 
     return (
-        <Modal isOpen={isOpen} onClose={handleClose} title={config.title} size="sm">
+        <Modal isOpen={isOpen} onClose={handleClose} title={t(config.title)} size="sm">
             <div className="space-y-4">
                 <div className="p-4 rounded-xl flex items-center gap-4 bg-error-50 dark:bg-error-950/20 text-error-600">
                     <Icon size={config.iconSize} />
-                    <p className="text-sm font-bold leading-tight">{config.message}</p>
+                    <p className="text-sm font-bold leading-tight">{t(config.message)}</p>
                 </div>
 
                 <div className="space-y-2">
                     <label className="text-xs font-black uppercase text-gray-500 tracking-widest pl-1">
-                        {config.label}
+                        {t(config.label)}
                     </label>
                     <Input
-                        placeholder={config.placeholder}
+                        placeholder={t(config.placeholder)}
                         value={cancelReason}
                         onChange={(e) => setCancelReason(e.target.value)}
                         className="h-12 text-sm"
@@ -94,7 +89,7 @@ export function CancellationModal({ isOpen, onClose, bookingId, role = 'CUSTOMER
 
                 <div className="flex gap-3 pt-4">
                     <Button fullWidth variant="ghost" onClick={handleClose}>
-                        {config.cancelText}
+                        {t(config.cancelText)}
                     </Button>
                     <Button
                         fullWidth
@@ -103,7 +98,7 @@ export function CancellationModal({ isOpen, onClose, bookingId, role = 'CUSTOMER
                         disabled={!cancelReason.trim()}
                         loading={cancelMutation.isPending}
                     >
-                        {config.confirmText}
+                        {t(config.confirmText)}
                     </Button>
                 </div>
             </div>

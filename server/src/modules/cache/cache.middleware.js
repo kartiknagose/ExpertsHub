@@ -12,9 +12,17 @@ async function serviceCatalogCache(req, res, next) {
 
 async function workerProfileCache(req, res, next) {
   try {
-    const id = parseInt(req.params.id);
-    const profile = await cacheService.getWorkerProfile(id);
-    res.json({ profile });
+    const workerId = parseInt(req.params.workerId);
+    if (isNaN(workerId)) return next(); // Fallback if ID is invalid
+    
+    const profile = await cacheService.getWorkerProfile(workerId);
+    if (!profile) return res.status(404).json({ message: 'Worker not found' });
+
+    // Ensure response matches the expected structure { profile, services }
+    res.json({ 
+      profile, 
+      services: profile.services || [] 
+    });
   } catch (err) {
     next(err);
   }

@@ -1,105 +1,131 @@
-// Reusable Select component for forms
-// Mirrors Input.jsx API — supports labels, error messages, icons, and dark/light theme
+// Select component — Premium rebuild matching Input.jsx design
+// Features better focus states, micro-animations, and consistent typography
 
-import { forwardRef, useId } from 'react';
+import { forwardRef, useId, useState } from 'react';
 import { ChevronDown, AlertCircle } from 'lucide-react';
+import { motion as Motion, AnimatePresence } from 'framer-motion';
 
-/**
- * Select Component
- * @param {string} label - Select label
- * @param {string} error - Error message (shows red border and error text)
- * @param {React.ReactNode} icon - Icon component (from lucide-react)
- * @param {boolean} required - Show required asterisk
- * @param {boolean} disabled - Disable select
- * @param {string} value - Controlled value
- * @param {function} onChange - Change handler
- * @param {React.ReactNode} children - <option> elements
- * @param {React.Ref} ref - Forwarded ref (for React Hook Form)
- */
 export const Select = forwardRef(function Select(
   {
     label,
     error,
+    hint,
     icon: Icon,
     required = false,
     disabled = false,
     className = '',
+    selectClassName = '',
     children,
+    value,
+    defaultValue,
     ...props
   },
   ref
 ) {
-  const autoId = useId();
+  const [isFocused, setIsFocused] = useState(false);
+  const autoId   = useId();
   const selectId = props.id || autoId;
 
-  // Base styles
-  const baseStyles = 'w-full px-4 py-2.5 rounded-lg border transition-colors duration-200 focus:outline-none focus:ring-2 appearance-none cursor-pointer';
+  const getContainerClass = () => {
+    if (error) return 'shadow-lg shadow-error-500/10 ring-4 ring-error-500/10';
+    if (isFocused) return 'shadow-2xl shadow-brand-500/20 ring-4 ring-brand-500/20';
+    return 'hover:shadow-lg hover:shadow-brand-500/5 hover:bg-neutral-100 dark:hover:bg-dark-700/50';
+  };
 
-  // Theme-based styles
-  const themeStyles = error
-    ? 'bg-white dark:bg-dark-800 border-error-500 text-gray-900 dark:text-gray-100 focus:border-error-400 focus:ring-error-500/50'
-    : 'bg-white dark:bg-dark-800 border-gray-300 dark:border-dark-600 text-gray-900 dark:text-gray-100 focus:border-brand-600 dark:focus:border-brand-500 focus:ring-brand-600/50 dark:focus:ring-brand-500/50 hover:border-gray-400 dark:hover:border-dark-500';
-
-  // Icon padding
-  const paddingWithIcon = Icon ? 'pl-11' : '';
-
-  // Right padding for chevron
-  const paddingRight = 'pr-10';
-
-  // Disabled styles
-  const disabledStyles = disabled ? 'opacity-50 cursor-not-allowed' : '';
-
-  // Combine all styles
-  const selectClasses = `${baseStyles} ${themeStyles} ${paddingWithIcon} ${paddingRight} ${disabledStyles} ${className}`;
-
-  // Label styles
-  const labelStyles = 'block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5';
-
-  // Error text styles
-  const errorStyles = 'mt-1.5 text-sm text-error-500 dark:text-error-400';
 
   return (
-    <div className="w-full">
-      {/* Label */}
-      {label && (
-        <label htmlFor={selectId} className={labelStyles}>
-          {label}
-          {required && <span className="text-error-500 ml-1">*</span>}
-        </label>
-      )}
-
-      {/* Select wrapper */}
+    <div className={`w-full group ${className}`}>
       <div className="relative">
-        {/* Left icon */}
-        {Icon && (
-          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
-            <Icon size={20} />
-          </div>
-        )}
-
-        {/* Select field */}
-        <select
-          id={selectId}
-          disabled={disabled}
-          className={selectClasses}
-          ref={ref}
-          {...props}
+        <Motion.div
+           animate={{
+            scale: isFocused ? 1.005 : 1,
+          }}
+          transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+          className={`
+            relative min-h-[74px] rounded-2xl transition-all duration-300 ease-out flex items-center
+            ${disabled ? 'bg-neutral-100 dark:bg-dark-900 opacity-60' : ''}
+            ${!disabled && isFocused ? 'bg-white dark:bg-dark-800' : 'bg-neutral-50 dark:bg-dark-900/55'}
+            ${getContainerClass()}
+          `}
         >
-          {children}
-        </select>
+          {/* 1. Icon Overlay */}
+          {Icon && (
+            <div className={`absolute left-4 top-1/2 -translate-y-1/2 z-30 pointer-events-none transition-colors duration-300 ${isFocused ? 'text-brand-500' : 'text-neutral-400 dark:text-neutral-500'}`}>
+              <Icon size={18} strokeWidth={2.5} />
+            </div>
+          )}
 
-        {/* Chevron icon */}
-        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500 dark:text-gray-400">
-          {error ? <AlertCircle size={18} className="text-error-500" /> : <ChevronDown size={18} />}
-        </div>
+          {/* 2. Fixed Label Overlay */}
+          {label && (
+            <div
+              className={`
+                absolute top-3.5 z-30 pointer-events-none select-none transition-all duration-300
+                text-[10px] font-black uppercase tracking-widest leading-none
+                ${isFocused ? 'text-brand-600 dark:text-brand-400' : 'text-neutral-400 dark:text-neutral-500'}
+                ${Icon ? 'left-12' : 'left-5'}
+              `}
+            >
+              {label}
+              {required && <span className="text-error-500 ml-0.5">*</span>}
+            </div>
+          )}
+
+          {/* 3. The Main Select (Zero Boundary) */}
+          <select
+            id={selectId}
+            disabled={disabled}
+            value={value}
+            defaultValue={defaultValue}
+            className={`
+              block w-full h-full bg-transparent !border-0 !outline-none !ring-0 !shadow-none
+              focus:!border-0 focus:!outline-none focus:!ring-0 focus:!shadow-none
+              focus-visible:!outline-none focus-visible:!ring-0
+              text-gray-900 dark:text-white font-medium cursor-pointer transition-all
+              rounded-2xl
+              ${Icon ? 'pl-12' : 'pl-5'}
+              pr-10
+              ${label ? 'pt-8 pb-3' : 'py-5'}
+              ${selectClassName}
+            `}
+            ref={ref}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
+            {...props}
+          >
+            {children}
+          </select>
+
+          {/* 4. Arrow Overlay */}
+          <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-neutral-400 dark:text-neutral-500 transition-colors duration-200 group-hover:text-brand-500 z-30">
+            {error ? <AlertCircle size={18} className="text-error-500" /> : <ChevronDown size={18} strokeWidth={3} />}
+          </div>
+        </Motion.div>
       </div>
 
-      {/* Error message */}
-      {error && (
-        <p className={errorStyles}>
-          {error}
-        </p>
-      )}
+      <AnimatePresence mode="wait">
+        {error ? (
+          <Motion.p
+            key="error"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="mt-1.5 px-1 text-[10px] font-black uppercase tracking-widest text-error-600 dark:text-error-400 flex items-center gap-1.5"
+          >
+            <AlertCircle size={10} strokeWidth={3} />
+            {error}
+          </Motion.p>
+        ) : hint ? (
+          <Motion.p
+            key="hint"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="mt-1.5 px-1 text-[10px] font-bold uppercase tracking-widest text-neutral-400 dark:text-neutral-500 flex items-center gap-1.5"
+          >
+            <div className="w-1 h-1 rounded-full bg-neutral-300 dark:bg-dark-600" />
+            {hint}
+          </Motion.p>
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 });

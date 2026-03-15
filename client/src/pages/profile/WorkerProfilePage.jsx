@@ -1,24 +1,40 @@
-// Worker profile page
-// Allows workers to view and update their profile
-
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Briefcase, MapPin, IndianRupee, Image, Save, UserCircle, Star, ShieldCheck, CheckCircle, PencilLine, X, Plus, Map } from 'lucide-react';
+import {
+  Briefcase,
+  Camera,
+  CheckCircle2,
+  MapPin,
+  PencilLine,
+  Plus,
+  Save,
+  ShieldCheck,
+  Star,
+  UserCircle,
+  X,
+} from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { MainLayout } from '../../components/layout/MainLayout';
-
-// ServiceAreaPolygonEditor is available in components/features/location/ 
-// but requires react-leaflet-draw which has compatibility issues with Vite 7 build.
-// The polygon editor can be enabled when react-leaflet-draw is updated.
-import { Card, CardHeader, CardTitle, CardDescription } from '../../components/common';
-import { Input, Button, Badge } from '../../components/common';
+import {
+  Badge,
+  Button,
+  Card,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  Input,
+  Textarea,
+  WorkerTierBadge,
+} from '../../components/common';
 import { toast } from 'sonner';
-import { getMyWorkerProfile, createWorkerProfile } from '../../api/workers';
+import { createWorkerProfile, getMyWorkerProfile } from '../../api/workers';
 import { uploadProfilePhoto } from '../../api/uploads';
 import { useAuth } from '../../hooks/useAuth';
 import { resolveProfilePhotoUrl } from '../../utils/profilePhoto';
+import { SocialShare } from '../../components/features/growth/SocialShare';
 import { getPageLayout } from '../../constants/layout';
 import { LocationPicker } from '../../components/features/location/LocationPicker';
 import { MiniMap } from '../../components/features/location/MiniMap';
@@ -34,23 +50,45 @@ const workerProfileSchema = z.object({
   serviceRadius: z.number().min(1).max(100).optional(),
 });
 
+function normalizeList(value) {
+  if (Array.isArray(value)) return value;
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return value
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean);
+    }
+  }
+  return [];
+}
+
 export function WorkerProfilePage() {
-  usePageTitle('Profile');
+  const { t } = useTranslation();
+  usePageTitle(t('Profile'));
+
   const navigate = useNavigate();
   const { user: authUser, setUser } = useAuth();
+
   const [profileData, setProfileData] = useState(null);
   const [skillsList, setSkillsList] = useState([]);
   const [serviceAreasList, setServiceAreasList] = useState([]);
-  const [showPolygonEditor, setShowPolygonEditor] = useState(false);
+  const [initialSkillsList, setInitialSkillsList] = useState([]);
+  const [initialAreasList, setInitialAreasList] = useState([]);
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [serverError, setServerError] = useState('');
+
   const [photoFile, setPhotoFile] = useState(null);
   const [photoPreview, setPhotoPreview] = useState('');
   const [initialPhotoUrl, setInitialPhotoUrl] = useState('');
+
   const [skillInput, setSkillInput] = useState('');
   const [areaInput, setAreaInput] = useState('');
-  const [initialSkillsList, setInitialSkillsList] = useState([]);
-  const [initialAreasList, setInitialAreasList] = useState([]);
-  const [isEditing, setIsEditing] = useState(false);
 
   const {
     register,
@@ -61,111 +99,120 @@ export function WorkerProfilePage() {
     formState: { errors, isSubmitting, isDirty },
   } = useForm({
     resolver: zodResolver(workerProfileSchema),
+    defaultValues: {
+      bio: '',
+      skills: '',
+      serviceAreas: '',
+      hourlyRate: '',
+      serviceRadius: 10,
+      baseLatitude: undefined,
+      baseLongitude: undefined,
+    },
   });
 
   const watchedRate = useWatch({ control, name: 'hourlyRate' });
   const watchedRadius = useWatch({ control, name: 'serviceRadius' });
 
-  // Only show Save Changes when the user is editing and changed something.
-  const canSave = isEditing && (isDirty || Boolean(photoFile) || (photoPreview && photoPreview !== initialPhotoUrl));
+  const isVerified = Boolean(
+    profileData?.isVerified ||
+    profileData?.verificationStatus === 'APPROVED' ||
+    profileData?.verificationStatus === 'VERIFIED'
+  );
+
+  const profileCompletion = useMemo(() => {
+    const hasBio = Boolean((profileData?.bio || '').trim());
+    const hasSkills = skillsList.length > 0;
+    const hasAreas = serviceAreasList.length > 0;
+    const hasRate = Boolean(profileData?.hourlyRate);
+    const hasPhoto = Boolean(photoPreview);
+
+    const items = [
+      { key: 'bio', label: t('Bio'), done: hasBio },
+      { key: 'skills', label: t('Skills'), done: hasSkills },
+      { key: 'areas', label: t('Service areas'), done: hasAreas },
+      { key: 'rate', label: t('Pricing'), done: hasRate },
+      { key: 'photo', label: t('Profile photo'), done: hasPhoto },
+    ];
+
+    const completed = items.filter((item) => item.done).length;
+    return {
+      items,
+      percent: Math.round((completed / items.length) * 100),
+    };
+  }, [profileData, skillsList, serviceAreasList, photoPreview, t]);
+
+  const hasListChanges = useMemo(() => {
+    const oldSkills = initialSkillsList.join('|').toLowerCase();
+    const newSkills = skillsList.join('|').toLowerCase();
+    const oldAreas = initialAreasList.join('|').toLowerCase();
+    const newAreas = serviceAreasList.join('|').toLowerCase();
+    return oldSkills !== newSkills || oldAreas !== newAreas;
+  }, [initialSkillsList, skillsList, initialAreasList, serviceAreasList]);
+
+  const hasPhotoChange = Boolean(photoFile) || (photoPreview && photoPreview !== initialPhotoUrl);
+  const canSave = isEditing && (isDirty || hasListChanges || hasPhotoChange);
 
   useEffect(() => {
+    let mounted = true;
+
     const loadProfile = async () => {
+      setIsLoadingProfile(true);
+      setServerError('');
+
       try {
         const data = await getMyWorkerProfile();
-        const profile = data.profile;
-        const userData = data.profile?.user || authUser || null;
+        const profile = data?.profile || null;
+        const userData = profile?.user || authUser || null;
 
-        setProfileData({
-          ...profile,
-          user: userData,
+        if (!mounted) return;
+
+        setProfileData(profile ? { ...profile, user: userData } : { user: userData });
+
+        const normalizedSkills = normalizeList(profile?.skills);
+        const normalizedAreas = normalizeList(profile?.serviceAreas);
+
+        setSkillsList(normalizedSkills);
+        setServiceAreasList(normalizedAreas);
+        setInitialSkillsList(normalizedSkills);
+        setInitialAreasList(normalizedAreas);
+
+        reset({
+          bio: profile?.bio || '',
+          skills: normalizedSkills.join(', '),
+          serviceAreas: normalizedAreas.join(', '),
+          hourlyRate: profile?.hourlyRate || '',
+          baseLatitude: profile?.baseLatitude || undefined,
+          baseLongitude: profile?.baseLongitude || undefined,
+          serviceRadius: profile?.serviceRadius || 10,
         });
-
-        if (profile) {
-          const normalizeList = (value) => {
-            if (Array.isArray(value)) return value;
-            if (typeof value === 'string') {
-              try {
-                const parsed = JSON.parse(value);
-                return Array.isArray(parsed) ? parsed : [];
-              } catch {
-                return value.split(',').map((item) => item.trim()).filter(Boolean);
-              }
-            }
-            return [];
-          };
-
-          const normalizedSkills = normalizeList(profile.skills);
-          const normalizedAreas = normalizeList(profile.serviceAreas);
-
-          setValue('bio', profile.bio || '');
-          setValue('skills', normalizedSkills.join(', '));
-          setValue('serviceAreas', normalizedAreas.join(', '));
-          setValue('hourlyRate', profile.hourlyRate || '');
-          setValue('baseLatitude', profile.baseLatitude || undefined);
-          setValue('baseLongitude', profile.baseLongitude || undefined);
-          setValue('serviceRadius', profile.serviceRadius || 10);
-
-          setSkillsList(normalizedSkills);
-          setServiceAreasList(normalizedAreas);
-          setInitialSkillsList(normalizedSkills);
-          setInitialAreasList(normalizedAreas);
-
-          // If important fields are missing, treat as setup/edit mode
-          if (!profile.bio || !profile.hourlyRate || normalizedSkills.length === 0 || normalizedAreas.length === 0) {
-            setIsEditing(true);
-          }
-        } else {
-          // No profile at all, definitely setup mode
-          setIsEditing(true);
-        }
 
         const resolvedPhoto = resolveProfilePhotoUrl(
           profile?.user?.profilePhotoUrl || authUser?.profilePhotoUrl || ''
         );
-        if (resolvedPhoto) {
-          setPhotoPreview(resolvedPhoto);
-          setInitialPhotoUrl(resolvedPhoto);
-        }
+        setPhotoPreview(resolvedPhoto || '');
+        setInitialPhotoUrl(resolvedPhoto || '');
+
+        const isProfileIncomplete =
+          !profile?.bio ||
+          !profile?.hourlyRate ||
+          normalizedSkills.length === 0 ||
+          normalizedAreas.length === 0;
+
+        setIsEditing(!profile || isProfileIncomplete);
       } catch (error) {
-        setServerError(error.response?.data?.message || 'Failed to load profile');
+        if (!mounted) return;
+        setServerError(error?.response?.data?.message || t('Failed to load profile'));
+      } finally {
+        if (mounted) setIsLoadingProfile(false);
       }
     };
 
     loadProfile();
-  }, [setValue, authUser]);
 
-  const handlePhotoChange = (e) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      // Client-side guard: only allow image uploads.
-      if (!file.type.startsWith('image/')) {
-        setServerError('Only image files are allowed');
-        setPhotoFile(null);
-        setPhotoPreview(initialPhotoUrl || '');
-        return;
-      }
-      setPhotoFile(file);
-      setPhotoPreview(URL.createObjectURL(file));
-    }
-  };
-
-  const handleCancelEdit = () => {
-    setIsEditing(false);
-    setServerError('');
-    setPhotoFile(null);
-    setPhotoPreview(initialPhotoUrl || '');
-    setSkillInput('');
-    setAreaInput('');
-    setSkillsList(initialSkillsList);
-    setServiceAreasList(initialAreasList);
-    reset({
-      bio: profileData?.bio || '',
-      skills: initialSkillsList.join(', '),
-      serviceAreas: initialAreasList.join(', '),
-      hourlyRate: profileData?.hourlyRate || '',
-    });
-  };
+    return () => {
+      mounted = false;
+    };
+  }, [authUser, reset, t]);
 
   const syncSkills = (next) => {
     setSkillsList(next);
@@ -189,6 +236,10 @@ export function WorkerProfilePage() {
     setSkillInput('');
   };
 
+  const removeSkill = (value) => {
+    syncSkills(skillsList.filter((item) => item !== value));
+  };
+
   const addArea = () => {
     const value = areaInput.trim();
     if (!value) return;
@@ -201,12 +252,44 @@ export function WorkerProfilePage() {
     setAreaInput('');
   };
 
-  const removeSkill = (value) => {
-    syncSkills(skillsList.filter((item) => item !== value));
-  };
-
   const removeArea = (value) => {
     syncAreas(serviceAreasList.filter((item) => item !== value));
+  };
+
+  const handlePhotoChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setServerError(t('Only image files are allowed'));
+      return;
+    }
+
+    setServerError('');
+    setPhotoFile(file);
+    setPhotoPreview(URL.createObjectURL(file));
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setServerError('');
+    setPhotoFile(null);
+    setPhotoPreview(initialPhotoUrl || '');
+    setSkillInput('');
+    setAreaInput('');
+
+    setSkillsList(initialSkillsList);
+    setServiceAreasList(initialAreasList);
+
+    reset({
+      bio: profileData?.bio || '',
+      skills: initialSkillsList.join(', '),
+      serviceAreas: initialAreasList.join(', '),
+      hourlyRate: profileData?.hourlyRate || '',
+      baseLatitude: profileData?.baseLatitude || undefined,
+      baseLongitude: profileData?.baseLongitude || undefined,
+      serviceRadius: profileData?.serviceRadius || 10,
+    });
   };
 
   const onSubmit = async (data) => {
@@ -219,435 +302,491 @@ export function WorkerProfilePage() {
         profilePhotoUrl = uploadResult.url;
       }
 
-      const skillsArray = skillsList;
-      const serviceAreasArray = serviceAreasList;
-
-      await createWorkerProfile({
+      const payload = {
         bio: data.bio,
         hourlyRate: data.hourlyRate,
-        skills: skillsArray,
-        serviceAreas: serviceAreasArray,
-        profilePhotoUrl,
-        baseLatitude: data.baseLatitude,
-        baseLongitude: data.baseLongitude,
+        skills: skillsList,
+        serviceAreas: serviceAreasList,
+        baseLatitude: Number.isFinite(data.baseLatitude) ? data.baseLatitude : undefined,
+        baseLongitude: Number.isFinite(data.baseLongitude) ? data.baseLongitude : undefined,
         serviceRadius: data.serviceRadius,
-      });
+      };
 
-      // Refresh profile data so UI reflects changes without a reload.
-      const refreshed = await getMyWorkerProfile();
-      const refreshedProfile = refreshed.profile || null;
-      setProfileData((prev) => ({
-        ...refreshedProfile,
-        user: prev?.user || authUser || null,
-      }));
-      if (refreshedProfile) {
-        setSkillsList(skillsArray);
-        setServiceAreasList(serviceAreasArray);
-        setInitialSkillsList(skillsArray);
-        setInitialAreasList(serviceAreasArray);
+      // Backend currently validates profilePhotoUrl as local upload path only.
+      // Upload endpoint already persists cloud URLs on user profile, so skip sending
+      // external URLs here to avoid false validation failures during profile save.
+      if (profilePhotoUrl && profilePhotoUrl.startsWith('/uploads/profile-photos/')) {
+        payload.profilePhotoUrl = profilePhotoUrl;
       }
 
-      toast.success('Profile updated successfully.');
+      await createWorkerProfile(payload);
 
-      if (refreshedProfile?.user) {
-        const updatedUser = { ...authUser, ...refreshedProfile.user };
-        // Ensure manual update of profilePhotoUrl if for some reason backend didn't return it instantly
-        if (profilePhotoUrl) {
-          updatedUser.profilePhotoUrl = profilePhotoUrl;
-        }
+      const refreshed = await getMyWorkerProfile();
+      const refreshedProfile = refreshed?.profile || null;
+      const mergedUser = refreshedProfile?.user || authUser || null;
 
+      setProfileData(refreshedProfile ? { ...refreshedProfile, user: mergedUser } : { user: mergedUser });
+      setInitialSkillsList(skillsList);
+      setInitialAreasList(serviceAreasList);
+
+      const resolvedPhoto = resolveProfilePhotoUrl(
+        profilePhotoUrl || refreshedProfile?.user?.profilePhotoUrl || authUser?.profilePhotoUrl || ''
+      );
+      setPhotoPreview(resolvedPhoto || '');
+      setInitialPhotoUrl(resolvedPhoto || '');
+      setPhotoFile(null);
+      setIsEditing(false);
+
+      if (mergedUser) {
+        const updatedUser = { ...authUser, ...mergedUser };
+        if (profilePhotoUrl) updatedUser.profilePhotoUrl = profilePhotoUrl;
         localStorage.setItem('user', JSON.stringify(updatedUser));
         setUser(updatedUser);
       }
 
-      if (profilePhotoUrl) {
-        setPhotoPreview(resolveProfilePhotoUrl(profilePhotoUrl));
-      } else if (refreshedProfile?.user?.profilePhotoUrl) {
-        setPhotoPreview(resolveProfilePhotoUrl(refreshedProfile.user.profilePhotoUrl));
-      }
-      setIsEditing(false);
+      toast.success(t('Profile updated successfully.'));
     } catch (error) {
-      const errorMessage = error.response?.data?.message || 'Failed to update profile';
+      const errorMessage =
+        error?.response?.data?.message ||
+        error?.response?.data?.error ||
+        error?.message ||
+        t('Failed to update profile');
       setServerError(errorMessage);
       toast.error(errorMessage);
     }
   };
 
+  const completionBadgeVariant = profileCompletion.percent >= 80 ? 'success' : 'info';
+
   return (
     <MainLayout>
       <div className={getPageLayout('default')}>
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100">
-            Worker Profile
-          </h1>
-          <p className="text-gray-600 mt-2 dark:text-gray-400">
-            Build trust with customers across India and manage your services.
-          </p>
-        </div>
-
-        <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
-          <div className="space-y-6">
-            <Card className="p-6">
-              <div className="flex items-center gap-4">
-                {photoPreview ? (
-                  <img src={photoPreview} alt="Profile" className="w-16 h-16 rounded-full object-cover" />
-                ) : (
-                  <div className="w-16 h-16 rounded-full bg-gradient-to-br from-brand-500 to-accent-500 flex items-center justify-center text-white">
-                    <UserCircle size={28} />
-                  </div>
-                )}
-                <div>
-                  <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                    {profileData?.user?.name || 'Worker'}
-                  </p>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant={profileData?.isVerified ? 'success' : 'warning'}>
-                      {profileData?.isVerified ? 'Verified' : 'Verification Pending'}
-                    </Badge>
-                    <Badge variant="info">Worker</Badge>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1 dark:text-gray-400">
-                    {profileData?.user?.email || 'Add email'}
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-4 space-y-2">
-                <div className="flex items-center gap-2 text-sm">
-                  <IndianRupee size={16} className="text-success-500" />
-                  <span className="text-gray-600 dark:text-gray-300">
-                    INR {profileData?.hourlyRate || '--'} / hr
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <MapPin size={16} className="text-brand-500" />
-                  <span className="text-gray-600 dark:text-gray-300">
-                    {serviceAreasList[0] || 'Set service areas in India'}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <Star size={16} className="text-accent-500" />
-                  <span className="text-gray-600 dark:text-gray-300">
-                    {profileData?.rating?.toFixed?.(1) || '0.0'} rating · {profileData?.totalReviews || 0} reviews
-                  </span>
-                </div>
-              </div>
-            </Card>
-
-            {(() => {
-              const hasBio = Boolean(profileData?.bio);
-              const hasSkills = skillsList.length > 0;
-              const hasAreas = serviceAreasList.length > 0;
-              const hasRate = Boolean(profileData?.hourlyRate);
-              const hasPhoto = Boolean(photoPreview);
-              const completionTotal = 5;
-              const completionCount = [hasBio, hasSkills, hasAreas, hasRate, hasPhoto].filter(Boolean).length;
-              const completionPercent = Math.round((completionCount / completionTotal) * 100);
-
-              return (
-                <Card className="p-6">
-                  <CardTitle>Profile Strength</CardTitle>
-                  <CardDescription>Boost visibility in Indian search results.</CardDescription>
-                  <div className="mt-4">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600 dark:text-gray-300">Progress</span>
-                      <span className="text-gray-800 dark:text-gray-200">{completionPercent}%</span>
-                    </div>
-                    <div className="mt-2 h-2 w-full rounded-full bg-gray-200 dark:bg-dark-700">
-                      <div
-                        className="h-2 rounded-full bg-gradient-to-r from-brand-500 to-accent-500"
-                        style={{ width: `${completionPercent}%` }}
-                      />
-                    </div>
-                    <div className="mt-4 space-y-2 text-sm">
-                      <div className="flex items-center gap-2">
-                        <CheckCircle size={16} className={hasBio ? 'text-success-500' : 'text-gray-400'} />
-                        <span className="text-gray-600 dark:text-gray-300">Add bio</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <CheckCircle size={16} className={hasSkills ? 'text-success-500' : 'text-gray-400'} />
-                        <span className="text-gray-600 dark:text-gray-300">Add skills</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <CheckCircle size={16} className={hasAreas ? 'text-success-500' : 'text-gray-400'} />
-                        <span className="text-gray-600 dark:text-gray-300">Add service areas</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <CheckCircle size={16} className={hasRate ? 'text-success-500' : 'text-gray-400'} />
-                        <span className="text-gray-600 dark:text-gray-300">Set hourly rate</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <CheckCircle size={16} className={hasPhoto ? 'text-success-500' : 'text-gray-400'} />
-                        <span className="text-gray-600 dark:text-gray-300">Add profile photo</span>
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              );
-            })()}
-
-            <Card className="p-6">
-              <CardTitle>Services Snapshot</CardTitle>
-              <CardDescription>What customers see first</CardDescription>
-              <div className="mt-4 space-y-3">
-                <div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Skills</p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {skillsList.length === 0 && (
-                      <Badge variant="default">Add skills</Badge>
-                    )}
-                    {skillsList.map((skill) => (
-                      <Badge key={skill} variant="info">{skill}</Badge>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Service Areas</p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {serviceAreasList.length === 0 && (
-                      <Badge variant="default">Add areas</Badge>
-                    )}
-                    {serviceAreasList.map((area) => (
-                      <Badge key={area} variant="default">{area}</Badge>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              {!isEditing && (
-                <div className="mt-6 pt-4 border-t border-gray-100 dark:border-dark-700">
-                  <Button
-                    variant="outline"
-                    fullWidth
-                    onClick={() => navigate('/worker/services')}
-                  >
-                    Manage Offered Services
-                  </Button>
-                </div>
-              )}
-            </Card>
+        <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-widest text-brand-500">{t('Worker Profile')}</p>
+            <h1 className="mt-1.5 text-2xl font-black tracking-tight text-neutral-900 dark:text-white">
+              {t('Manage Your Professional Profile')}
+            </h1>
+            <p className="mt-1.5 text-sm text-neutral-500 dark:text-neutral-400">
+              {t('Keep your profile updated so customers can trust and book you quickly.')}
+            </p>
           </div>
 
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>
-                    {!profileData?.bio ? 'Complete Your Profile' : (isEditing ? 'Edit Profile' : 'Profile Details')}
-                  </CardTitle>
-                  <CardDescription>
-                    {isEditing
-                      ? 'Update your profile information and save changes.'
-                      : 'Keep your skills and pricing up to date for Indian customers.'}
-                  </CardDescription>
-                </div>
-                {!isEditing && (
-                  <Button size="sm" icon={PencilLine} onClick={() => setIsEditing(true)}>
-                    Edit
-                  </Button>
-                )}
-              </div>
-            </CardHeader>
-
+          <div className="flex flex-wrap gap-2">
             {!isEditing && (
-              <div className="space-y-4 px-6 pb-6">
-                <div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Bio</p>
-                  <p className="text-gray-800 dark:text-gray-200">{profileData?.bio || '--'}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Skills</p>
-                  <p className="text-gray-800 dark:text-gray-200">
-                    {skillsList.length ? skillsList.join(', ') : '--'}
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={PencilLine}
+                onClick={() => setIsEditing(true)}
+                className="h-10 rounded-xl px-4 font-bold text-xs"
+              >
+                {t('Edit Profile')}
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              icon={ShieldCheck}
+              onClick={() => navigate('/worker/verification')}
+              className="h-10 rounded-xl px-4 font-bold text-xs"
+            >
+              {t('Verification')}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              icon={Briefcase}
+              onClick={() => navigate('/worker/services')}
+              className="h-10 rounded-xl px-4 font-bold text-xs"
+            >
+              {t('Services')}
+            </Button>
+          </div>
+        </div>
+
+        {serverError && (
+          <div className="mb-4 rounded-xl border border-error-200 bg-error-50 px-3 py-2.5 text-sm font-semibold text-error-600 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">
+            {serverError}
+          </div>
+        )}
+
+        {isLoadingProfile ? (
+          <Card className="p-8">
+            <p className="text-sm text-neutral-500 dark:text-neutral-400">{t('Loading profile...')}</p>
+          </Card>
+        ) : (
+          <div className="grid gap-4 lg:grid-cols-[300px_1fr]">
+            <div className="space-y-6">
+              <Card className="p-4">
+                <div className="flex flex-col items-center text-center">
+                  <div className="relative">
+                    <div className="h-24 w-24 overflow-hidden rounded-xl bg-neutral-100 dark:bg-dark-800">
+                      {photoPreview ? (
+                        <img src={photoPreview} alt="Profile" className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-neutral-400">
+                          <UserCircle size={44} />
+                        </div>
+                      )}
+                    </div>
+                    {isVerified && (
+                      <div className="absolute -right-2 -bottom-2 rounded-lg bg-success-500 p-1.5 text-white shadow-lg">
+                        <ShieldCheck size={14} />
+                      </div>
+                    )}
+                  </div>
+
+                  <h2 className="mt-3 text-lg font-bold text-neutral-900 dark:text-white">
+                    {profileData?.user?.name || t('Worker')}
+                  </h2>
+                  <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+                    {profileData?.user?.email || t('Email not available')}
                   </p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Service Areas</p>
-                  <p className="text-gray-800 dark:text-gray-200">
-                    {serviceAreasList.length ? serviceAreasList.join(', ') : '--'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Hourly Rate</p>
-                  <p className="text-gray-800 dark:text-gray-200">
-                    {profileData?.hourlyRate ? `INR ${profileData.hourlyRate} / hr` : '--'}
-                  </p>
-                </div>
-                {profileData?.baseLatitude && (
-                  <div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Service Hub & Coverage</p>
-                    <div className="mt-2 rounded-xl overflow-hidden border border-gray-100 dark:border-dark-700">
-                      <MiniMap lat={profileData.baseLatitude} lng={profileData.baseLongitude} height="120px" />
-                      <div className="p-2 text-[10px] font-bold uppercase tracking-widest text-center bg-gray-50 text-brand-600 dark:bg-dark-900 dark:text-brand-400">
-                        {profileData.serviceRadius || 10} km Coverage Radius
+
+                  <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                    <WorkerTierBadge totalJobs={profileData?.totalReviews || 0} />
+                    <Badge variant={isVerified ? 'success' : 'info'}>
+                      {isVerified ? t('Verified') : t('Verification Pending')}
+                    </Badge>
+                  </div>
+
+                  <div className="mt-4 grid w-full grid-cols-2 gap-2.5">
+                    <div className="rounded-lg bg-neutral-50 p-2.5 dark:bg-dark-800">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
+                        {t('Hourly Rate')}
+                      </p>
+                      <p className="mt-1 text-base font-bold text-neutral-900 dark:text-white">
+                        ₹{profileData?.hourlyRate || '--'}
+                      </p>
+                    </div>
+                    <div className="rounded-lg bg-neutral-50 p-2.5 dark:bg-dark-800">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">{t('Rating')}</p>
+                      <div className="mt-1 flex items-center justify-center gap-1">
+                        <Star size={14} className="fill-warning-500 text-warning-500" />
+                        <p className="text-base font-bold text-neutral-900 dark:text-white">
+                          {profileData?.rating?.toFixed?.(1) || '4.9'}
+                        </p>
                       </div>
                     </div>
                   </div>
-                )}
-              </div>
-            )}
+                </div>
+              </Card>
 
-            {isEditing && (
-              <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 px-6 pb-6">
-                <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-                  <div className="space-y-5">
+              <Card className="p-4">
+                <CardHeader className="p-0">
+                  <CardTitle>{t('Profile Completion')}</CardTitle>
+                  <CardDescription>{t('Complete all essentials to improve visibility')}</CardDescription>
+                </CardHeader>
+
+                <div className="mt-4">
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-xs font-semibold text-neutral-500">{t('Progress')}</span>
+                    <Badge variant={completionBadgeVariant}>{profileCompletion.percent}%</Badge>
+                  </div>
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-neutral-200 dark:bg-dark-700">
+                    <div
+                      className="h-full rounded-full bg-brand-500"
+                      style={{ width: `${profileCompletion.percent}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-3 space-y-1.5">
+                  {profileCompletion.items.map((item) => (
+                    <div key={item.key} className="flex items-center gap-2 text-sm">
+                      <CheckCircle2 size={14} className={item.done ? 'text-success-500' : 'text-neutral-300'} />
+                      <span className={item.done ? 'text-neutral-700 dark:text-neutral-200' : 'text-neutral-400'}>
+                        {item.label}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                {!isEditing && (
+                  <div className="mt-4 border-t border-neutral-100 pt-3 dark:border-dark-700">
+                    <Button
+                      variant="outline"
+                      fullWidth
+                      onClick={() => navigate('/worker/availability')}
+                      icon={MapPin}
+                    >
+                      {t('Set Availability')}
+                    </Button>
+                  </div>
+                )}
+              </Card>
+            </div>
+
+            <div>
+              {!isEditing ? (
+                <Card className="p-4 sm:p-5">
+                  <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-200">
-                        Profile Photo
-                      </label>
-                      <label
-                        className="flex items-center gap-4 rounded-xl border border-dashed p-4 transition-colors cursor-pointer border-gray-200 hover:border-brand-500 bg-gray-50 dark:border-dark-600 dark:bg-dark-800/40"
+                      <CardTitle>{t('Public Profile Preview')}</CardTitle>
+                      <CardDescription className="mt-1">
+                        {t('This is what customers see before booking you.')}
+                      </CardDescription>
+                    </div>
+                    <SocialShare
+                      title={t('Hire {{name}}', { name: profileData?.user?.name || t('Professional') })}
+                      text={t('Check out my services on UrbanPro V2.')}
+                    />
+                  </div>
+
+                  <div className="space-y-5">
+                    <section>
+                      <h3 className="mb-2 text-sm font-bold text-neutral-800 dark:text-neutral-200">{t('About')}</h3>
+                      <p className="rounded-lg bg-neutral-50 p-3 text-sm leading-relaxed text-neutral-700 dark:bg-dark-800 dark:text-neutral-300">
+                        {profileData?.bio || t('No bio provided yet.')}
+                      </p>
+                    </section>
+
+                    <section>
+                      <h3 className="mb-2 text-sm font-bold text-neutral-800 dark:text-neutral-200">{t('Skills')}</h3>
+                      <div className="flex flex-wrap gap-2">
+                        {skillsList.length > 0 ? (
+                          skillsList.map((skill) => (
+                            <Badge key={skill} variant="info">{skill}</Badge>
+                          ))
+                        ) : (
+                          <p className="text-sm text-neutral-500">{t('No skills added yet.')}</p>
+                        )}
+                      </div>
+                    </section>
+
+                    <section>
+                      <h3 className="mb-2 text-sm font-bold text-neutral-800 dark:text-neutral-200">{t('Service Areas')}</h3>
+                      <div className="flex flex-wrap gap-2">
+                        {serviceAreasList.length > 0 ? (
+                          serviceAreasList.map((area) => (
+                            <Badge key={area}>{area}</Badge>
+                          ))
+                        ) : (
+                          <p className="text-sm text-neutral-500">{t('No service areas defined yet.')}</p>
+                        )}
+                      </div>
+                    </section>
+
+                    <section>
+                      <h3 className="mb-2 text-sm font-bold text-neutral-800 dark:text-neutral-200">
+                        {t('Base Location & Service Radius')}
+                      </h3>
+                      {profileData?.baseLatitude && profileData?.baseLongitude ? (
+                        <div className="overflow-hidden rounded-lg border border-neutral-200 dark:border-dark-700">
+                          <MiniMap
+                            lat={profileData.baseLatitude}
+                            lng={profileData.baseLongitude}
+                            radius={profileData.serviceRadius || 10}
+                            height="220px"
+                          />
+                        </div>
+                      ) : (
+                        <div className="rounded-lg border border-dashed border-neutral-300 p-4 text-sm text-neutral-500 dark:border-dark-700 dark:text-neutral-400">
+                          {t('Base location is not configured yet.')}
+                        </div>
+                      )}
+                    </section>
+                  </div>
+                </Card>
+              ) : (
+                <Card className="p-4 sm:p-5">
+                  <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <CardTitle>{t('Edit Profile')}</CardTitle>
+                      <CardDescription className="mt-1">
+                        {t('Update your details and save when you are ready.')}
+                      </CardDescription>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        icon={X}
+                        onClick={handleCancelEdit}
                       >
-                        <div className="w-16 h-16 rounded-full bg-gray-200 dark:bg-dark-700 overflow-hidden">
+                        {t('Cancel')}
+                      </Button>
+                      <Button
+                        type="submit"
+                        form="worker-profile-form"
+                        icon={Save}
+                        loading={isSubmitting}
+                        disabled={!canSave}
+                      >
+                        {t('Save Changes')}
+                      </Button>
+                    </div>
+                  </div>
+
+                  <form id="worker-profile-form" onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">
+                    <section className="grid gap-4 lg:grid-cols-[140px_1fr]">
+                      <div>
+                        <p className="text-sm font-bold text-neutral-800 dark:text-neutral-200">{t('Profile Photo')}</p>
+                        <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+                          {t('Use a clear and professional image.')}
+                        </p>
+                      </div>
+
+                      <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-dashed border-neutral-300 p-3 transition hover:bg-neutral-50 dark:border-dark-700 dark:hover:bg-dark-800">
+                        <div className="h-16 w-16 overflow-hidden rounded-lg bg-neutral-100 dark:bg-dark-700">
                           {photoPreview ? (
-                            <img src={photoPreview} alt="Profile" className="w-full h-full object-cover" />
+                            <img src={photoPreview} alt="Preview" className="h-full w-full object-cover" />
                           ) : (
-                            <div className="w-full h-full flex items-center justify-center text-gray-400">
-                              <Image size={24} />
+                            <div className="flex h-full w-full items-center justify-center text-neutral-400">
+                              <UserCircle size={32} />
                             </div>
                           )}
                         </div>
-                        <div>
-                          <p className="text-sm text-gray-700 dark:text-gray-200">Drop a new photo here</p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
-                            JPG or PNG, up to 5MB
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold text-neutral-800 dark:text-neutral-200">
+                            {t('Upload Photo')}
+                          </p>
+                          <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+                            {t('JPG or PNG, up to 10MB.')}
                           </p>
                         </div>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          capture="environment"
-                          onChange={handlePhotoChange}
-                          className="hidden"
-                        />
+                        <Camera size={18} className="text-neutral-500" />
+                        <input type="file" accept="image/*" onChange={handlePhotoChange} className="hidden" />
                       </label>
-                    </div>
+                    </section>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-200">
-                        Bio
-                      </label>
-                      <textarea
-                        rows={4}
-                        placeholder="Tell customers about your experience"
-                        className="w-full rounded-xl border px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 border-gray-200 bg-white text-gray-800 placeholder:text-gray-400 dark:border-dark-600 dark:bg-dark-900 dark:text-gray-100 dark:placeholder:text-gray-500"
+                    <section className="grid gap-4 lg:grid-cols-2">
+                      <Textarea
+                        label={t('Professional Bio')}
+                        rows={6}
+                        placeholder={t('Describe your experience, services, and strengths.')}
+                        error={errors.bio?.message}
                         {...register('bio')}
                       />
-                      {errors.bio?.message && (
-                        <p className="mt-1 text-sm text-error-500">{errors.bio.message}</p>
-                      )}
-                    </div>
 
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
-                          Skills
-                        </label>
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                          Add up to 10
-                        </span>
-                      </div>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {skillsList.length === 0 && (
-                          <span className="text-xs text-gray-400 dark:text-gray-500">No skills yet</span>
-                        )}
-                        {skillsList.map((skill) => (
-                          <span
-                            key={skill}
-                            className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium bg-gray-100 text-gray-700 dark:bg-dark-700 dark:text-gray-200"
-                          >
-                            {skill}
-                            <button type="button" onClick={() => removeSkill(skill)} className="text-gray-400 hover:text-gray-200">
-                              <X size={12} />
-                            </button>
-                          </span>
-                        ))}
-                      </div>
-                      <div className="mt-3 flex items-center gap-2">
-                        <input
-                          value={skillInput}
-                          onChange={(e) => setSkillInput(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ',') {
-                              e.preventDefault();
-                              addSkill();
-                            }
-                          }}
-                          placeholder="Type a skill and press Enter"
-                          className="flex-1 rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 border-gray-200 bg-white text-gray-800 placeholder:text-gray-400 dark:border-dark-600 dark:bg-dark-900 dark:text-gray-100 dark:placeholder:text-gray-500"
+                      <div className="space-y-3 rounded-lg border border-neutral-200 p-3 dark:border-dark-700">
+                        <Input
+                          label={t('Hourly Rate (INR)')}
+                          type="number"
+                          error={errors.hourlyRate?.message}
+                          {...register('hourlyRate')}
                         />
-                        <button
-                          type="button"
-                          onClick={addSkill}
-                          className="inline-flex items-center gap-2 rounded-xl bg-brand-500 px-3 py-2 text-xs font-semibold text-white hover:bg-brand-600"
-                        >
-                          <Plus size={14} />
-                          Add
-                        </button>
-                      </div>
-                      <input type="hidden" {...register('skills')} />
-                      {errors.skills?.message && (
-                        <p className="mt-1 text-sm text-error-500">{errors.skills.message}</p>
-                      )}
-                    </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-200">
-                        Service Areas
-                      </label>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {serviceAreasList.length === 0 && (
-                          <span className="text-xs text-gray-400 dark:text-gray-500">No areas yet</span>
-                        )}
-                        {serviceAreasList.map((area) => (
-                          <span
-                            key={area}
-                            className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium bg-gray-100 text-gray-700 dark:bg-dark-700 dark:text-gray-200"
-                          >
-                            {area}
-                            <button type="button" onClick={() => removeArea(area)} className="text-gray-400 hover:text-gray-200">
-                              <X size={12} />
-                            </button>
-                          </span>
-                        ))}
-                      </div>
-                      <div className="mt-3 flex items-center gap-2">
-                        <input
-                          value={areaInput}
-                          onChange={(e) => setAreaInput(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ',') {
-                              e.preventDefault();
-                              addArea();
+                        <div>
+                          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-500">
+                            {t('Quick Adjust')}
+                          </p>
+                          <input
+                            type="range"
+                            min="100"
+                            max="5000"
+                            step="50"
+                            value={watchedRate || 0}
+                            onChange={(e) =>
+                              setValue('hourlyRate', Number(e.target.value), { shouldDirty: true })
                             }
-                          }}
-                          placeholder="Add a city or locality"
-                          className="flex-1 rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 border-gray-200 bg-white text-gray-800 placeholder:text-gray-400 dark:border-dark-600 dark:bg-dark-900 dark:text-gray-100 dark:placeholder:text-gray-500"
-                        />
-                        <button
-                          type="button"
-                          onClick={addArea}
-                          className="inline-flex items-center gap-2 rounded-xl bg-brand-500 px-3 py-2 text-xs font-semibold text-white hover:bg-brand-600"
-                        >
-                          <Plus size={14} />
-                          Add
-                        </button>
+                            className="w-full accent-brand-500"
+                          />
+                          <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-300">
+                            {t('Current rate')}: <span className="font-bold">₹{watchedRate || 0}</span>
+                          </p>
+                        </div>
                       </div>
-                      <input type="hidden" {...register('serviceAreas')} />
-                      {errors.serviceAreas?.message && (
-                        <p className="mt-1 text-sm text-error-500">{errors.serviceAreas.message}</p>
-                      )}
-                    </div>
+                    </section>
 
-                    <div className="pt-4 space-y-5">
-                      <div className="border-t border-dashed border-gray-100 dark:border-dark-700 pt-5">
-                        <label className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-200">
-                          Service Hub (Base Location)
-                        </label>
-                        <p className="text-xs mb-3 text-gray-500 dark:text-gray-400">
-                          Mark your central location on the map. This helps us find jobs near you.
+                    <section className="grid gap-4 lg:grid-cols-2">
+                      <div className="rounded-lg border border-neutral-200 p-3 dark:border-dark-700">
+                        <p className="mb-3 text-sm font-bold text-neutral-800 dark:text-neutral-200">{t('Skills')}</p>
+                        <div className="mb-2.5 flex min-h-10 flex-wrap gap-1.5 rounded-lg bg-neutral-50 p-2 dark:bg-dark-800">
+                          {skillsList.length > 0 ? (
+                            skillsList.map((skill) => (
+                              <span
+                                key={skill}
+                                className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1 text-xs font-semibold text-neutral-700 shadow-sm dark:bg-dark-700 dark:text-neutral-200"
+                              >
+                                {skill}
+                                <button type="button" onClick={() => removeSkill(skill)}>
+                                  <X size={12} className="text-neutral-400 hover:text-error-500" />
+                                </button>
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-xs text-neutral-500">{t('No skills added')}</span>
+                          )}
+                        </div>
+                        <div className="flex gap-2">
+                          <Input
+                            value={skillInput}
+                            onChange={(e) => setSkillInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ',') {
+                                e.preventDefault();
+                                addSkill();
+                              }
+                            }}
+                            placeholder={t('Add a skill')}
+                          />
+                          <Button type="button" variant="secondary" onClick={addSkill} className="px-3" aria-label={t('Add skill')}>
+                            <Plus size={16} />
+                          </Button>
+                        </div>
+                        <input type="hidden" {...register('skills')} />
+                        {errors.skills?.message && (
+                          <p className="mt-2 text-xs font-semibold text-error-500">{errors.skills.message}</p>
+                        )}
+                      </div>
+
+                      <div className="rounded-lg border border-neutral-200 p-3 dark:border-dark-700">
+                        <p className="mb-3 text-sm font-bold text-neutral-800 dark:text-neutral-200">{t('Service Areas')}</p>
+                        <div className="mb-2.5 flex min-h-10 flex-wrap gap-1.5 rounded-lg bg-neutral-50 p-2 dark:bg-dark-800">
+                          {serviceAreasList.length > 0 ? (
+                            serviceAreasList.map((area) => (
+                              <span
+                                key={area}
+                                className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1 text-xs font-semibold text-neutral-700 shadow-sm dark:bg-dark-700 dark:text-neutral-200"
+                              >
+                                {area}
+                                <button type="button" onClick={() => removeArea(area)}>
+                                  <X size={12} className="text-neutral-400 hover:text-error-500" />
+                                </button>
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-xs text-neutral-500">{t('No service areas added')}</span>
+                          )}
+                        </div>
+                        <div className="flex gap-2">
+                          <Input
+                            value={areaInput}
+                            onChange={(e) => setAreaInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ',') {
+                                e.preventDefault();
+                                addArea();
+                              }
+                            }}
+                            placeholder={t('Add city or locality')}
+                          />
+                          <Button type="button" variant="secondary" onClick={addArea} className="px-3" aria-label={t('Add area')}>
+                            <Plus size={16} />
+                          </Button>
+                        </div>
+                        <input type="hidden" {...register('serviceAreas')} />
+                        {errors.serviceAreas?.message && (
+                          <p className="mt-2 text-xs font-semibold text-error-500">{errors.serviceAreas.message}</p>
+                        )}
+                      </div>
+                    </section>
+
+                    <section className="rounded-lg border border-neutral-200 p-3 dark:border-dark-700">
+                      <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                        <p className="text-sm font-bold text-neutral-800 dark:text-neutral-200">
+                          {t('Base Location & Radius')}
                         </p>
+                        <Badge>{(watchedRadius || 10)} {t('km radius')}</Badge>
+                      </div>
+
+                      <div className="mb-3 rounded-lg border border-neutral-200 dark:border-dark-700">
                         <LocationPicker
-                          onLocationSelect={(loc) => {
+                          className="!h-[250px] !rounded-lg"
+                          radius={watchedRadius}
+                          onChange={(loc) => {
                             setValue('baseLatitude', loc.lat, { shouldDirty: true });
                             setValue('baseLongitude', loc.lng, { shouldDirty: true });
                           }}
@@ -659,120 +798,34 @@ export function WorkerProfilePage() {
                         />
                       </div>
 
-                      <div className="p-4 rounded-xl border border-gray-200 bg-gray-50/50 dark:border-dark-700 dark:bg-dark-800/20">
-                        <div className="flex items-center justify-between mb-2">
-                          <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
-                            Service Radius
-                          </label>
-                          <span className="text-sm font-bold text-brand-500">
-                            {watchedRadius || 10} km
-                          </span>
-                        </div>
+                      <div>
                         <input
                           type="range"
                           min="1"
                           max="100"
-                          step="1"
                           {...register('serviceRadius', { valueAsNumber: true })}
                           className="w-full accent-brand-500"
                         />
-                        <p className="text-[10px] mt-2 text-gray-400 dark:text-gray-500">
-                          Jobs within this distance from your hub will be visible to you.
+                        <p className="mt-2 text-xs text-neutral-500 dark:text-neutral-400">
+                          {t('Choose how far you are willing to travel for jobs.')}
                         </p>
                       </div>
+                    </section>
 
-                      {/* Service Area Polygon Editor */}
-                      <div className="border-t border-dashed border-gray-100 dark:border-dark-700 pt-5">
-                        <div className="flex items-center justify-between mb-2">
-                          <label className="text-sm font-medium text-gray-700 dark:text-gray-200 flex items-center gap-2">
-                            <Map size={16} className="text-brand-500" />
-                            Service Area Zone (Optional)
-                          </label>
-                          <button
-                            type="button"
-                            className="text-xs text-brand-600 hover:underline"
-                            onClick={() => setShowPolygonEditor(!showPolygonEditor)}
-                          >
-                            {showPolygonEditor ? 'Hide Map' : 'Draw on Map'}
-                          </button>
-                        </div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-                          Draw a polygon on the map to define your exact coverage zone. Bookings outside this area will be declined automatically.
-                        </p>
-                        {showPolygonEditor && (
-                          <div className="rounded-xl overflow-hidden border border-gray-200 dark:border-dark-700 p-6 text-center bg-gray-50 dark:bg-dark-800">
-                            <Map size={32} className="mx-auto text-gray-400 mb-3" />
-                            <p className="text-sm font-semibold text-gray-600 dark:text-gray-300">Service Area Polygon Editor</p>
-                            <p className="text-xs text-gray-400 mt-1">
-                              Draw your coverage zone on an interactive map. This feature will be available once the map drawing library is updated.
-                            </p>
-                          </div>
-                        )}
-                      </div>
+                    <div className="flex flex-col-reverse gap-2 border-t border-neutral-100 pt-3 sm:flex-row sm:justify-end dark:border-dark-700">
+                      <Button type="button" variant="outline" icon={X} onClick={handleCancelEdit}>
+                        {t('Cancel')}
+                      </Button>
+                      <Button type="submit" icon={Save} loading={isSubmitting} disabled={!canSave}>
+                        {t('Save Changes')}
+                      </Button>
                     </div>
-                  </div>
-
-                  <div className="space-y-4 rounded-2xl border p-4 border-gray-200 bg-gray-50 dark:border-dark-700 dark:bg-dark-900/40">
-                    <div>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">Hourly Rate</p>
-                      <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
-                        INR {watchedRate || '--'} / hr
-                      </p>
-                    </div>
-                    <input
-                      type="range"
-                      min="100"
-                      max="5000"
-                      step="50"
-                      value={watchedRate || 0}
-                      onChange={(e) => setValue('hourlyRate', Number(e.target.value), { shouldDirty: true })}
-                      className="w-full accent-brand-500"
-                    />
-                    <Input
-                      label="Hourly Rate (INR/hr)"
-                      type="number"
-                      placeholder="750"
-                      icon={IndianRupee}
-                      error={errors.hourlyRate?.message}
-                      {...register('hourlyRate')}
-                    />
-                    <div className="text-xs text-gray-500 dark:text-gray-400">
-                      Tip: Higher rates can signal premium expertise in metro cities.
-                    </div>
-                  </div>
-                </div>
-
-                {serverError && (
-                  <p className="text-sm text-error-500">{serverError}</p>
-                )}
-
-
-                <div className="flex flex-col gap-3">
-                  {canSave && (
-                    <Button
-                      type="submit"
-                      fullWidth
-                      loading={isSubmitting}
-                      icon={Save}
-                      iconPosition="right"
-                    >
-                      Save Changes
-                    </Button>
-                  )}
-                  <Button
-                    type="button"
-                    fullWidth
-                    variant="outline"
-                    icon={X}
-                    onClick={handleCancelEdit}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </form>
-            )}
-          </Card>
-        </div>
+                  </form>
+                </Card>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </MainLayout>
   );

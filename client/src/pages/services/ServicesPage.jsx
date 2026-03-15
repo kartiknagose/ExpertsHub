@@ -12,6 +12,8 @@ import { getPageLayout } from '../../constants/layout';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcut';
 import { queryKeys } from '../../utils/queryKeys';
 import { usePageTitle } from '../../hooks/usePageTitle';
+import { useCity } from '../../context/CityContext';
+import { useTranslation } from 'react-i18next';
 
 const categoryIconMap = {
   cleaning: Sparkles,
@@ -36,6 +38,7 @@ const getCategoryIcon = (category) => {
 
 // Memoized Service Card Component (ISSUE-035)
 const ServiceCard = memo(({ service }) => {
+  const { t } = useTranslation();
   const iconType = getCategoryIcon(service.category);
   const bgImage = getServiceImage(service.name || service.category);
 
@@ -98,7 +101,7 @@ const ServiceCard = memo(({ service }) => {
               icon={ArrowRight}
               iconPosition="right"
             >
-              Book Now
+              {t('Book Now')}
             </Button>
           </Link>
         </div>
@@ -108,13 +111,15 @@ const ServiceCard = memo(({ service }) => {
 });
 
 export function ServicesPage() {
-    usePageTitle('Services');
+    const { t } = useTranslation();
+    usePageTitle(t('Services'));
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('');
   const [priceRange, setPriceRange] = useState({ min: 0, max: 10000 });
   const [minRating, setMinRating] = useState(0);
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
+  const { selectedCity } = useCity();
 
   // Keyboard shortcuts
   useKeyboardShortcuts([
@@ -123,14 +128,15 @@ export function ServicesPage() {
   ]);
 
   const { data: services = [], isLoading, isError, error, refetch } = useQuery({
-    queryKey: queryKeys.services.list({ search, category, priceRange, minRating }),
+    queryKey: queryKeys.services.list({ search, category, priceRange, minRating, city: selectedCity?.slug }),
     queryFn: async () => {
       const data = await getAllServices({
         search,
         category,
         minPrice: priceRange.min,
         maxPrice: priceRange.max,
-        minRating
+        minRating,
+        city: selectedCity?.slug
       });
       return Array.isArray(data.services) ? data.services : Array.isArray(data) ? data : [];
     },
@@ -188,45 +194,42 @@ export function ServicesPage() {
         {/* Modern Search Hero */}
         <div className="relative mb-12 py-12 text-center">
           <h1 className="text-4xl md:text-6xl font-black mb-6 tracking-tight text-gray-900 dark:text-white">
-            What do you <span className="text-brand-500">need help</span> with?
+            {t('What do you need help with?').split(' ').slice(0, 3).join(' ')} <span className="text-brand-500">{t('need help')}</span> {t('What do you need help with?').split(' ').slice(5).join(' ')}
           </h1>
 
-          <div className="max-w-3xl mx-auto relative group">
-            <div className={`absolute -inset-1 bg-gradient-to-r from-brand-500 to-accent-500 rounded-[2rem] blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200`}></div>
-            <div className="relative flex items-center p-2 rounded-[1.8rem] shadow-2xl bg-white border-gray-100 dark:bg-dark-800 dark:border-dark-700">
-              <div className="pl-6 flex items-center text-gray-400">
-                <Search size={24} />
-              </div>
-              <input
-                type="text"
-                placeholder="Search for services like 'Home Cleaning', 'Electrical Repair'..."
-                className="w-full px-6 py-4 bg-transparent outline-none text-lg font-medium text-gray-900 dark:text-white"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-              <div className="flex items-center gap-2 pr-2">
-                <Button
-                  variant={isFiltersOpen ? 'primary' : 'outline'}
-                  className={`rounded-2xl px-6 h-12 gap-2 border-0 ring-1 ${isFiltersOpen ? 'ring-brand-500' : 'ring-gray-200 dark:ring-dark-700'}`}
-                  onClick={() => setIsFiltersOpen(!isFiltersOpen)}
-                >
-                  <SlidersHorizontal size={18} />
-                  <span className="hidden md:inline font-bold uppercase text-[10px] tracking-widest">Filters</span>
-                  {activeFiltersCount > 0 && (
-                    <span className="w-5 h-5 rounded-full bg-brand-500 text-white text-[10px] flex items-center justify-center font-black">
-                      {activeFiltersCount}
-                    </span>
-                  )}
-                </Button>
-                <Button
-                  variant="primary"
-                  className="rounded-2xl px-8 h-12 shadow-xl shadow-brand-500/20"
-                  onClick={() => refetch()}
-                >
-                  <span className="font-black uppercase text-[10px] tracking-widest">Search</span>
-                </Button>
-              </div>
-            </div>
+          <div className="max-w-3xl mx-auto">
+            <Input
+              icon={Search}
+              placeholder={t("Search for services like 'Home Cleaning', 'Electrical Repair'...")}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="group"
+              inputClassName="text-lg pr-[280px]"
+              rightElement={
+                <div className="flex items-center gap-2 pr-1">
+                  <Button
+                    variant={isFiltersOpen ? 'primary' : 'outline'}
+                    className={`rounded-2xl px-6 h-12 gap-2 border-0 ring-1 ${isFiltersOpen ? 'ring-brand-500' : 'ring-gray-200 dark:ring-dark-700'}`}
+                    onClick={() => setIsFiltersOpen(!isFiltersOpen)}
+                  >
+                    <SlidersHorizontal size={18} />
+                    <span className="hidden md:inline font-bold uppercase text-xs tracking-widest">{t('Filters')}</span>
+                    {activeFiltersCount > 0 && (
+                      <span className="w-5 h-5 rounded-full bg-brand-500 text-white text-[10px] flex items-center justify-center font-black">
+                        {activeFiltersCount}
+                      </span>
+                    )}
+                  </Button>
+                  <Button
+                    variant="primary"
+                    className="rounded-2xl px-8 h-12 shadow-xl shadow-brand-500/20"
+                    onClick={() => refetch()}
+                  >
+                    <span className="font-bold uppercase text-xs tracking-widest">{t('Search')}</span>
+                  </Button>
+                </div>
+              }
+            />
           </div>
 
           {/* Quick Category Chips */}
@@ -239,7 +242,7 @@ export function ServicesPage() {
                 ? 'bg-brand-500 text-white shadow-lg shadow-brand-500/20'
                 : 'bg-white text-gray-500 hover:text-brand-600 hover:bg-gray-50 shadow-sm border dark:bg-dark-800 dark:text-gray-400 dark:hover:text-white dark:hover:bg-dark-700 dark:border-0 dark:shadow-none'}`}
             >
-              All
+              {t('All')}
             </button>
             {categories.map((cat) => (
               <button
@@ -272,7 +275,7 @@ export function ServicesPage() {
                   {/* Price Filter */}
                   <div>
                     <div className="flex items-center justify-between mb-6">
-                      <h3 className="text-sm font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">Max Price Range</h3>
+                      <h3 className="text-sm font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">{t('Max Price Range')}</h3>
                       <span className="text-brand-500 font-black">₹{priceRange.max.toLocaleString()}</span>
                     </div>
                     <div className="relative pt-2">
@@ -295,7 +298,7 @@ export function ServicesPage() {
 
                   {/* Service Quality */}
                   <div>
-                    <h3 className="text-sm font-black uppercase tracking-widest mb-6 text-gray-500 dark:text-gray-400">Expert Quality</h3>
+                    <h3 className="text-sm font-black uppercase tracking-widest mb-6 text-gray-500 dark:text-gray-400">{t('Expert Quality')}</h3>
                     <div className="grid grid-cols-4 gap-2">
                       {[0, 3, 4, 4.5].map((rating) => (
                         <button
@@ -305,7 +308,7 @@ export function ServicesPage() {
                             ? 'bg-brand-500 border-brand-500 text-white'
                             : 'bg-white border-gray-100 text-gray-500 hover:border-brand-200 dark:bg-dark-800/50 dark:border-white/5 dark:text-gray-400'}`}
                         >
-                          <span className="text-xs font-black">{rating === 0 ? 'Any' : `${rating}+`}</span>
+                          <span className="text-xs font-black">{rating === 0 ? t('Any') : `${rating}+`}</span>
                           <Star size={10} className={minRating === rating ? 'fill-white' : 'fill-gray-400'} />
                         </button>
                       ))}
@@ -322,7 +325,7 @@ export function ServicesPage() {
                         onClick={clearFilters}
                         icon={X}
                       >
-                        Reset All
+                        {t('Reset All')}
                       </Button>
                       <Button
                         variant="primary"
@@ -331,7 +334,7 @@ export function ServicesPage() {
                         onClick={() => setIsFiltersOpen(false)}
                         icon={Check}
                       >
-                        Apply
+                        {t('Apply')}
                       </Button>
                     </div>
                   </div>
@@ -346,11 +349,11 @@ export function ServicesPage() {
           isError={isError}
           error={error}
           isEmpty={!isLoading && !isError && uniqueServices.length === 0}
-          emptyTitle="No services found"
-          emptyMessage="Try different search terms or clear your filters."
+          emptyTitle={t("No services found")}
+          emptyMessage={t("Try different search terms or clear your filters.")}
           emptyAction={
             <Button size="sm" variant="outline" onClick={clearFilters}>
-              Clear Filters
+              {t("Clear Filters")}
             </Button>
           }
           loadingFallback={

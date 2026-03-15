@@ -9,13 +9,71 @@ const {
   getWorkerServicesById,
   getWorkerProfileById,
   removeWorkerService,
+  getTopWorkers,
 } = require('./worker.service');
+
+function normalizeStringArray(value) {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => (typeof item === 'string' ? item.trim() : String(item || '').trim()))
+      .filter(Boolean);
+  }
+
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) {
+        return parsed
+          .map((item) => (typeof item === 'string' ? item.trim() : String(item || '').trim()))
+          .filter(Boolean);
+      }
+    } catch {
+      // fall through to comma-separated parsing
+    }
+
+    return value
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  return undefined;
+}
+
+function toNumberOrUndefined(value) {
+  if (value === undefined || value === null || value === '') return undefined;
+  const num = Number(value);
+  return Number.isFinite(num) ? num : undefined;
+}
 
 // POST /api/workers/profile
 // Create or update the authenticated user's worker profile (lets any user become a worker)
 exports.saveProfile = asyncHandler(async (req, res) => {
   const userId = req.user.id; // from auth middleware
   const { bio, hourlyRate, skills, serviceAreas, profilePhotoUrl, baseLatitude, baseLongitude, serviceRadius } = req.body;
+
+  const normalizedHourlyRate = toNumberOrUndefined(hourlyRate);
+  const normalizedBaseLatitude = toNumberOrUndefined(baseLatitude);
+  const normalizedBaseLongitude = toNumberOrUndefined(baseLongitude);
+  const normalizedServiceRadius = toNumberOrUndefined(serviceRadius);
+  const normalizedSkills = normalizeStringArray(skills);
+  const normalizedServiceAreas = normalizeStringArray(serviceAreas);
+
+  if (hourlyRate !== undefined && hourlyRate !== null && hourlyRate !== '' && normalizedHourlyRate === undefined) {
+    throw new AppError(400, 'Invalid hourlyRate value. Please provide a valid number.');
+  }
+
+  if (baseLatitude !== undefined && baseLatitude !== null && baseLatitude !== '' && normalizedBaseLatitude === undefined) {
+    throw new AppError(400, 'Invalid baseLatitude value. Please provide a valid number.');
+  }
+
+  if (baseLongitude !== undefined && baseLongitude !== null && baseLongitude !== '' && normalizedBaseLongitude === undefined) {
+    throw new AppError(400, 'Invalid baseLongitude value. Please provide a valid number.');
+  }
+
+  if (serviceRadius !== undefined && serviceRadius !== null && serviceRadius !== '' && normalizedServiceRadius === undefined) {
+    throw new AppError(400, 'Invalid serviceRadius value. Please provide a valid number.');
+  }
 
   // Validate profilePhotoUrl if provided — only accept URLs from our upload endpoint
   if (profilePhotoUrl && !isValidUploadUrl(profilePhotoUrl, ['/uploads/profile-photos/'])) {
@@ -24,13 +82,13 @@ exports.saveProfile = asyncHandler(async (req, res) => {
 
   const profile = await upsertWorkerProfile(userId, {
     bio,
-    hourlyRate: typeof hourlyRate === 'number' ? hourlyRate : undefined,
-    skills,
-    serviceAreas,
+    hourlyRate: normalizedHourlyRate,
+    skills: normalizedSkills,
+    serviceAreas: normalizedServiceAreas,
     profilePhotoUrl,
-    baseLatitude,
-    baseLongitude,
-    serviceRadius: serviceRadius ? Number(serviceRadius) : undefined,
+    baseLatitude: normalizedBaseLatitude,
+    baseLongitude: normalizedBaseLongitude,
+    serviceRadius: normalizedServiceRadius,
   });
 
   res.status(201).json({ profile });
@@ -102,4 +160,12 @@ exports.removeService = asyncHandler(async (req, res) => {
   res.json({
     message: 'Service removed successfully',
   });
+});
+
+// GET /api/workers/leaderboard (Sprint 17 - #81)
+// Get top workers based on ratings and reviews
+exports.getLeaderboard = asyncHandler(async (req, res) => {
+  const limit = req.query.limit ? parseInt(req.query.limit) : 20;
+  const workers = await getTopWorkers(limit);
+  res.json({ workers });
 });

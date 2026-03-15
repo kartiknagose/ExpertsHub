@@ -8,53 +8,32 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'prompt',
-      srcDir: 'src',
-      filename: 'sw.js',
-      strategies: 'injectManifest',
-      includeAssets: ['urbanpro-favicon.svg', 'apple-touch-icon-180x180.png', 'robots.txt'],
+      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
       manifest: {
-        name: 'UrbanPro — AI-Powered Local Services Marketplace',
+        name: 'UrbanPro',
         short_name: 'UrbanPro',
-        description: 'Connect with trusted professionals for home services, repairs, and more.',
-        start_url: '/',
-        display: 'standalone',
-        background_color: '#ffffff',
+        description: 'UrbanPro - AI-Powered Local Services Marketplace',
         theme_color: '#7c3aed',
-        orientation: 'portrait',
-        categories: ['business', 'lifestyle', 'utilities'],
         icons: [
           {
-            src: '/pwa-64x64.png',
-            sizes: '64x64',
-            type: 'image/png',
-          },
-          {
-            src: '/pwa-192x192.png',
+            src: 'pwa-192x192.png',
             sizes: '192x192',
-            type: 'image/png',
+            type: 'image/png'
           },
           {
-            src: '/pwa-512x512.png',
+            src: 'pwa-512x512.png',
+            sizes: '512x512',
+            type: 'image/png'
+          },
+          {
+            src: 'pwa-512x512.png',
             sizes: '512x512',
             type: 'image/png',
-          },
-          {
-            src: '/pwa-512x512.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'maskable',
-          },
-          {
-            src: '/urbanpro-favicon.svg',
-            sizes: 'any',
-            type: 'image/svg+xml',
-          },
-        ],
-      },
-      injectManifest: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-      },
-    }),
+            purpose: 'any maskable'
+          }
+        ]
+      }
+    })
   ],
   server: {
     port: 5173,
@@ -69,27 +48,11 @@ export default defineConfig({
     },
   },
   build: {
-    // Faster builds
     sourcemap: false,
     minify: 'esbuild',
     target: 'esnext',
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-          'vendor-query': ['@tanstack/react-query'],
-          'vendor-motion': ['framer-motion'],
-          'vendor-map': ['leaflet', 'react-leaflet'],
-          'vendor-form': ['react-hook-form', '@hookform/resolvers', 'zod'],
-          'vendor-socket': ['socket.io-client'],
-          'vendor-utils': ['axios', 'date-fns', 'sonner'],
-          'vendor-icons': ['lucide-react'],
-        },
-      },
-    },
   },
-  // Reduce processing
   optimizeDeps: {
-    include: ['react', 'react-dom', 'react-router-dom'],
+    include: ['react', 'react-dom', 'react-router-dom', 'framer-motion', 'lucide-react', 'axios'],
   },
 })

@@ -1,10 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, Check, Trash2, Clock, Circle, Settings } from 'lucide-react';
+import { Bell, Check, Clock, Circle, Settings } from 'lucide-react';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../../hooks/useAuth';
-import { Button } from '../../common';
 import { getNotifications, markNotificationAsRead, markAllNotificationsAsRead } from '../../../api';
 import { queryKeys } from '../../../utils/queryKeys';
 
@@ -43,12 +42,12 @@ export function NotificationDropdown() {
         // Handle navigation based on type
         if (n.type === 'CHAT_MESSAGE' && n.data?.bookingId) {
             const path = user.role === 'CUSTOMER'
-                ? `/bookings/${n.data.bookingId}`
+                ? `/customer/bookings/${n.data.bookingId}`
                 : `/worker/bookings/${n.data.bookingId}`;
             navigate(path);
         } else if (n.type === 'BOOKING_UPDATE' && n.data?.bookingId) {
             const path = user.role === 'CUSTOMER'
-                ? `/bookings/${n.data.bookingId}`
+                ? `/customer/bookings/${n.data.bookingId}`
                 : `/worker/bookings/${n.data.bookingId}`;
             navigate(path);
         }

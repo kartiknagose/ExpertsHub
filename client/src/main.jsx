@@ -9,6 +9,10 @@ import GlobalErrorBoundary from './components/common/GlobalErrorBoundary.jsx';
 import './index.css';
 import 'leaflet/dist/leaflet.css';
 import './utils/leafletSetup';
+import './config/i18n';
+import { installToastDeduper } from './utils/toastDeduper';
+
+installToastDeduper();
 
 /**
  * React Query Client Setup

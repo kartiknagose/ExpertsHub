@@ -166,9 +166,45 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
     return R * c;
 }
 
+/**
+ * CITY MANAGEMENT (Sprint 17 - #83)
+ */
+
+async function getCities() {
+    return prisma.city.findMany({
+        where: { isActive: true },
+        orderBy: { name: 'asc' }
+    });
+}
+
+async function getCityServices(citySlug) {
+    const city = await prisma.city.findUnique({
+        where: { slug: citySlug },
+        include: {
+            services: {
+                where: { isActive: true },
+                include: {
+                    service: true
+                }
+            }
+        }
+    });
+
+    if (!city) throw new AppError(404, 'City not found');
+
+    // Return services with their city-specific basePrice if available
+    return city.services.map(cs => ({
+        ...cs.service,
+        basePrice: cs.basePrice || cs.service.basePrice,
+        citySpecific: !!cs.basePrice
+    }));
+}
+
 module.exports = {
     updateLocation,
     getWorkerLocation,
     getNearbyWorkers,
-    calculateDistance
+    calculateDistance,
+    getCities,
+    getCityServices
 };

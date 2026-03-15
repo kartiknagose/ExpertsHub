@@ -1,10 +1,22 @@
 const Razorpay = require('razorpay');
-const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || 'rzp_test_xxxxxxxx';
-const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || 'xxxxxxxxxxxxxx';
-const razorpay = new Razorpay({ key_id: RAZORPAY_KEY_ID, key_secret: RAZORPAY_KEY_SECRET });
+const crypto = require('crypto');
+const AppError = require('../../common/errors/AppError');
+const prisma = require('../../config/prisma');
+
+function getRazorpayClient() {
+  const keyId = process.env.RAZORPAY_KEY_ID;
+  const keySecret = process.env.RAZORPAY_KEY_SECRET;
+
+  if (!keyId || !keySecret) {
+    throw new AppError(500, 'Payment gateway is not configured.');
+  }
+
+  return new Razorpay({ key_id: keyId, key_secret: keySecret });
+}
 
 // Create Razorpay order for booking
 async function createRazorpayOrder(bookingId, amount, currency = 'INR') {
+  const razorpay = getRazorpayClient();
   const options = {
     amount: Math.round(amount * 100), // Razorpay expects paise
     currency,
@@ -15,7 +27,39 @@ async function createRazorpayOrder(bookingId, amount, currency = 'INR') {
   const order = await razorpay.orders.create(options);
   return order;
 }
-const prisma = require('../../config/prisma');
+
+async function createRazorpayWalletTopupOrder(userId, amount, currency = 'INR') {
+  const razorpay = getRazorpayClient();
+  const options = {
+    amount: Math.round(amount * 100),
+    currency,
+    receipt: `wallet_${userId}_${Date.now()}`,
+    notes: { userId: String(userId), purpose: 'WALLET_TOPUP' },
+    payment_capture: 1,
+  };
+  const order = await razorpay.orders.create(options);
+  return order;
+}
+
+function verifyRazorpayPaymentSignature({ orderId, paymentId, signature }) {
+  const keySecret = process.env.RAZORPAY_KEY_SECRET;
+  if (!keySecret) {
+    throw new AppError(500, 'Payment gateway is not configured.');
+  }
+
+  if (!orderId || !paymentId || !signature) {
+    return false;
+  }
+
+  const payload = `${orderId}|${paymentId}`;
+  const digest = crypto.createHmac('sha256', keySecret).update(payload).digest('hex');
+  return digest === signature;
+}
+
+async function fetchRazorpayOrder(orderId) {
+  const razorpay = getRazorpayClient();
+  return razorpay.orders.fetch(orderId);
+}
 
 async function listMyPayments(userId, role, { skip = 0, limit = 20 } = {}) {
   const where =
@@ -59,7 +103,11 @@ async function listAllPayments({ skip = 0, limit = 20 } = {}) {
 }
 
 module.exports = {
+  getRazorpayClient,
   listMyPayments,
   listAllPayments,
   createRazorpayOrder,
+  createRazorpayWalletTopupOrder,
+  verifyRazorpayPaymentSignature,
+  fetchRazorpayOrder,
 };

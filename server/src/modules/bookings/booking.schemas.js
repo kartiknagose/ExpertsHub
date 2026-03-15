@@ -81,6 +81,12 @@ const createBookingSchema = [
     .isString().withMessage('Notes must be text')
     .trim()
     .isLength({ max: 1000 }).withMessage('Notes cannot exceed 1000 characters'),
+
+  // Optional: Frequency for recurring bookings (Sprint 17 - #78)
+  body('frequency')
+    .optional()
+    .isIn(['ONE_TIME', 'WEEKLY', 'BI_WEEKLY', 'MONTHLY'])
+    .withMessage('Invalid frequency'),
 ];
 
 /**
@@ -137,11 +143,37 @@ const payBookingSchema = [
   param('id')
     .isInt({ min: 1 }).withMessage('Booking ID must be a valid number'),
 
+  body('createRazorpayOrder')
+    .optional()
+    .isBoolean().withMessage('createRazorpayOrder must be true or false'),
+
   body('paymentReference')
     .optional()
     .isString().withMessage('Payment reference must be text')
     .trim()
     .isLength({ max: 100 }).withMessage('Payment reference cannot exceed 100 characters'),
+
+  body('paymentOrderId')
+    .optional()
+    .isString().withMessage('Payment order ID must be text')
+    .trim()
+    .isLength({ max: 100 }).withMessage('Payment order ID cannot exceed 100 characters'),
+
+  body('paymentSignature')
+    .optional()
+    .isString().withMessage('Payment signature must be text')
+    .trim()
+    .isLength({ max: 200 }).withMessage('Payment signature cannot exceed 200 characters'),
+];
+
+const refreshOtpSchema = [
+  param('id')
+    .isInt({ min: 1 }).withMessage('Booking ID must be a valid number'),
+
+  body('otpType')
+    .optional()
+    .isIn(['START', 'COMPLETE', 'start', 'complete'])
+    .withMessage('otpType must be either START or COMPLETE'),
 ];
 
 // Export these validation schemas so other files can use them
@@ -150,4 +182,5 @@ module.exports = {
   updateBookingStatusSchema,
   cancelBookingSchema,
   payBookingSchema,
+  refreshOtpSchema,
 };

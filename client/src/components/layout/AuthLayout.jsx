@@ -1,61 +1,113 @@
+// AuthLayout — glassmorphic brand panel, animated stats, responsive
+
+import { motion as Motion } from 'framer-motion';
 import { MainLayout } from './MainLayout';
-import { IMAGES } from '../../constants/images';
+import { Shield, Star, Users } from 'lucide-react';
 
 /**
- * AuthLayout - Shared split-screen layout for all auth pages.
- * Left: branded visual panel (hidden on mobile). Right: form content.
+ * AuthLayout — split-screen for all auth pages
  */
 export function AuthLayout({ children, title, subtitle }) {
+  const stats = [
+    { value: '50K+', label: 'Customers',    icon: Users },
+    { value: '8K+',  label: 'Professionals', icon: Shield },
+    { value: '4.9★', label: 'Avg Rating',   icon: Star },
+  ];
+
   return (
     <MainLayout>
-      <div className="min-h-[calc(100vh-64px)] flex bg-gray-50 dark:bg-dark-950">
+      <div className="min-h-[calc(100vh-64px)] flex bg-neutral-50 dark:bg-dark-950">
 
-        {/* Left Side - Visual Branding (Hidden on mobile) */}
+        {/* ── Left Panel — Brand Visual ─────────────────────────────────── */}
         <div className="hidden lg:flex flex-1 relative overflow-hidden items-center justify-center p-12">
-          <div className="absolute inset-0 bg-gradient-to-br from-brand-600 via-brand-700 to-accent-700" />
-          <div className="absolute inset-0 opacity-30" style={{ backgroundImage: 'radial-gradient(circle at 20% 80%, rgba(255,255,255,0.15) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(255,255,255,0.1) 0%, transparent 50%)' }} />
-          <div className="absolute -top-20 -right-20 w-64 h-64 rounded-full border border-white/10" />
-          <div className="absolute -bottom-20 -left-20 w-80 h-80 rounded-full border border-white/10" />
+          {/* Background gradient */}
+          <div className="absolute inset-0" style={{ background: 'linear-gradient(145deg, #1d4ed8 0%, #4f46e5 45%, #7c3aed 75%, #9d174d 100%)' }} />
 
+          {/* Animated orb accents */}
+          <Motion.div
+            animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }}
+            transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
+            className="absolute top-[-20%] right-[-10%] w-[70%] h-[70%] rounded-full blur-[100px] bg-brand-400"
+          />
+          <Motion.div
+            animate={{ scale: [1, 1.15, 1], opacity: [0.2, 0.35, 0.2] }}
+            transition={{ duration: 11, repeat: Infinity, ease: 'easeInOut', delay: 2 }}
+            className="absolute bottom-[-20%] left-[-10%] w-[60%] h-[60%] rounded-full blur-[100px] bg-accent-500"
+          />
+
+          {/* Decorative rings */}
+          <div className="absolute top-8   right-8  w-48 h-48 rounded-full border border-white/8" />
+          <div className="absolute bottom-8 left-8  w-64 h-64 rounded-full border border-white/8" />
+          <div className="absolute top-1/3 right-12 w-28 h-28 rounded-full border border-white/8" />
+
+          {/* Content */}
           <div className="relative z-10 max-w-lg text-white">
-            <div className="flex items-center gap-3 mb-10">
-              <div className="w-10 h-10 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center">
+            {/* Logo */}
+            <Motion.div
+              initial={{ opacity: 0, y: -16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+              className="flex items-center gap-3 mb-10"
+            >
+              <div className="w-11 h-11 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/30">
                 <span className="text-white font-black text-xl">U</span>
               </div>
-              <span className="text-2xl font-bold">UrbanPro</span>
-            </div>
+              <span className="text-2xl font-black tracking-tight">UrbanPro</span>
+            </Motion.div>
 
-            <h1 className="text-4xl xl:text-5xl font-extrabold mb-5 leading-tight">
+            <Motion.h1
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.6, delay: 0.1 }}
+              className="text-4xl xl:text-5xl font-black mb-5 leading-tight tracking-tight"
+            >
               {title || 'Your trusted home services platform'}
-            </h1>
-            <p className="text-lg text-brand-100 mb-10 leading-relaxed">
+            </Motion.h1>
+            <Motion.p
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.6, delay: 0.2 }}
+              className="text-lg text-white/70 mb-10 leading-relaxed"
+            >
               {subtitle || 'Connect with verified professionals for all your home service needs.'}
-            </p>
+            </Motion.p>
 
-            <div className="grid grid-cols-3 gap-4">
-              {[
-                { value: '50K+', label: 'Customers' },
-                { value: '8K+', label: 'Professionals' },
-                { value: '4.9★', label: 'Avg Rating' },
-              ].map((stat) => (
-                <div key={stat.label} className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-4 text-center">
-                  <div className="text-2xl font-black mb-0.5">{stat.value}</div>
-                  <div className="text-xs text-brand-200">{stat.label}</div>
-                </div>
-              ))}
-            </div>
+            {/* Stats */}
+            <Motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.3 }}
+              className="grid grid-cols-3 gap-3"
+            >
+              {stats.map((stat) => {
+                const I = stat.icon;
+                return (
+                  <div key={stat.label} className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-4 text-center">
+                    <I size={16} className="mx-auto mb-1.5 text-white/60" />
+                    <div className="text-2xl font-black mb-0.5">{stat.value}</div>
+                    <div className="text-xs text-white/60 font-medium">{stat.label}</div>
+                  </div>
+                );
+              })}
+            </Motion.div>
           </div>
         </div>
 
-        {/* Right Side - Form Content */}
-        <div className="flex-1 flex items-center justify-center p-6 sm:p-12 relative bg-white dark:bg-dark-950">
-          <div className="w-full max-w-md">
+        {/* ── Right Panel — Form ────────────────────────────────────────── */}
+        <div className="flex-1 flex items-center justify-center p-6 sm:p-10 relative bg-white dark:bg-dark-950">
+          {/* Subtle background glow */}
+          <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden="true">
+            <div className="absolute top-0 right-0 w-64 h-64 rounded-full blur-[80px] opacity-40 bg-brand-100 dark:bg-brand-500/10" />
+            <div className="absolute bottom-0 left-0 w-48 h-48 rounded-full blur-[60px] opacity-30 bg-accent-100 dark:bg-accent-500/8" />
+          </div>
+
+          <div className="w-full max-w-md relative z-10">
             {/* Mobile Logo */}
             <div className="flex lg:hidden items-center gap-2.5 mb-8">
-              <div className="w-8 h-8 bg-gradient-to-br from-brand-500 to-accent-500 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold">U</span>
+              <div className="w-9 h-9 bg-gradient-to-br from-brand-500 to-accent-500 rounded-xl flex items-center justify-center shadow-brand-sm">
+                <span className="text-white font-black text-base">U</span>
               </div>
-              <span className="text-xl font-bold bg-gradient-to-r from-brand-500 to-accent-500 bg-clip-text text-transparent">UrbanPro</span>
+              <span className="text-xl font-black gradient-text">UrbanPro</span>
             </div>
 
             {children}

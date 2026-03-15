@@ -43,14 +43,21 @@ export default function useSocket(user = null) {
     }
 
     function attachDebugHandlers(socket, label) {
-      socket.on('connect', () => {
-        console.log(`Socket connected (${label})`, socket.id);
-        joinRooms(socket);
-        try { window.dispatchEvent(new Event('upro:socket-ready')); } catch { /* ignore */ }
-      });
-      socket.on('disconnect', (reason) => console.log(`Socket disconnected (${label})`, reason));
-      socket.on('connect_error', (err) => console.warn(`Socket connect_error (${label})`, err?.message || err));
-      socket.on('error', (err) => console.warn(`Socket error (${label})`, err?.message || err));
+      if (import.meta.env.DEV) {
+        socket.on('connect', () => {
+          console.log(`Socket connected (${label})`, socket.id);
+          joinRooms(socket);
+          try { window.dispatchEvent(new Event('upro:socket-ready')); } catch { /* ignore */ }
+        });
+        socket.on('disconnect', (reason) => console.log(`Socket disconnected (${label})`, reason));
+        socket.on('connect_error', (err) => console.warn(`Socket connect_error (${label})`, err?.message || err));
+        socket.on('error', (err) => console.warn(`Socket error (${label})`, err?.message || err));
+      } else {
+        socket.on('connect', () => {
+          joinRooms(socket);
+          try { window.dispatchEvent(new Event('upro:socket-ready')); } catch { /* ignore */ }
+        });
+      }
 
       // Global notification event
       socket.on('notification:new', (notification) => {
@@ -126,7 +133,6 @@ export default function useSocket(user = null) {
 
           if (connected && mounted) {
             socketRef.current = socket;
-            // Expose for debugging convenience
             try { window.__UPRO_SOCKET = socketRef; } catch { /* ignore */ }
             return;
           }
@@ -187,9 +193,9 @@ export function useSocketEvent(event, callback, deps = []) {
     };
 
     const handleReady = () => {
-      const socketRef = typeof window !== 'undefined' ? window.__UPRO_SOCKET : null;
-      if (socketRef?.current) {
-        attach(socketRef.current);
+      const socketRefGlobal = typeof window !== 'undefined' ? window.__UPRO_SOCKET : null;
+      if (socketRefGlobal?.current) {
+        attach(socketRefGlobal.current);
       }
     };
 
@@ -217,9 +223,9 @@ export function useSocketEvent(event, callback, deps = []) {
  */
 export function useSocketEmit() {
   const emit = (event, payload) => {
-    const socketRef = typeof window !== 'undefined' ? window.__UPRO_SOCKET : null;
-    if (socketRef?.current) {
-      socketRef.current.emit(event, payload);
+    const socketRefGlobal = typeof window !== 'undefined' ? window.__UPRO_SOCKET : null;
+    if (socketRefGlobal?.current) {
+      socketRefGlobal.current.emit(event, payload);
       return true;
     }
     return false;

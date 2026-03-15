@@ -97,6 +97,49 @@ async function emitBookingStatusUpdated(booking) {
   }
 }
 
+async function emitBookingOtpRefreshed(bookingId, otpType, otpCode) {
+  if (!getIo || !bookingId) return;
+
+  try {
+    const io = getIo();
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      select: {
+        id: true,
+        status: true,
+        customerId: true,
+        workerProfile: { select: { userId: true } },
+      },
+    });
+
+    if (!booking) return;
+
+    const payload = {
+      bookingId: booking.id,
+      status: booking.status,
+      otpType,
+      customerId: booking.customerId,
+      workerUserId: booking.workerProfile?.userId || null,
+      refreshedAt: new Date().toISOString(),
+    };
+
+    if (booking.customerId) {
+      const customerPayload = {
+        ...payload,
+        otpCode: otpCode || null,
+      };
+      io.to(`user:${booking.customerId}`).emit('booking:otp_refreshed', customerPayload);
+      io.to(`customer:${booking.customerId}`).emit('booking:otp_refreshed', customerPayload);
+    }
+    if (booking.workerProfile?.userId) {
+      io.to(`user:${booking.workerProfile.userId}`).emit('booking:otp_refreshed', payload);
+      io.to(`worker:${booking.workerProfile.userId}`).emit('booking:otp_refreshed', payload);
+    }
+  } catch (err) {
+    console.warn('Socket emit failed (booking:otp_refreshed):', err.message);
+  }
+}
+
 /**
  * CREATE A NEW BOOKING
  * 
@@ -386,7 +429,12 @@ const cancelBooking = asyncHandler(async (req, res) => {
  */
 const payBooking = asyncHandler(async (req, res) => {
   const bookingId = parseId(req.params.id, 'Booking ID');
-  const { paymentReference, createRazorpayOrder } = req.body;
+  const {
+    paymentReference,
+    paymentOrderId,
+    paymentSignature,
+    createRazorpayOrder,
+  } = req.body;
   const userId = req.user.id;
   const userRole = req.user.role;
 
@@ -394,7 +442,7 @@ const payBooking = asyncHandler(async (req, res) => {
     bookingId,
     userId,
     userRole,
-    { paymentReference, createRazorpayOrder }
+    { paymentReference, paymentOrderId, paymentSignature, createRazorpayOrder }
   );
 
   if (createRazorpayOrder) {
@@ -552,6 +600,29 @@ const verifyBookingCompletion = asyncHandler(async (req, res) => {
   emitBookingStatusUpdated(updatedBooking);
 });
 
+/**
+ * REFRESH BOOKING OTP
+ *
+ * HTTP Endpoint: POST /api/bookings/:id/otp/refresh
+ * Who can access: Only assigned WORKER
+ */
+const refreshBookingOtp = asyncHandler(async (req, res) => {
+  const bookingId = parseId(req.params.id, 'Booking ID');
+  const userId = req.user.id;
+  const { otpType } = req.body || {};
+
+  const result = await bookingService.refreshBookingOtp(bookingId, userId, otpType);
+
+  res.status(200).json({
+    message: `${result.otpType === 'START' ? 'Start' : 'Completion'} OTP refreshed and sent to customer.`,
+    bookingId: result.bookingId,
+    otpType: result.otpType,
+    expiresInMinutes: result.expiresInMinutes,
+  });
+
+  emitBookingOtpRefreshed(bookingId, result.otpType, result.otpCode);
+});
+
 // ─── SESSION MANAGEMENT (Phase 7) ──────────────────────────────────
 
 const getBookingSessions = asyncHandler(async (req, res) => {
@@ -699,6 +770,7 @@ module.exports = {
   acceptBooking,
   verifyBookingStart,
   verifyBookingCompletion,
+  refreshBookingOtp,
   getBookingSessions,
   createSession,
   startSession,

@@ -4,6 +4,7 @@ import { Card } from '../ui/Card';
 import { Spinner } from '../ui/Spinner';
 import { Button } from '../ui/Button';
 import { EmptyState } from './EmptyState';
+import { useTranslation } from 'react-i18next';
 
 export function AsyncState({
   isLoading,
@@ -11,8 +12,8 @@ export function AsyncState({
   error,
   onRetry,
   isEmpty,
-  emptyTitle = 'No data yet',
-  emptyMessage = 'There is nothing to show right now.',
+  emptyTitle,
+  emptyMessage,
   emptyAction,
   errorMessage,
   loadingFallback,
@@ -20,6 +21,11 @@ export function AsyncState({
   emptyFallback,
   children,
 }) {
+  const { t } = useTranslation();
+  
+  const finalEmptyTitle = emptyTitle || t('No data yet');
+  const finalEmptyMessage = emptyMessage || t('There is nothing to show right now.');
+  const finalErrorMessage = errorMessage || error?.response?.data?.error || error?.message || t('Failed to load data.');
   if (isLoading) {
     return loadingFallback || (
       <div className="flex items-center justify-center py-16">
@@ -29,22 +35,14 @@ export function AsyncState({
   }
 
   if (isError) {
-    if (errorFallback) {
-      return errorFallback;
-    }
-
-    const message =
-      errorMessage ||
-      error?.response?.data?.error ||
-      error?.message ||
-      'Failed to load data.';
+    if (errorFallback) return errorFallback;
 
     return (
-      <Card className="p-6">
-        <p className="text-error-500 mb-3">{message}</p>
+      <Card className="p-12 text-center border-dashed border-2 border-error-100 dark:border-error-500/10">
+        <p className="text-error-500 mb-6 font-bold">{finalErrorMessage}</p>
         {onRetry && (
-          <Button size="sm" onClick={onRetry}>
-            Retry
+          <Button size="sm" variant="gradient" onClick={onRetry} className="mx-auto h-10 px-6">
+            {t('Retry')}
           </Button>
         )}
       </Card>
@@ -54,8 +52,8 @@ export function AsyncState({
   if (isEmpty) {
     return emptyFallback || (
       <EmptyState
-        title={emptyTitle}
-        message={emptyMessage}
+        title={finalEmptyTitle}
+        message={finalEmptyMessage}
         action={emptyAction}
       />
     );
@@ -63,8 +61,8 @@ export function AsyncState({
 
   if (!children) {
     return (
-      <p className="text-gray-600 dark:text-gray-300">
-        No content available.
+      <p className="text-gray-600 dark:text-gray-300 text-center py-10 font-medium">
+        {t('No content available.')}
       </p>
     );
   }

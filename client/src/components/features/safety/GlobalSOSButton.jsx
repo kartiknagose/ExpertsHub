@@ -246,6 +246,23 @@ export function GlobalSOSButton() {
                                             </div>
                                         </div>
 
+                                        {/* Call Emergency directly (Added for Phase 1.4 coverage) */}
+                                        <div className="space-y-2">
+                                            <a
+                                                href="tel:112"
+                                                className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl font-black text-sm uppercase tracking-widest
+                                                           bg-brand-500 hover:bg-brand-600 text-white shadow-lg shadow-brand-500/20 transition-all"
+                                            >
+                                                <Phone size={18} />
+                                                Call Emergency (112)
+                                            </a>
+                                            <p className="text-[10px] text-center font-bold text-gray-400 uppercase tracking-tighter">
+                                                Tap above to dial official services immediately
+                                            </p>
+                                        </div>
+
+                                        <div className="h-px bg-gray-100 dark:bg-dark-700 w-full" />
+
                                         {/* Hold-to-confirm */}
                                         <button
                                             onMouseDown={startHold}

@@ -77,13 +77,17 @@ export function ServiceDetailPage() {
     resolver: zodResolver(bookingSchema),
   });
 
-  // Auto-select worker from query param (from Worker Profile Window's Book Now)
+  // Auto-select worker from query param (from Worker Profile Window's Book Now / Book Again)
   const preselectedWorker = searchParams.get('worker');
+  const preselectedAddress = searchParams.get('address');
   useEffect(() => {
     if (preselectedWorker) {
       setValue('workerProfileId', Number(preselectedWorker), { shouldValidate: true, shouldDirty: true });
     }
-  }, [preselectedWorker, setValue]);
+    if (preselectedAddress) {
+      setValue('addressDetails', preselectedAddress, { shouldValidate: true, shouldDirty: true });
+    }
+  }, [preselectedWorker, preselectedAddress, setValue]);
 
   const selectedWorkerId = useWatch({ control, name: 'workerProfileId' });
   const scheduledDate = useWatch({ control, name: 'scheduledDate' });
@@ -176,7 +180,7 @@ export function ServiceDetailPage() {
       queryClient.invalidateQueries({ queryKey: queryKeys.bookings.worker() });
       queryClient.invalidateQueries({ queryKey: queryKeys.bookings.all() });
 
-      setTimeout(() => navigate('/dashboard'), 2000);
+      setTimeout(() => navigate('/customer/dashboard'), 2000);
 
     } catch (err) {
       const message = err.response?.data?.error || err.response?.data?.message || err.message || 'Failed to create booking';
@@ -277,7 +281,7 @@ export function ServiceDetailPage() {
       <ConfirmDialog
         isOpen={profileSetupDialog}
         onConfirm={() => {
-          navigate('/profile/setup', { state: { from: `/services/${id}` } });
+          navigate('/customer/profile', { state: { from: `/services/${id}` } });
         }}
         onCancel={() => setProfileSetupDialog(false)}
         title="Complete Your Profile"

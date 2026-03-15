@@ -1,8 +1,10 @@
+import { useTranslation } from 'react-i18next';
 import { CheckCircle, Star, MessageSquare } from 'lucide-react';
 import { Card, Button } from '../../../components/common';
 import { StarRating } from '../../../components/features/reviews/StarRating';
 
 export function BookingReviewSection({ booking, user, activeReview, setActiveReview, reviewMutation, onSubmit }) {
+    const { t } = useTranslation();
     const hasReviewed = (booking.reviews || []).some(r => {
         const reviewerId = r.reviewerId || r.reviewer?.id;
         return String(reviewerId) === String(user?.id);
@@ -17,8 +19,8 @@ export function BookingReviewSection({ booking, user, activeReview, setActiveRev
                         <CheckCircle size={24} />
                     </div>
                     <div>
-                        <h4 className="font-black text-lg">Feedback Submitted</h4>
-                        <p className="text-sm text-gray-500 font-medium">You rated the customer {review.rating} stars.</p>
+                        <h4 className="font-black text-lg">{t('Feedback Submitted')}</h4>
+                        <p className="text-sm text-gray-500 font-medium">{t('You rated the customer')} {review.rating} {t('stars.')}</p>
                     </div>
                     {review.comment && (
                         <p className="text-sm italic text-gray-400">&ldquo;{review.comment}&rdquo;</p>
@@ -36,8 +38,8 @@ export function BookingReviewSection({ booking, user, activeReview, setActiveRev
                         <Star size={20} fill="currentColor" />
                     </div>
                     <div>
-                        <h4 className="font-black text-lg">Rate your experience</h4>
-                        <p className="text-sm text-gray-500 font-medium">How was working with {booking.customer?.name}?</p>
+                        <h4 className="font-black text-lg">{t('Rate your experience')}</h4>
+                        <p className="text-sm text-gray-500 font-medium">{t('How was working with')} {booking.customer?.name}?</p>
                     </div>
                 </div>
 
@@ -51,10 +53,10 @@ export function BookingReviewSection({ booking, user, activeReview, setActiveRev
                     <div className="w-full space-y-3">
                         <div className="flex items-center gap-2 px-1">
                             <MessageSquare size={14} className="text-gray-400" />
-                            <span className="text-2xs font-black uppercase tracking-widest text-gray-400">Add a Public Comment</span>
+                            <span className="text-2xs font-black uppercase tracking-widest text-gray-400">{t('Add a Public Comment')}</span>
                         </div>
                         <textarea
-                            placeholder="How was the customer? Polite? Job as described?"
+                            placeholder={t("How was the customer? Polite? Job as described?")}
                             value={activeReview.comment}
                             onChange={(e) => setActiveReview(s => ({ ...s, comment: e.target.value }))}
                             className="w-full p-4 rounded-xl border transition-all text-sm outline-none focus:ring-4 focus:ring-brand-500/10 bg-gray-50 border-gray-100 focus:border-brand-500 dark:bg-dark-900 dark:border-dark-700 dark:text-white"
@@ -70,7 +72,7 @@ export function BookingReviewSection({ booking, user, activeReview, setActiveRev
                         disabled={!activeReview.rating}
                         className="h-14 rounded-2xl font-black bg-brand-600 shadow-xl shadow-brand-500/20"
                     >
-                        Submit Feedback
+                        {t('Submit Feedback')}
                     </Button>
                 </div>
             </div>

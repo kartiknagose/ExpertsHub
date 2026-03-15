@@ -11,7 +11,27 @@ function isValidUploadUrl(url, allowedPrefixes) {
   if (!url || typeof url !== 'string') return false;
 
   // Must match at least one allowed prefix
-  return allowedPrefixes.some((prefix) => url.startsWith(prefix));
+  if (allowedPrefixes.some((prefix) => url.startsWith(prefix))) {
+    return true;
+  }
+
+  // Allow trusted cloud-hosted uploads (Cloudinary)
+  try {
+    const parsed = new URL(url);
+    const protocolOk = parsed.protocol === 'https:' || parsed.protocol === 'http:';
+    const hostOk = parsed.hostname === 'res.cloudinary.com';
+    if (!protocolOk || !hostOk) return false;
+
+    const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+    if (cloudName) {
+      return parsed.pathname.startsWith(`/${cloudName}/`);
+    }
+
+    // Fallback when cloud name is not configured in env
+    return parsed.pathname.length > 2;
+  } catch {
+    return false;
+  }
 }
 
 module.exports = { isValidUploadUrl };

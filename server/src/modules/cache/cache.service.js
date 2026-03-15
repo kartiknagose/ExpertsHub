@@ -8,7 +8,8 @@ module.exports = {
     const cached = await redis.get(SERVICE_CATALOG_KEY);
     if (cached) return JSON.parse(cached);
     // Fetch from DB and cache
-    const { prisma } = require('../../prisma/client');
+    const { PrismaClient } = require('@prisma/client');
+    const prisma = new PrismaClient();
     const services = await prisma.service.findMany();
     await redis.set(SERVICE_CATALOG_KEY, JSON.stringify(services), 'EX', 300); // 5min TTL
     return services;
@@ -21,10 +22,37 @@ module.exports = {
   async getWorkerProfile(id) {
     const cached = await redis.get(WORKER_PROFILE_KEY(id));
     if (cached) return JSON.parse(cached);
-    const { prisma } = require('../../prisma/client');
+    const { PrismaClient } = require('@prisma/client');
+    const prisma = new PrismaClient();
     const profile = await prisma.workerProfile.findUnique({
       where: { id },
-      include: { user: true, services: true }
+      include: { 
+        user: {
+          select: {
+            id: true,
+            name: true,
+            profilePhotoUrl: true,
+            rating: true,
+            totalReviews: true,
+            reviewsReceived: {
+              include: {
+                reviewer: {
+                  select: { id: true, name: true, profilePhotoUrl: true }
+                }
+              },
+              orderBy: { createdAt: 'desc' },
+              take: 5
+            }
+          }
+        },
+        services: {
+          include: { 
+            service: {
+              select: { id: true, name: true, category: true }
+            }
+          }
+        }
+      }
     });
     await redis.set(WORKER_PROFILE_KEY(id), JSON.stringify(profile), 'EX', 120); // 2min TTL
     return profile;

@@ -1,134 +1,195 @@
-// Reusable Input component for forms
-// Supports labels, error messages, icons, and different input types
+// Input component — Premium Rebuild with Floating Labels, Micro-animations & Glassmorphism
+// Uses framer-motion for smooth transitions and professional look
 
 import { forwardRef, useId, useState } from 'react';
-import { Eye, EyeOff, CheckCircle, AlertCircle } from 'lucide-react';
+import { Eye, EyeOff, CheckCircle, AlertCircle, X } from 'lucide-react';
+import { motion as Motion, AnimatePresence } from 'framer-motion';
 
-/**
- * Input Component
- * @param {string} label - Input label
- * @param {string} type - Input type: 'text', 'email', 'password', 'number', 'tel', 'date', 'time'
- * @param {string} placeholder - Placeholder text
- * @param {string} error - Error message (shows red border and error text)
- * @param {boolean} success - Show success state (green border and checkmark)
- * @param {React.ReactNode} icon - Icon component (from lucide-react)
- * @param {boolean} required - Show required asterisk
- * @param {boolean} disabled - Disable input
- * @param {string} value - Controlled value
- * @param {function} onChange - Change handler
- * @param {React.Ref} ref - Forwarded ref (for React Hook Form)
- */
 export const Input = forwardRef(function Input(
   {
     label,
     type = 'text',
+    size = 'default',
     placeholder,
     error,
     success = false,
     icon: Icon,
+    rightElement,       // custom right slot
+    hint,               // helper text shown below input
     required = false,
     disabled = false,
+    showClear = false,  // option to show clear button
+    onClear,            // callback for clear button
     className = '',
+    inputClassName = '',
+    value,              // for controlled component detection
+    defaultValue,
     ...props
   },
   ref
 ) {
   const [showPassword, setShowPassword] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
   const autoId = useId();
   const inputId = props.id || autoId;
+  const isCompact = size === 'compact';
 
-  // Determine actual input type (toggle for password)
-  const inputType = type === 'password' && showPassword ? 'text' : type;
+  // Determine if input has content (for floating label)
+  const currentHasValue = !!(value || defaultValue || props.value);
 
-  // Base input styles
-  const baseInputStyles = 'w-full px-4 py-2.5 rounded-lg border transition-colors duration-200 focus:outline-none focus:ring-2';
+  const actualType = type === 'password' && showPassword ? 'text' : type;
 
-  // Theme-based styles (Tailwind dark: modifier)
-  const themeStyles = error
-    ? 'bg-white dark:bg-dark-800 border-error-500 text-gray-900 dark:text-gray-100 focus:border-error-400 focus:ring-error-500/50'
-    : success
-    ? 'bg-white dark:bg-dark-800 border-success-500 text-gray-900 dark:text-gray-100 focus:border-success-400 focus:ring-success-500/50'
-    : 'bg-white dark:bg-dark-800 border-gray-300 dark:border-dark-600 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:border-brand-600 dark:focus:border-brand-500 focus:ring-brand-600/50 dark:focus:ring-brand-500/50 hover:border-gray-400 dark:hover:border-dark-500';
-
-  // Icon and password toggle padding
-  const paddingWithIcon = Icon ? 'pl-11' : '';
-  const paddingWithPasswordToggle = type === 'password' ? 'pr-11' : '';
-  const paddingWithValidation = (success || error) && type !== 'password' ? 'pr-11' : '';
-
-  // Disabled styles
-  const disabledStyles = disabled ? 'opacity-50 cursor-not-allowed' : '';
-
-  // Combine all input styles
-  const inputClasses = `${baseInputStyles} ${themeStyles} ${paddingWithIcon} ${paddingWithPasswordToggle} ${paddingWithValidation} ${disabledStyles} ${className}`;
-
-  // Label styles
-  const labelStyles = 'block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5';
-
-  // Error text styles
-  const errorStyles = 'mt-1.5 text-sm text-error-500 dark:text-error-400';
+  const getContainerClass = () => {
+    if (error) return 'shadow-lg shadow-error-500/10 ring-4 ring-error-500/10';
+    if (success) return 'shadow-lg shadow-success-500/10 ring-4 ring-success-500/10';
+    if (isFocused) return 'shadow-2xl shadow-brand-500/20 ring-4 ring-brand-500/20';
+    return 'hover:shadow-lg hover:shadow-brand-500/5 hover:bg-neutral-100 dark:hover:bg-dark-700/50';
+  };
 
   return (
-    <div className="w-full">
-      {/* Label */}
-      {label && (
-        <label htmlFor={inputId} className={labelStyles}>
-          {label}
-          {required && <span className="text-error-500 ml-1">*</span>}
-        </label>
-      )}
-
-      {/* Input wrapper (for icons) */}
+    <div className={`w-full group ${className}`}>
+      {/* Container Wrapper */}
       <div className="relative">
-        {/* Left icon */}
-        {Icon && (
-          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-            <Icon size={20} />
-          </div>
+        {/* The Premium Glow Layer (inspired by correctly implemented search tray) */}
+        {!disabled && (
+          <div className={`
+            absolute -inset-0.5 ${isCompact ? 'rounded-[1.15rem]' : 'rounded-[2.1rem]'} blur opacity-0 transition duration-500
+            ${error ? 'bg-error-500/20 opacity-40' : success ? 'bg-success-500/20 opacity-40' : 'bg-gradient-to-r from-brand-500 to-accent-500 group-hover:opacity-20'}
+            ${isFocused ? 'opacity-40 blur-md duration-200' : ''}
+          `} />
         )}
 
-        {/* Input field */}
-        <input
-          id={inputId}
-          type={inputType}
-          placeholder={placeholder}
-          disabled={disabled}
-          className={inputClasses}
-          ref={ref}
-          {...props}
-        />
+        <Motion.div
+          animate={{
+            scale: isFocused ? 1.01 : 1,
+          }}
+          transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+          className={`
+            relative ${isCompact ? 'min-h-[58px] rounded-[1rem]' : 'min-h-[74px] rounded-[2rem]'} transition-all duration-300 ease-out flex items-center
+            ${disabled ? 'bg-neutral-100 dark:bg-dark-900/50 opacity-60' : ''}
+            ${!disabled && isFocused ? 'bg-white dark:bg-dark-800' : 'bg-neutral-50/80 dark:bg-dark-900/40 backdrop-blur-sm'}
+            ${!disabled && !isFocused ? 'border border-neutral-200/50 dark:border-white/5' : 'border border-transparent'}
+            ${getContainerClass()}
+          `}
+        >
+          {/* 1. Icon Overlay */}
+          {Icon && (
+            <div className={`absolute left-4 top-1/2 -translate-y-1/2 z-30 pointer-events-none transition-colors duration-300 ${isFocused ? 'text-brand-500' : 'text-neutral-400 dark:text-neutral-500'}`}>
+              <Icon size={18} strokeWidth={2.5} />
+            </div>
+          )}
 
-        {/* Password visibility toggle */}
-        {type === 'password' && (
-          <button
-            type="button"
-            onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 focus:outline-none text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-            tabIndex={-1}
-            aria-label={showPassword ? 'Hide password' : 'Show password'}
-          >
-            {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-          </button>
-        )}
+          {/* 2. Fixed Label Overlay */}
+          {label && (
+            <div
+              className={`
+                absolute ${isCompact ? 'top-2.5' : 'top-3'} z-30 pointer-events-none select-none transition-all duration-300
+                ${isCompact ? 'text-[10px] tracking-[0.14em]' : 'text-xs tracking-widest'} font-bold uppercase leading-none
+                ${isFocused ? 'text-brand-600 dark:text-brand-400' : 'text-neutral-400 dark:text-neutral-500'}
+                ${Icon ? 'left-12' : 'left-5'}
+              `}
+            >
+              {label}
+              {required && <span className="text-error-500 ml-0.5">*</span>}
+            </div>
+          )}
 
-        {/* Validation icons */}
-        {type !== 'password' && success && !error && (
-          <div className="absolute right-3 top-1/2 -translate-y-1/2 text-success-500">
-            <CheckCircle size={20} />
+          {/* 3. The Main Input (Zero Boundary) */}
+          <input
+            id={inputId}
+            ref={ref}
+            type={actualType}
+            placeholder={placeholder}
+            disabled={disabled}
+            value={value}
+            defaultValue={defaultValue}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
+            className={`
+              block w-full h-full bg-transparent !border-0 !outline-none !ring-0 !shadow-none
+              focus:!border-0 focus:!outline-none focus:!ring-0 focus:!shadow-none
+              focus-visible:!outline-none focus-visible:!ring-0
+              text-gray-900 dark:text-white font-medium appearance-none selection:bg-brand-500/30
+              placeholder:text-neutral-400/40 dark:placeholder:text-neutral-500/40
+              ${isCompact ? 'rounded-xl' : 'rounded-2xl'}
+              ${Icon ? 'pl-12' : 'pl-5'}
+              ${(type === 'password' || rightElement || success || error || showClear) ? 'pr-20' : 'pr-5'}
+              ${label ? (isCompact ? 'pt-5 pb-1.5' : 'pt-7 pb-2') : (isCompact ? 'py-3.5' : 'py-5')}
+              ${inputClassName}
+            `}
+            {...props}
+          />
+
+          {/* 4. Right Action Overlay */}
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 shrink-0 z-30">
+            {showClear && currentHasValue && !disabled && (
+              <button
+                type="button"
+                onClick={onClear}
+                className="p-1.5 rounded-full hover:bg-neutral-100 dark:hover:bg-dark-700 text-neutral-400 dark:text-neutral-500 transition-colors"
+                tabIndex={-1}
+              >
+                <X size={14} />
+              </button>
+            )}
+
+            {type === 'password' ? (
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className={`p-1.5 rounded-xl transition-all ${isFocused ? 'text-brand-500 bg-brand-500/5' : 'text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200'}`}
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            ) : rightElement ? (
+              <div className="flex items-center">{rightElement}</div>
+            ) : error ? (
+              <Motion.div 
+                initial={{ scale: 0.5, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="text-error-500 p-1"
+              >
+                <AlertCircle size={20} fill="currentColor" className="text-error-50 dark:text-error-500/20" />
+              </Motion.div>
+            ) : success ? (
+              <Motion.div 
+                initial={{ scale: 0.5, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="text-success-500 p-1"
+              >
+                <CheckCircle size={20} fill="currentColor" className="text-success-50 dark:text-success-500/20" />
+              </Motion.div>
+            ) : null}
           </div>
-        )}
-        {type !== 'password' && error && (
-          <div className="absolute right-3 top-1/2 -translate-y-1/2 text-error-500">
-            <AlertCircle size={20} />
-          </div>
-        )}
+        </Motion.div>
       </div>
 
-      {/* Error message */}
-      {error && (
-        <p className={errorStyles}>
-          {error}
-        </p>
-      )}
+      {/* Sub-label info area */}
+      <AnimatePresence mode="wait">
+        {error ? (
+          <Motion.p
+            key="error"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="mt-1.5 px-1 text-xs font-bold uppercase tracking-widest text-error-600 dark:text-error-400 flex items-center gap-1.5"
+          >
+            <AlertCircle size={10} strokeWidth={3} />
+            {error}
+          </Motion.p>
+        ) : hint ? (
+          <Motion.p
+            key="hint"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="mt-1.5 px-1 text-xs font-bold uppercase tracking-widest text-neutral-400 dark:text-neutral-500 flex items-center gap-1.5"
+          >
+            <div className="w-1 h-1 rounded-full bg-neutral-300 dark:bg-dark-600" />
+            {hint}
+          </Motion.p>
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 });

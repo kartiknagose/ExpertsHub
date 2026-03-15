@@ -23,7 +23,7 @@ export function ProfileIncompleteAlert() {
     const handleAction = () => {
         if (alertType === 'profile') {
             if (user.role === 'CUSTOMER') {
-                navigate('/profile');
+                navigate('/customer/profile');
             } else if (user.role === 'WORKER') {
                 navigate('/worker/profile');
             }

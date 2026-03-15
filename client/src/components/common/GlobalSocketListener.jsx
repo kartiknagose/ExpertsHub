@@ -32,7 +32,7 @@ export const GlobalSocketListener = () => {
         if (!user?.id) return;
         queryClient.invalidateQueries({ queryKey: queryKeys.bookings.all() });
 
-        if (user.role === 'CUSTOMER') {
+        if (user?.role === 'CUSTOMER') {
             const statusMessages = {
                 CONFIRMED: `Professional ${booking.workerProfile?.user?.name || ''} has accepted your booking!`,
                 IN_PROGRESS: 'Your service has started. Please share the completion OTP once finished.',
@@ -48,7 +48,7 @@ export const GlobalSocketListener = () => {
                     }
                 });
             }
-        } else if (user.role === 'WORKER') {
+        } else if (user?.role === 'WORKER') {
             if (booking.status === 'CANCELLED') {
                 toast.error('A customer cancelled their booking.', {
                     action: { label: 'View', onClick: () => navigate('/worker/dashboard') }
@@ -59,7 +59,7 @@ export const GlobalSocketListener = () => {
 
     useSocketEvent('booking:available', (payload) => {
         if (!user?.id || user.role !== 'WORKER') return;
-        toast('New Job Opportunity!', {
+        toast.info('New Job Opportunity!', {
             description: `${payload.serviceName} needed at ${payload.address}`,
             icon: <Zap className="text-orange-500" size={16} />,
             action: {
@@ -92,18 +92,15 @@ export const GlobalSocketListener = () => {
 
     useSocketEvent('notification:new', (notification) => {
         if (!user?.id) return;
-        const event = new CustomEvent('upro:notification-received', { detail: notification });
-        window.dispatchEvent(event);
-
         if (notification.priority === 'HIGH' || notification.type === 'BOOKING_UPDATE') {
-            toast(notification.title, {
+            toast.info(notification.title, {
                 description: notification.message,
                 icon: <Activity className="text-brand-500" size={16} />,
                 action: {
                     label: 'View',
                     onClick: () => {
                         if (notification.data?.bookingId) {
-                            navigate(user.role === 'CUSTOMER' ? `/bookings/${notification.data.bookingId}` : `/worker/bookings/${notification.data.bookingId}`);
+                            navigate(user?.role === 'CUSTOMER' ? `/bookings/${notification.data.bookingId}` : `/worker/bookings/${notification.data.bookingId}`);
                         }
                     }
                 }

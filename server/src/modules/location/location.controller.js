@@ -115,8 +115,21 @@ const getNearbyWorkers = asyncHandler(async (req, res) => {
     res.json({ workers });
 });
 
+const getCities = asyncHandler(async (req, res) => {
+    const cities = await locationService.getCities();
+    res.json({ cities });
+});
+
+const getCityServices = asyncHandler(async (req, res) => {
+    const { slug } = req.params;
+    const services = await locationService.getCityServices(slug);
+    res.json({ services });
+});
+
 module.exports = {
     updateLocation,
     getWorkerLocation,
-    getNearbyWorkers
+    getNearbyWorkers,
+    getCities,
+    getCityServices
 };

@@ -12,6 +12,7 @@ const WORKERS_ENDPOINTS = {
   WORKER_SERVICES: (workerId) => `/workers/${workerId}/services`,
   DELETE_SERVICE: (serviceId) => `/workers/services/${serviceId}`,
   PUBLIC_PROFILE: (workerId) => `/workers/${workerId}`,
+  LEADERBOARD: '/workers/leaderboard/top',
 };
 
 /**
@@ -84,4 +85,14 @@ export const getWorkerServices = async (workerId) => {
 export const removeServiceFromWorker = async (serviceId) => {
   const response = await axiosInstance.delete(WORKERS_ENDPOINTS.DELETE_SERVICE(serviceId));
   return response.data;
+};
+
+/**
+ * Get top workers leaderboard
+ * @param {number} limit 
+ * @returns {Promise} Response with top workers array
+ */
+export const getLeaderboard = async (limit = 20) => {
+  const response = await axiosInstance.get(WORKERS_ENDPOINTS.LEADERBOARD, { params: { limit } });
+  return response.data.workers;
 };

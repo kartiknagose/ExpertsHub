@@ -2,9 +2,16 @@ const prisma = require('../../config/prisma');
 const AppError = require('../../common/errors/AppError');
 const { randomBytes } = require('crypto');
 
+// Import specialized services
+const LoyaltyService = require('./loyalty.service');
+const ProPlusService = require('./proplus.service');
+const FavoritesService = require('./favorites.service');
+const GiftCardService = require('./gift.service');
+
 /**
  * BUSINESS GROWTH SERVICE (Sprint 17)
  * Handles Wallet, Referrals, and Coupons.
+ * Consolidates sub-services for easier access from other modules.
  */
 
 /**
@@ -196,6 +203,7 @@ async function depositCredits(userId, amount, description = 'Wallet Deposit', re
     }, tx);
 }
 
+// Re-export specialized services for simplified access
 module.exports = {
     initializeWallet,
     generateReferralCode,
@@ -203,5 +211,22 @@ module.exports = {
     processWalletTransaction,
     validateCoupon,
     awardReferralBonus,
-    depositCredits
+    depositCredits,
+
+    // Proxy to specialized services
+    awardLoyaltyPoints: LoyaltyService.awardPoints,
+    redeemLoyaltyPoints: LoyaltyService.redeemPoints,
+    getLoyaltySummary: LoyaltyService.getLoyaltySummary,
+    
+    subscribeProPlus: ProPlusService.subscribeUser,
+    getProPlusSubscription: ProPlusService.getSubscriptionInfo,
+    cancelProPlus: ProPlusService.cancelSubscription,
+
+    toggleFavoriteWorker: FavoritesService.toggleFavorite,
+    getFavoriteWorkers: FavoritesService.getFavorites,
+
+    purchaseGiftCard: GiftCardService.purchaseGiftCard,
+    redeemGiftCard: GiftCardService.redeemGiftCard,
+    checkGiftCard: GiftCardService.checkGiftCard
 };
+

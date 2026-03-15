@@ -8,6 +8,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
     ShieldAlert, UserPlus, Trash2, Phone, User, Heart,
     ArrowLeft, AlertTriangle, CheckCircle, Info, Siren
@@ -25,7 +26,8 @@ const RELATIONS = ['Spouse', 'Parent', 'Sibling', 'Friend', 'Colleague', 'Child'
 const MAX_CONTACTS = 5;
 
 export function EmergencyContactsPage() {
-    usePageTitle('Emergency Contacts');
+    const { t } = useTranslation();
+    usePageTitle(t('Emergency Contacts'));
     const navigate = useNavigate();
     const queryClient = useQueryClient();
 
@@ -45,27 +47,27 @@ export function EmergencyContactsPage() {
             queryClient.invalidateQueries({ queryKey: queryKeys.safety.emergencyContacts() });
             setForm({ name: '', phone: '', relation: '' });
             setShowForm(false);
-            toast.success('Emergency contact added!');
+            toast.success(t('Emergency contact added!'));
         },
-        onError: (err) => toast.error(err.response?.data?.error || 'Failed to add contact'),
+        onError: (err) => toast.error(err.response?.data?.error || t('Failed to add contact')),
     });
 
     const deleteMutation = useMutation({
         mutationFn: deleteEmergencyContact,
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: queryKeys.safety.emergencyContacts() });
-            toast.success('Contact removed');
+            toast.success(t('Contact removed'));
         },
-        onError: () => toast.error('Failed to remove contact'),
+        onError: () => toast.error(t('Failed to remove contact')),
     });
 
     const validate = () => {
         const e = {};
-        if (!form.name.trim()) e.name = 'Name is required';
-        if (!form.phone.trim()) e.phone = 'Phone number is required';
+        if (!form.name.trim()) e.name = t('Name is required');
+        if (!form.phone.trim()) e.phone = t('Phone number is required');
         else if (!/^[6-9]\d{9}$/.test(form.phone.replace(/\s/g, '')))
-            e.phone = 'Enter a valid 10-digit Indian mobile number';
-        if (!form.relation) e.relation = 'Relation is required';
+            e.phone = t('Enter a valid 10-digit Indian mobile number');
+        if (!form.relation) e.relation = t('Relation is required');
         setErrors(e);
         return Object.keys(e).length === 0;
     };
@@ -81,11 +83,11 @@ export function EmergencyContactsPage() {
         <MainLayout>
             <div className={getPageLayout('default')}>
                 <PageHeader
-                    title="Emergency Contacts"
-                    subtitle="People who will be instantly notified via SMS when you trigger an SOS alert."
+                    title={t("Emergency Contacts")}
+                    subtitle={t("People who will be instantly notified via SMS when you trigger an SOS alert.")}
                     actions={
                         <Button variant="ghost" icon={ArrowLeft} onClick={() => navigate(-1)}>
-                            Back
+                            {t('Back')}
                         </Button>
                     }
                 />
@@ -97,12 +99,12 @@ export function EmergencyContactsPage() {
                     </div>
                     <div>
                         <h3 className="font-bold text-sm mb-1 text-red-800 dark:text-red-300">
-                            How SOS Alerts Work
+                            {t('How SOS Alerts Work')}
                         </h3>
                         <p className="text-xs leading-relaxed text-red-600 dark:text-red-400">
-                            During an active booking, a floating <strong>SOS button</strong> appears on every page.
-                            Hold it for 3 seconds to trigger an emergency alert. Your contacts will receive an
-                            SMS with your GPS location and booking details — <strong>completely free</strong> via carrier gateway.
+                            {t('During an active booking, a floating')} <strong>{t('SOS button')}</strong> {t('appears on every page.')}
+                            {t('Hold it for 3 seconds to trigger an emergency alert. Your contacts will receive an')}
+                            {t('SMS with your GPS location and booking details —')} <strong>{t('completely free')}</strong> {t('via carrier gateway.')}
                         </p>
                     </div>
                 </div>
@@ -113,7 +115,7 @@ export function EmergencyContactsPage() {
                     <div className="lg:col-span-2 space-y-4">
                         <div className="flex items-center justify-between">
                             <h2 className="text-lg font-bold text-gray-900 dark:text-white">
-                                Your Contacts ({contacts.length}/{MAX_CONTACTS})
+                                {t('Your Contacts')} ({contacts.length}/{MAX_CONTACTS})
                             </h2>
                             {!showForm && contacts.length < MAX_CONTACTS && (
                                 <Button
@@ -122,7 +124,7 @@ export function EmergencyContactsPage() {
                                     onClick={() => setShowForm(true)}
                                     className="bg-brand-600 text-white hover:bg-brand-700"
                                 >
-                                    Add Contact
+                                    {t('Add Contact')}
                                 </Button>
                             )}
                         </div>
@@ -131,16 +133,16 @@ export function EmergencyContactsPage() {
                         {showForm && (
                             <div className="p-5 rounded-2xl border bg-white border-gray-200 shadow-sm dark:bg-dark-800 dark:border-dark-700 dark:shadow-none">
                                 <h3 className="font-bold mb-4 text-gray-900 dark:text-white">
-                                    Add New Contact
+                                    {t('Add New Contact')}
                                 </h3>
                                 <form onSubmit={handleSubmit} className="space-y-4">
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <div>
                                             <label className="block text-xs font-black uppercase tracking-widest mb-1.5 text-gray-500 dark:text-gray-400">
-                                                Full Name *
+                                                {t('Full Name *')}
                                             </label>
                                             <Input
-                                                placeholder="e.g. Rahul Sharma"
+                                                placeholder={t("e.g. Rahul Sharma")}
                                                 value={form.name}
                                                 onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))}
                                                 className={errors.name ? 'border-red-500' : ''}
@@ -149,10 +151,10 @@ export function EmergencyContactsPage() {
                                         </div>
                                         <div>
                                             <label className="block text-xs font-black uppercase tracking-widest mb-1.5 text-gray-500 dark:text-gray-400">
-                                                Mobile Number *
+                                                {t('Mobile Number *')}
                                             </label>
                                             <Input
-                                                placeholder="e.g. 9876543210"
+                                                placeholder={t("e.g. 9876543210")}
                                                 value={form.phone}
                                                 onChange={(e) => setForm(f => ({ ...f, phone: e.target.value }))}
                                                 maxLength={10}
@@ -163,7 +165,7 @@ export function EmergencyContactsPage() {
                                     </div>
                                     <div>
                                         <label className="block text-xs font-black uppercase tracking-widest mb-1.5 text-gray-500 dark:text-gray-400">
-                                            Relationship *
+                                            {t('Relationship *')}
                                         </label>
                                         <div className="flex flex-wrap gap-2">
                                             {RELATIONS.map((r) => (
@@ -177,7 +179,7 @@ export function EmergencyContactsPage() {
                                                             : 'border-gray-200 text-gray-600 hover:border-brand-400 hover:text-brand-600 dark:border-dark-600 dark:text-gray-400 dark:hover:border-brand-500 dark:hover:text-brand-400'
                                                         }`}
                                                 >
-                                                    {r}
+                                                    {t(r)}
                                                 </button>
                                             ))}
                                         </div>
@@ -189,14 +191,14 @@ export function EmergencyContactsPage() {
                                             loading={addMutation.isPending}
                                             className="bg-brand-600 text-white hover:bg-brand-700 px-6"
                                         >
-                                            Save Contact
+                                            {t('Save Contact')}
                                         </Button>
                                         <Button
                                             type="button"
                                             variant="ghost"
                                             onClick={() => { setShowForm(false); setForm({ name: '', phone: '', relation: '' }); setErrors({}); }}
                                         >
-                                            Cancel
+                                            {t('Cancel')}
                                         </Button>
                                     </div>
                                 </form>
@@ -219,17 +221,17 @@ export function EmergencyContactsPage() {
                                     <ShieldAlert size={28} className="text-red-500" />
                                 </div>
                                 <h3 className="text-lg font-bold mb-2 text-gray-900 dark:text-white">
-                                    No emergency contacts yet
+                                    {t('No emergency contacts yet')}
                                 </h3>
                                 <p className="text-sm mb-6 text-gray-500 dark:text-gray-400">
-                                    Add at least one person to be notified in an emergency.
+                                    {t('Add at least one person to be notified in an emergency.')}
                                 </p>
                                 <Button
                                     icon={UserPlus}
                                     onClick={() => setShowForm(true)}
                                     className="bg-brand-600 text-white hover:bg-brand-700 mx-auto"
                                 >
-                                    Add First Contact
+                                    {t('Add First Contact')}
                                 </Button>
                             </div>
                         )}
@@ -262,7 +264,7 @@ export function EmergencyContactsPage() {
                                     loading={deleteMutation.isPending && deleteMutation.variables === contact.id}
                                     onClick={() => deleteMutation.mutate(contact.id)}
                                 >
-                                    Remove
+                                    {t('Remove')}
                                 </Button>
                             </div>
                         ))}
@@ -273,28 +275,28 @@ export function EmergencyContactsPage() {
                         <div className="p-5 rounded-2xl bg-white border border-gray-100 shadow-sm dark:bg-dark-800 dark:border-dark-700 dark:shadow-none">
                             <h3 className="font-bold mb-4 flex items-center gap-2 text-gray-900 dark:text-white">
                                 <Info size={16} className="text-brand-500" />
-                                SMS Notification
+                                {t('SMS Notification')}
                             </h3>
                             <ul className="space-y-3 text-sm text-gray-600 dark:text-gray-400">
                                 <li className="flex gap-2">
                                     <CheckCircle size={14} className="text-green-500 mt-0.5 shrink-0" />
-                                    SMS sent instantly via free carrier gateway
+                                    {t('SMS sent instantly via free carrier gateway')}
                                 </li>
                                 <li className="flex gap-2">
                                     <CheckCircle size={14} className="text-green-500 mt-0.5 shrink-0" />
-                                    Works with Jio, Airtel, Vi, BSNL numbers
+                                    {t('Works with Jio, Airtel, Vi, BSNL numbers')}
                                 </li>
                                 <li className="flex gap-2">
                                     <CheckCircle size={14} className="text-green-500 mt-0.5 shrink-0" />
-                                    GPS location included in the message
+                                    {t('GPS location included in the message')}
                                 </li>
                                 <li className="flex gap-2">
                                     <CheckCircle size={14} className="text-green-500 mt-0.5 shrink-0" />
-                                    Admin team notified in real-time
+                                    {t('Admin team notified in real-time')}
                                 </li>
                                 <li className="flex gap-2">
                                     <AlertTriangle size={14} className="text-yellow-500 mt-0.5 shrink-0" />
-                                    SMS delivery depends on carrier gateway availability
+                                    {t('SMS delivery depends on carrier gateway availability')}
                                 </li>
                             </ul>
                         </div>
@@ -302,13 +304,13 @@ export function EmergencyContactsPage() {
                         <div className="p-5 rounded-2xl bg-brand-50 border border-brand-100 dark:bg-brand-900/10 dark:border-brand-800">
                             <h3 className="font-bold mb-2 flex items-center gap-2 text-brand-800 dark:text-brand-300">
                                 <Heart size={16} />
-                                Best Practices
+                                {t('Best Practices')}
                             </h3>
                             <ul className="space-y-2 text-xs text-brand-700 dark:text-brand-400">
-                                <li>• Add 2-3 trusted contacts for redundancy</li>
-                                <li>• Make sure your contacts know they might get SOS texts</li>
-                                <li>• Update contacts when numbers change</li>
-                                <li>• Enable location permissions in your browser</li>
+                                <li>• {t('Add 2-3 trusted contacts for redundancy')}</li>
+                                <li>• {t('Make sure your contacts know they might get SOS texts')}</li>
+                                <li>• {t('Update contacts when numbers change')}</li>
+                                <li>• {t('Enable location permissions in your browser')}</li>
                             </ul>
                         </div>
                     </div>

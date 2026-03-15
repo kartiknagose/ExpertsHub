@@ -36,6 +36,11 @@ const resetPasswordSchema = [
   body('password').isLength({ min: 8 }).withMessage('Password min 8 chars'),
 ];
 
+const changePasswordSchema = [
+  body('currentPassword').notEmpty().withMessage('Current password required'),
+  body('newPassword').isLength({ min: 8 }).withMessage('New password must be at least 8 characters'),
+];
+
 module.exports = {
   registerSchema,
   registerWorkerSchema,
@@ -43,4 +48,5 @@ module.exports = {
   verifyEmailSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
+  changePasswordSchema,
 };

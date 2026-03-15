@@ -17,7 +17,7 @@ async function getAdminKPIs() {
         }),
         // Revenue: Sum of platform commissions
         prisma.booking.aggregate({
-            _sum: { commission: true },
+            _sum: { platformCommission: true },
             where: { status: 'COMPLETED', paymentStatus: 'PAID' }
         }),
         // Users: Number of non-deleted users
@@ -30,7 +30,7 @@ async function getAdminKPIs() {
 
     return {
         gmv: Number(gmvData._sum.totalPrice || 0),
-        revenue: Number(revenueData._sum.commission || 0),
+        revenue: Number(revenueData._sum.platformCommission || 0),
         activeUsers: usersCount,
         activeWorkers: workersCount,
         totalBookings: bookingsCount,
@@ -47,8 +47,8 @@ async function getMonthlyPerformance() {
         SELECT 
             TO_CHAR(DATE_TRUNC('month', "createdAt"), 'MMMM') as month,
             SUM("totalPrice") as gmv,
-            SUM("commission") as revenue,
-            COUNT(id) as bookings
+            SUM("platformCommission") as revenue,
+            COUNT("id") as bookings
         FROM "Booking"
         WHERE "paymentStatus" = 'PAID'
         GROUP BY DATE_TRUNC('month', "createdAt")
@@ -72,7 +72,7 @@ async function getCategoryBreakdown() {
         SELECT 
             s.category as category,
             SUM(b."totalPrice") as value,
-            COUNT(b.id) as count
+            COUNT(b."id") as count
         FROM "Booking" b
         JOIN "Service" s ON b."serviceId" = s.id
         WHERE b."status" = 'COMPLETED'
@@ -93,7 +93,7 @@ async function getCategoryBreakdown() {
 async function getWorkerMetrics() {
     const topEarners = await prisma.workerProfile.findMany({
         take: 5,
-        orderBy: { totalEarnings: 'desc' },
+        orderBy: { walletBalance: 'desc' },
         include: { user: { select: { name: true } } }
     });
 
@@ -104,7 +104,7 @@ async function getWorkerMetrics() {
     return {
         topEarners: topEarners.map(w => ({
             name: w.user.name,
-            earnings: Number(w.totalEarnings || 0)
+            earnings: Number(w.walletBalance || 0)
         })),
         overallRating: Number(averageRating._avg.rating || 0).toFixed(1)
     };

@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { ShieldCheck, CheckCircle2, AlertCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { MainLayout } from '../../components/layout/MainLayout';
 import { Card, CardHeader, CardTitle, CardDescription } from '../../components/common';
 import { AsyncState, PageHeader, VerificationStatusBadge } from '../../components/common';
@@ -10,7 +11,8 @@ import { usePageTitle } from '../../hooks/usePageTitle';
 import { WorkerOnboardingWizard } from '../../components/features/worker/WorkerOnboardingWizard';
 
 export function WorkerVerificationPage() {
-  usePageTitle('Verification');
+  const { t, i18n } = useTranslation();
+  usePageTitle(t('Verification'));
 
   const verificationQuery = useQuery({
     queryKey: queryKeys.verification.my(),
@@ -24,16 +26,16 @@ export function WorkerVerificationPage() {
     <MainLayout>
       <div className={getPageLayout('narrow')}>
         <PageHeader
-          title="Verification"
-          subtitle="Submit your verification request to build customer trust."
+          title={t("Verification")}
+          subtitle={t("Submit your verification request to build customer trust.")}
         />
 
         <div className="grid grid-cols-1 lg:grid-cols-[350px_1fr] gap-8">
           {/* Status Card */}
           <Card className="h-fit">
             <CardHeader>
-              <CardTitle>Status</CardTitle>
-              <CardDescription>Track your verification progress.</CardDescription>
+              <CardTitle>{t('Status')}</CardTitle>
+              <CardDescription>{t('Track your verification progress.')}</CardDescription>
             </CardHeader>
             <AsyncState
               isLoading={verificationQuery.isLoading}
@@ -42,7 +44,7 @@ export function WorkerVerificationPage() {
               errorFallback={
                 <div className="px-6 pb-6">
                   <p className="text-sm text-error-500">
-                    {verificationQuery.error?.response?.data?.error || verificationQuery.error?.message || 'Failed to load verification.'}
+                    {verificationQuery.error?.response?.data?.error || verificationQuery.error?.message || t('Failed to load verification.')}
                   </p>
                 </div>
               }
@@ -59,7 +61,7 @@ export function WorkerVerificationPage() {
                   </div>
                   <div>
                     <p className="font-bold text-gray-800 dark:text-gray-100">
-                      {application ? 'Application Submitted' : 'Not Submitted'}
+                      {application ? t('Application Submitted') : t('Not Submitted')}
                     </p>
                     {application && (
                       <VerificationStatusBadge status={application.status} className="mt-1" />
@@ -69,28 +71,28 @@ export function WorkerVerificationPage() {
 
                 {application?.notes && (
                   <div className="p-3 rounded-lg text-sm bg-gray-50 text-gray-600 dark:bg-dark-800 dark:text-gray-300">
-                    <span className="font-semibold block mb-1">Your Note:</span>
+                    <span className="font-semibold block mb-1">{t('Your Note:')}</span>
                     {application.notes}
                   </div>
                 )}
 
                 {application?.rejectionReason && (
                   <div className="p-3 rounded-lg bg-error-50 text-error-700 text-sm border border-error-100">
-                    <span className="font-bold block mb-1 flex items-center gap-1"><AlertCircle size={12} /> Admin Feedback:</span>
+                    <span className="font-bold block mb-1 flex items-center gap-1"><AlertCircle size={12} /> {t('Admin Feedback:')}</span>
                     {application.rejectionReason}
                   </div>
                 )}
 
                 {application?.submittedAt && (
                   <div className="text-gray-500 text-xs dark:text-gray-400">
-                    Submitted on {new Date(application.submittedAt).toLocaleString()}
+                    {t('Submitted on')} {new Date(application.submittedAt).toLocaleString(i18n.language)}
                   </div>
                 )}
 
                 {/* Document summary from application */}
                 {application?.documents && application.documents.length > 0 && (
                   <div>
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Submitted Documents</p>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">{t('Submitted Documents')}</p>
                     <div className="space-y-2">
                       {application.documents.map((doc) => (
                         <div key={doc.id} className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
@@ -110,14 +112,14 @@ export function WorkerVerificationPage() {
             {!canApply ? (
               <Card>
                 <div className="p-8 text-center">
-                  {application?.status === 'APPROVED' ? (
+                   {application?.status === 'APPROVED' ? (
                     <>
                       <div className="w-16 h-16 bg-success-50 text-success-500 rounded-full flex items-center justify-center mx-auto mb-4">
                         <CheckCircle2 size={32} />
                       </div>
-                      <h3 className="text-lg font-semibold mb-2 text-gray-800 dark:text-gray-200">Identity Verified</h3>
+                      <h3 className="text-lg font-semibold mb-2 text-gray-800 dark:text-gray-200">{t('Identity Verified')}</h3>
                       <p className="text-gray-500 dark:text-gray-400">
-                        Congratulations! Your profile has been verified. You can now accept bookings and offer services.
+                        {t('Congratulations! Your profile has been verified. You can now accept bookings and offer services.')}
                       </p>
                     </>
                   ) : (
@@ -125,9 +127,9 @@ export function WorkerVerificationPage() {
                       <div className="w-16 h-16 bg-brand-50 text-brand-500 rounded-full flex items-center justify-center mx-auto mb-4">
                         <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
                       </div>
-                      <h3 className="text-lg font-semibold mb-2 text-gray-800 dark:text-gray-200">Application Under Review</h3>
+                      <h3 className="text-lg font-semibold mb-2 text-gray-800 dark:text-gray-200">{t('Application Under Review')}</h3>
                       <p className="text-gray-500 dark:text-gray-400">
-                        Your verification request is currently being reviewed by our team. We will notify you once a decision is made.
+                        {t('Your verification request is currently being reviewed by our team. We will notify you once a decision is made.')}
                       </p>
                     </>
                   )}

@@ -1,13 +1,10 @@
 const prisma = require('../../config/prisma');
 const AppError = require('../../common/errors/AppError');
-// const Razorpay = require('razorpay');
-
-// const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || 'rzp_test_xxxxxxxx';
-// const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || 'xxxxxxxxxxxxxx';
-// const razorpay = new Razorpay({ key_id: RAZORPAY_KEY_ID, key_secret: RAZORPAY_KEY_SECRET });
+const { getRazorpayClient } = require('../payments/payment.service');
 
 const MIN_PAYOUT_THRESHOLD = 100.0;
 const INSTANT_PAYOUT_FEE_PERCENT = 2.0;
+const PAYOUT_MODE = (process.env.RAZORPAY_PAYOUT_MODE || 'SIMULATED').toUpperCase();
 
 exports.getWorkerBankDetails = async (userId) => {
     const profile = await prisma.workerProfile.findUnique({
@@ -29,11 +26,12 @@ exports.getWorkerBankDetails = async (userId) => {
     return {
         ...profile,
         bankAccountNumber: maskedAcc,
-        isLinked: !!profile.razorpayAccountId
+        isLinked: !!profile.razorpayAccountId,
+        payoutMode: PAYOUT_MODE,
     };
 };
 
-exports.updateWorkerBankDetails = async (userId, bankAccountNumber, bankIfsc) => {
+exports.updateWorkerBankDetails = async (userId, bankAccountNumber, bankIfsc, razorpayAccountId) => {
     const profile = await prisma.workerProfile.findUnique({ where: { userId }, include: { user: true } });
     if (!profile) throw new AppError(404, 'Worker profile not found');
 
@@ -41,32 +39,39 @@ exports.updateWorkerBankDetails = async (userId, bankAccountNumber, bankIfsc) =>
         throw new AppError(400, 'Bank Account Number and IFSC are required');
     }
 
-    // 1. Create a linked account (Route Contact & Fund Account) via Razorpay API
-    // NOTE: This usually involves creating a contact -> fund account -> linked account API sequence.
-    // For sandbox / Sprint 8 scope, we simulate generating a dummy ID if keys are dummy.
-    let accountId = `acc_${Math.random().toString(36).substr(2, 9)}`;
+    const normalizedAcc = String(bankAccountNumber).replace(/\s+/g, '');
+    const normalizedIfsc = String(bankIfsc).trim().toUpperCase();
+    if (!/^\d{9,18}$/.test(normalizedAcc)) {
+        throw new AppError(400, 'Bank account number must be 9 to 18 digits.');
+    }
+    if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(normalizedIfsc)) {
+        throw new AppError(400, 'Invalid IFSC format.');
+    }
 
-    try {
-        if (process.env.RAZORPAY_KEY_ID?.startsWith('rzp_live') || process.env.RAZORPAY_KEY_ID?.startsWith('rzp_test')) {
-            // In a real prod environment we map bank account -> Razorpay API
-            // Since Razorpay requires KYC for active Route Accounts, we often use Test Mode mocks
-            // For Sprint 8 parity, we'll store the account strings locally.
-        }
-    } catch (err) {
-        console.error('Razorpay Linking Failed:', err.message);
-        throw new AppError(500, 'Failed to link Razorpay Route account');
+    let accountId = razorpayAccountId ? String(razorpayAccountId).trim() : profile.razorpayAccountId;
+
+    // In simulated mode we auto-generate a stable testing account ID if none is provided.
+    if (!accountId && PAYOUT_MODE !== 'LIVE') {
+        accountId = `test_acc_${Math.random().toString(36).slice(2, 11)}`;
+    }
+
+    if (PAYOUT_MODE === 'LIVE' && !accountId) {
+        throw new AppError(400, 'Razorpay linked account ID is required for live payouts.');
     }
 
     await prisma.workerProfile.update({
         where: { id: profile.id },
         data: {
-            bankAccountNumber,
-            bankIfsc,
+            bankAccountNumber: normalizedAcc,
+            bankIfsc: normalizedIfsc,
             razorpayAccountId: accountId
         }
     });
 
-    return { isLinked: true };
+    return {
+        isLinked: !!accountId,
+        payoutMode: PAYOUT_MODE,
+    };
 };
 
 exports.processInstantPayout = async (userId) => {
@@ -131,13 +136,30 @@ async function processRazorpayTransfer(profile, deductBalance, payoutAmount) {
             }
         });
 
-        // 3. Initiate Razorpay Route Transfer
+        // 3. Initiate Razorpay transfer (live) or test transfer (simulated)
         try {
-            // In production, execute razorpay.transfers.create({
-            //   account: profile.razorpayAccountId, amount: payoutAmount * 100, currency: 'INR'
-            // });
+            let transferId;
 
-            const transferId = `trf_${Math.random().toString(36).substr(2, 9)}`;
+            const canUseLiveTransfer =
+                PAYOUT_MODE === 'LIVE' &&
+                typeof profile.razorpayAccountId === 'string' &&
+                profile.razorpayAccountId.startsWith('acc_');
+
+            if (canUseLiveTransfer) {
+                const razorpay = getRazorpayClient();
+                const transfer = await razorpay.transfers.create({
+                    account: profile.razorpayAccountId,
+                    amount: Math.round(Number(payoutAmount) * 100),
+                    currency: 'INR',
+                    notes: {
+                        workerProfileId: String(profile.id),
+                        payoutType: 'WORKER_WITHDRAWAL',
+                    },
+                });
+                transferId = transfer.id;
+            } else {
+                transferId = `trf_test_${Math.random().toString(36).slice(2, 11)}`;
+            }
 
             // 4. Update status to processed
             const completed = await tx.payout.update({

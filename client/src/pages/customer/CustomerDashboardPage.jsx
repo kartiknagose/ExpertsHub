@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 
 import { MainLayout } from '../../components/layout/MainLayout';
 import {
@@ -42,19 +43,29 @@ import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcut';
 import { useSocketEvent } from '../../hooks/useSocket';
 import { toast } from 'sonner';
 import { usePageTitle } from '../../hooks/usePageTitle';
+import { useRazorpay } from '../../hooks/useRazorpay';
+import { ensureRazorpayLoaded, getRazorpayKeyId } from '../../utils/razorpay';
 
 export function CustomerDashboardPage() {
-    usePageTitle('Dashboard');
+  const { t } = useTranslation();
+  usePageTitle(t('Dashboard'));
   const { user } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [cancelConfirmId, setCancelConfirmId] = useState(null);
+  const razorpayKeyId = getRazorpayKeyId();
+
+  useRazorpay({
+    onError: () => {
+      toast.error(t('Payment system failed to load. Please refresh and try again.'));
+    },
+  });
 
   // Keyboard shortcuts
   useKeyboardShortcuts([
-    { key: 'b', callback: () => navigate('/bookings'), meta: true, title: 'Go to bookings' },
-    { key: 's', callback: () => navigate('/services'), meta: true, title: 'Browse services' },
-    { key: 'p', callback: () => navigate('/profile'), meta: true, title: 'Open profile' },
+    { key: 'b', callback: () => navigate('/customer/bookings'), meta: true, title: t('Go to bookings') },
+    { key: 's', callback: () => navigate('/services'), meta: true, title: t('Browse services') },
+    { key: 'p', callback: () => navigate('/customer/profile'), meta: true, title: t('Open profile') },
   ]);
 
   const { data, isLoading, isError, refetch } = useQuery({
@@ -71,11 +82,11 @@ export function CustomerDashboardPage() {
   const reviewMutation = useMutation({
     mutationFn: (payload) => createReview(payload),
     onSuccess: () => {
-      toast.success('Review submitted! Thank you.');
+      toast.success(t('Review submitted! Thank you.'));
       queryClient.invalidateQueries({ queryKey: queryKeys.bookings.customer() });
     },
     onError: (error) => {
-      toast.error(error.response?.data?.message || error.response?.data?.error || 'Failed to submit review');
+      toast.error(error.response?.data?.message || error.response?.data?.error || t('Failed to submit review'));
     },
   });
 
@@ -86,14 +97,95 @@ export function CustomerDashboardPage() {
     },
   });
 
+  const launchRazorpayCheckout = (order, booking, onSuccess, onFailure) => {
+    if (!window?.Razorpay) {
+      toast.error(t('Payment system unavailable. Please try again in a moment.'));
+      onFailure?.();
+      return;
+    }
+
+    if (!razorpayKeyId) {
+      toast.error(t('Payment is not configured. Please contact support.'));
+      onFailure?.();
+      return;
+    }
+
+    const options = {
+      key: razorpayKeyId,
+      amount: order.amount,
+      currency: order.currency,
+      name: 'UrbanPro V2',
+      description: `Booking #${booking.id}`,
+      order_id: order.id,
+      prefill: {
+        name: user?.name,
+        email: user?.email,
+        contact: user?.mobile,
+      },
+      handler: function (response) {
+        onSuccess(response);
+      },
+      modal: {
+        ondismiss: onFailure,
+      },
+    };
+
+    try {
+      const rzp = new window.Razorpay(options);
+      rzp.open();
+    } catch (_error) {
+      toast.error(t('Unable to open payment window. Please try again.'));
+      onFailure?.();
+    }
+  };
+
   const payMutation = useMutation({
-    mutationFn: (id) => payBooking(id),
+    mutationFn: async (booking) => {
+      if (!booking?.id) {
+        throw new Error('Missing booking details for payment.');
+      }
+
+      if (!razorpayKeyId) {
+        throw new Error('Payment is not configured.');
+      }
+
+      await ensureRazorpayLoaded();
+
+      const orderResp = await payBooking(booking.id, { createRazorpayOrder: true });
+      const order = orderResp?.order;
+
+      if (!order) {
+        throw new Error('Failed to initiate payment.');
+      }
+
+      await new Promise((resolve, reject) => {
+        launchRazorpayCheckout(
+          order,
+          booking,
+          async (razorpayResponse) => {
+            try {
+              await payBooking(booking.id, {
+                paymentReference: razorpayResponse.razorpay_payment_id,
+                paymentOrderId: razorpayResponse.razorpay_order_id,
+                paymentSignature: razorpayResponse.razorpay_signature,
+              });
+              resolve();
+            } catch (error) {
+              reject(error);
+            }
+          },
+          () => {
+            reject(new Error('Payment cancelled or failed.'));
+          }
+        );
+      });
+    },
     onSuccess: () => {
-      toast.success('Payment successful! Thank you.');
+      toast.success(t('Payment successful! Thank you.'));
       queryClient.invalidateQueries({ queryKey: queryKeys.bookings.customer() });
     },
     onError: (error) => {
-      toast.error(error.response?.data?.message || error.response?.data?.error || 'Payment failed');
+      toast.error(error.response?.data?.message || error.response?.data?.error || error.message || t('Payment failed'));
     },
   });
 
@@ -124,7 +216,8 @@ export function CustomerDashboardPage() {
         setCancelConfirmId(actionId);
         return; // Dialog handles the rest
       } else if (type === 'PAY') {
-        await payMutation.mutateAsync(actionId);
+        const booking = bookings.find((item) => item.id === actionId);
+        await payMutation.mutateAsync(booking);
       } else if (type === 'REVIEW') {
         await reviewMutation.mutateAsync({
           bookingId: payload.bookingId,
@@ -156,14 +249,14 @@ export function CustomerDashboardPage() {
 
   useSocketEvent('booking:created', (payload) => {
     if (payload.customerId === user?.id) {
-      toast.info('New booking confirmed!');
+      toast.info(t('New booking confirmed!'));
       refetch();
     }
   });
 
   useSocketEvent('booking:status_updated', (payload) => {
     if (payload.customerId === user?.id) {
-      toast.success(`Booking status: ${payload.status}`);
+      toast.success(t('Booking status: {{status}}', { status: t(payload.status) }));
       refetch();
     }
   });
@@ -177,16 +270,16 @@ export function CustomerDashboardPage() {
           <div className="flex items-center gap-6">
             <Avatar name={user?.name} src={user?.profilePhotoUrl} size="xl" ring />
             <div>
-              <h1 className="text-3xl md:text-5xl font-black tracking-tight mb-2 text-gray-900 dark:text-white">
-                Welcome back, <span className="text-brand-500">{user?.name?.split(' ')[0]}!</span>
+              <h1 className="text-3xl md:text-5xl font-bold tracking-tight mb-2 text-gray-900 dark:text-white">
+                {t('Welcome back,')} <span className="text-brand-500">{user?.name?.split(' ')[0]}!</span>
               </h1>
-              <p className="text-gray-500 font-medium italic">Your personalized service hub is ready.</p>
+              <p className="text-gray-500 font-medium italic">{t('Your personalized service hub is ready.')}</p>
             </div>
           </div>
 
           <div className="flex gap-2">
-            <Button onClick={() => navigate('/services')} className="px-8 rounded-2xl h-14 font-black uppercase text-[10px] tracking-[0.2em] shadow-xl shadow-brand-500/20">
-              Book New Service
+            <Button onClick={() => navigate('/services')} className="px-8 rounded-2xl h-14 font-bold uppercase text-[10px] tracking-[0.2em] shadow-xl shadow-brand-500/20">
+              {t('Book New Service')}
             </Button>
           </div>
         </div>
@@ -197,26 +290,26 @@ export function CustomerDashboardPage() {
         ) : (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-12">
             <StatCard
-              title="Active Sessions"
+              title={t("Active Sessions")}
               value={summary.active}
               icon={CalendarClock}
               color="brand"
               className="md:scale-105"
             />
             <StatCard
-              title="Jobs Completed"
+              title={t("Jobs Completed")}
               value={summary.completed}
               icon={CheckCircle}
               color="success"
             />
             <StatCard
-              title="Pending Payments"
+              title={t("Pending Payments")}
               value={`₹${bookings.filter(b => b.status === 'COMPLETED' && b.paymentStatus !== 'PAID').reduce((sum, b) => sum + Number(b.totalPrice || 0), 0).toLocaleString()}`}
               icon={Wallet}
               color="info"
             />
             <StatCard
-              title="Total Invested"
+              title={t("Total Invested")}
               value={`₹${totalSpent.toLocaleString()}`}
               icon={Briefcase}
               color="warning"
@@ -231,11 +324,11 @@ export function CustomerDashboardPage() {
             {/* Real-time Activity Section */}
             <section>
               <div className="flex items-center justify-between mb-8">
-                <h2 className="text-2xl font-black tracking-tight text-gray-900 dark:text-white">
-                  Live Activity
+                <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+                  {t('Live Activity')}
                 </h2>
-                <Link to="/bookings" className="text-brand-500 font-black text-xs uppercase tracking-widest hover:underline px-4 py-2 bg-brand-500/10 rounded-xl transition-colors">
-                  Full History
+                <Link to="/customer/bookings" className="text-brand-500 font-bold text-xs uppercase tracking-widest hover:underline px-4 py-2 bg-brand-500/10 rounded-xl transition-colors">
+                  {t('Full History')}
                 </Link>
               </div>
 
@@ -245,8 +338,8 @@ export function CustomerDashboardPage() {
                 onRetry={refetch}
                 loadingFallback={<div className="space-y-6"><BookingCardSkeleton /><BookingCardSkeleton /></div>}
                 isEmpty={activeBookings.length === 0}
-                emptyTitle="No active missions"
-                emptyMessage="Book a professional service to track real-time updates here."
+                emptyTitle={t("No active missions")}
+                emptyMessage={t("Book a professional service to track real-time updates here.")}
                 className="min-h-[200px]"
               >
                 <div className="grid grid-cols-1 gap-6">
@@ -266,8 +359,8 @@ export function CustomerDashboardPage() {
 
             {/* Smart Discovery Section */}
             <section>
-              <h2 className="text-2xl font-black tracking-tight mb-8 text-gray-900 dark:text-white">
-                Handpicked for you
+              <h2 className="text-2xl font-bold tracking-tight mb-8 text-gray-900 dark:text-white">
+                {t('Handpicked for you')}
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 {services.slice(0, 4).map(service => (
@@ -284,9 +377,10 @@ export function CustomerDashboardPage() {
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-dark-900 via-dark-900/10 to-transparent opacity-80" />
                       <div className="absolute bottom-6 left-6 right-6">
-                        <Badge className="bg-brand-500 text-white border-0 mb-3 px-3 py-1 font-black uppercase text-[8px] tracking-[0.2em]">{service.category}</Badge>
+                        <Badge className="bg-brand-500 text-white border-0 mb-3 px-3 py-1 font-bold uppercase text-[8px] tracking-[0.2em]">{t(service.category || '')}</Badge>
                         <div className="flex items-center justify-between">
-                          <h3 className="text-white font-black text-xl tracking-tight">{service.name}</h3>
+                          <h3 className="text-white font-bold text-xl tracking-tight">{t(service.name || '')}</h3>
+
                           <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white scale-0 group-hover:scale-100 transition-transform duration-300">
                             <ArrowRight size={20} />
                           </div>
@@ -305,17 +399,17 @@ export function CustomerDashboardPage() {
             {/* Share Widget */}
             <Card className="border-0 bg-brand-500 text-white p-8 rounded-[2.5rem] relative overflow-hidden shadow-2xl shadow-brand-500/20">
               <div className="relative z-10">
-                <h3 className="text-2xl font-black mb-4 leading-tight">Share UrbanPro <br />with Friends</h3>
-                <p className="text-brand-100 text-sm font-medium mb-6 opacity-80">Know someone who needs quality home services? Spread the word!</p>
+                <h3 className="text-2xl font-bold mb-4 leading-tight">{t('Share UrbanPro with Friends')}</h3>
+                <p className="text-brand-100 text-sm font-medium mb-6 opacity-80">{t('Know someone who needs quality home services? Spread the word!')}</p>
                 <Button onClick={() => {
                   if (navigator.share) {
-                    navigator.share({ title: 'UrbanPro', text: 'Check out UrbanPro for professional home services!', url: window.location.origin });
+                    navigator.share({ title: 'UrbanPro', text: t('Check out UrbanPro for professional home services!'), url: window.location.origin });
                   } else {
                     navigator.clipboard.writeText(window.location.origin);
-                    toast.success('Link copied to clipboard!');
+                    toast.success(t('Link copied to clipboard!'));
                   }
-                }} className="w-full h-14 bg-white text-brand-600 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-brand-50 hover:scale-[1.02] transition-all">
-                  Share Now
+                }} className="w-full h-14 bg-white text-brand-600 rounded-2xl font-bold uppercase text-[10px] tracking-widest hover:bg-brand-50 hover:scale-[1.02] transition-all">
+                  {t('Share Now')}
                 </Button>
               </div>
               <Zap className="absolute -bottom-6 -right-6 w-32 h-32 opacity-10 rotate-12" />
@@ -323,15 +417,15 @@ export function CustomerDashboardPage() {
 
             {/* Security widget */}
             <Card className="p-8 rounded-[2.5rem] bg-opacity-50 backdrop-blur-sm">
-              <h3 className="font-black uppercase tracking-widest text-[10px] mb-8 text-gray-500 dark:text-gray-400">Safety Matrix</h3>
+              <h3 className="font-bold uppercase tracking-widest text-[10px] mb-8 text-gray-500 dark:text-gray-400">{t('Safety Matrix')}</h3>
               <div className="space-y-8">
                 <div className="flex gap-4 group">
                   <div className="w-12 h-12 rounded-2xl bg-success-500/10 flex items-center justify-center text-success-500 group-hover:scale-110 transition-transform">
                     <ShieldAlert size={24} />
                   </div>
                   <div>
-                    <p className="font-black text-sm tracking-tight mb-1 text-dark-900 dark:text-white">Zero-Risk Promise</p>
-                    <p className="text-xs text-gray-500 font-medium">Verified professional network</p>
+                    <p className="font-bold text-sm tracking-tight mb-1 text-dark-900 dark:text-white">{t('Zero-Risk Promise')}</p>
+                    <p className="text-xs text-gray-500 font-medium">{t('Verified professional network')}</p>
                   </div>
                 </div>
                 <div className="flex gap-4 group">
@@ -339,8 +433,8 @@ export function CustomerDashboardPage() {
                     <Star size={24} />
                   </div>
                   <div>
-                    <p className="font-black text-sm tracking-tight mb-1 text-dark-900 dark:text-white">UrbanPro Quality</p>
-                    <p className="text-xs text-gray-500 font-medium">Top-rated standard of work</p>
+                    <p className="font-bold text-sm tracking-tight mb-1 text-dark-900 dark:text-white">{t('UrbanPro Quality')}</p>
+                    <p className="text-xs text-gray-500 font-medium">{t('Top-rated standard of work')}</p>
                   </div>
                 </div>
                 <div className="flex gap-4 group">
@@ -348,8 +442,8 @@ export function CustomerDashboardPage() {
                     <Wallet size={24} />
                   </div>
                   <div>
-                    <p className="font-black text-sm tracking-tight mb-1 text-dark-900 dark:text-white">Secure Escrow</p>
-                    <p className="text-xs text-gray-500 font-medium">Pay only when satisfied</p>
+                    <p className="font-bold text-sm tracking-tight mb-1 text-dark-900 dark:text-white">{t('Secure Escrow')}</p>
+                    <p className="text-xs text-gray-500 font-medium">{t('Pay only when satisfied')}</p>
                   </div>
                 </div>
               </div>
@@ -357,14 +451,14 @@ export function CustomerDashboardPage() {
 
             {/* Support widget */}
             <div className="p-2">
-              <button onClick={() => toast.info('Support center coming soon! For urgent help, email support@urbanpro.com')} className="w-full p-6 rounded-3xl border-2 border-dashed flex items-center justify-between group transition-all border-gray-200 hover:border-brand-500/30 dark:border-dark-700 dark:hover:border-brand-500/50">
+              <button onClick={() => toast.info(t('Support center coming soon! For urgent help, email support@urbanpro.com'))} className="w-full p-6 rounded-3xl border-2 border-dashed flex items-center justify-between group transition-all border-gray-200 hover:border-brand-500/30 dark:border-dark-700 dark:hover:border-brand-500/50">
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-dark-800 flex items-center justify-center">
                     <Clock size={18} className="text-gray-400" />
                   </div>
                   <div className="text-left">
-                    <p className="text-sm font-bold text-gray-700 dark:text-gray-300">Support Center</p>
-                    <p className="text-[10px] text-gray-500 font-black uppercase tracking-widest">Available 24/7</p>
+                    <p className="text-sm font-bold text-gray-700 dark:text-gray-300">{t('Support Center')}</p>
+                    <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">{t('Available 24/7')}</p>
                   </div>
                 </div>
                 <ChevronRight size={18} className="text-gray-400 group-hover:translate-x-1 transition-transform" />
@@ -384,10 +478,10 @@ export function CustomerDashboardPage() {
             setCancelConfirmId(null);
           }
         }}
-        title="Cancel Booking"
-        message="Are you sure you want to cancel this booking? This action cannot be undone."
-        confirmText="Yes, Cancel"
-        cancelText="Keep Booking"
+        title={t("Cancel Booking")}
+        message={t("Are you sure you want to cancel this booking? This action cannot be undone.")}
+        confirmText={t("Yes, Cancel")}
+        cancelText={t("Keep Booking")}
         variant="danger"
         loading={cancelMutation.isPending}
       />

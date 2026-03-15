@@ -15,6 +15,10 @@ COPY . .
 # Environment variable for the backend API during build (Vite requires it prefix with VITE_)
 ARG VITE_API_URL="/api"
 ENV VITE_API_URL=$VITE_API_URL
+ARG VITE_RAZORPAY_KEY_ID=""
+ENV VITE_RAZORPAY_KEY_ID=$VITE_RAZORPAY_KEY_ID
+ARG VITE_GOOGLE_PLACES_API_KEY=""
+ENV VITE_GOOGLE_PLACES_API_KEY=$VITE_GOOGLE_PLACES_API_KEY
 
 # Build the production bundle
 RUN npm run build

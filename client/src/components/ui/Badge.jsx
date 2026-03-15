@@ -1,78 +1,83 @@
-// Badge component for status indicators, labels, and tags
-// Supports different variants, sizes, and icon support
+// Badge component — vivid semantic colors, dot/icon support, animated variants
 
-/**
- * Badge Component
- * @param {string} variant - Style variant: 'default', 'success', 'warning', 'error', 'info', 'outline'
- * @param {string} size - Size: 'sm', 'md', 'lg'
- * @param {React.ReactNode} icon - Icon component (from lucide-react)
- * @param {boolean} dot - Show colored dot instead of icon
- * @param {React.ReactNode} children - Badge text/content
- * @param {string} className - Additional CSS classes
- */
+import { motion as Motion } from 'framer-motion';
+
 export function Badge({
   variant = 'default',
   size = 'md',
   icon: Icon,
   dot = false,
+  pulse = false,        // adds a pulsing dot (for live status)
   children,
   className = '',
   ...props
 }) {
-  // Base badge styles
-  const baseStyles = 'inline-flex items-center gap-1.5 font-medium rounded-full transition-colors duration-200';
+  const baseStyles = 'inline-flex items-center gap-1.5 font-semibold rounded-full tracking-wide';
 
-  // Size styles
   const sizeStyles = {
+    xs: 'px-1.5 py-0.5 text-[10px]',
     sm: 'px-2 py-0.5 text-xs',
-    md: 'px-2.5 py-1 text-sm',
-    lg: 'px-3 py-1.5 text-base',
+    md: 'px-2.5 py-1 text-xs',
+    lg: 'px-3 py-1.5 text-sm',
   };
 
-  // Variant styles (different colors)
   const variantStyles = {
-    default: 'bg-gray-200 dark:bg-dark-700 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-dark-600',
-    
-    success: 'bg-success-100 dark:bg-success-900/50 text-success-700 dark:text-success-300 border border-success-200 dark:border-success-700',
-    
-    warning: 'bg-warning-100 dark:bg-warning-900/50 text-warning-700 dark:text-warning-300 border border-warning-200 dark:border-warning-700',
-    
-    error: 'bg-error-100 dark:bg-error-900/50 text-error-700 dark:text-error-300 border border-error-200 dark:border-error-700',
-    
-    info: 'bg-brand-100 dark:bg-brand-900/50 text-brand-700 dark:text-brand-300 border border-brand-200 dark:border-brand-700',
-    
-    accent: 'bg-accent-100 dark:bg-accent-900/50 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-700',
-    
-    outline: 'bg-transparent text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-dark-600',
+    default: 'bg-neutral-100 dark:bg-dark-700 text-neutral-700 dark:text-neutral-300 border border-neutral-200 dark:border-dark-600',
+    primary: 'bg-brand-100 dark:bg-brand-500/20 text-brand-700 dark:text-brand-300 border border-brand-200 dark:border-brand-500/30',
+    success: 'bg-success-100 dark:bg-success-500/20 text-success-700 dark:text-success-300 border border-success-200 dark:border-success-500/30',
+    warning: 'bg-warning-100 dark:bg-warning-500/20 text-warning-700 dark:text-warning-300 border border-warning-200 dark:border-warning-500/30',
+    error:   'bg-error-100 dark:bg-error-500/20 text-error-700 dark:text-error-300 border border-error-200 dark:border-error-500/30',
+    accent:  'bg-accent-100 dark:bg-accent-500/20 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-500/30',
+    outline: 'bg-transparent text-neutral-700 dark:text-neutral-300 border border-neutral-300 dark:border-dark-600',
+    // Solid filled variants
+    'solid-primary': 'bg-brand-500 text-white',
+    'solid-success': 'bg-success-500 text-white',
+    'solid-warning': 'bg-warning-500 text-white',
+    'solid-error':   'bg-error-500 text-white',
+    'solid-accent':  'bg-accent-500 text-white',
+    // Gradient
+    gradient: 'text-white bg-gradient-to-r from-brand-500 to-accent-500',
   };
 
-  // Dot color based on variant
   const dotColors = {
-    default: 'bg-gray-500 dark:bg-gray-400',
+    default: 'bg-neutral-400',
+    primary: 'bg-brand-500',
     success: 'bg-success-500',
     warning: 'bg-warning-500',
-    error: 'bg-error-500',
-    info: 'bg-brand-500',
-    accent: 'bg-accent-500',
-    outline: 'bg-gray-500 dark:bg-gray-400',
+    error:   'bg-error-500',
+    accent:  'bg-accent-500',
+    outline: 'bg-neutral-400',
+    'solid-primary': 'bg-white',
+    'solid-success': 'bg-white',
+    'solid-warning': 'bg-white',
+    'solid-error':   'bg-white',
+    'solid-accent':  'bg-white',
+    gradient: 'bg-white',
   };
 
-  // Icon size based on badge size
-  const iconSize = size === 'sm' ? 12 : size === 'lg' ? 16 : 14;
+  const iconSize = size === 'xs' ? 10 : size === 'sm' ? 11 : size === 'lg' ? 14 : 12;
 
-  // Combine all styles
-  const badgeClasses = `${baseStyles} ${sizeStyles[size]} ${variantStyles[variant]} ${className}`;
+  const badgeClasses = [
+    baseStyles,
+    sizeStyles[size] ?? sizeStyles.md,
+    variantStyles[variant] ?? variantStyles.default,
+    className,
+  ].join(' ');
+
+  const dotColor = dotColors[variant] ?? 'bg-neutral-400';
 
   return (
     <span className={badgeClasses} {...props}>
-      {/* Show dot or icon */}
       {dot ? (
-        <span className={`w-2 h-2 rounded-full ${dotColors[variant]}`}></span>
+        <span className="relative flex items-center">
+          {pulse && (
+            <span className={`absolute inline-flex h-full w-full rounded-full opacity-75 animate-ping ${dotColor}`} />
+          )}
+          <span className={`relative inline-flex rounded-full w-2 h-2 ${dotColor}`} />
+        </span>
       ) : Icon ? (
         <Icon size={iconSize} />
       ) : null}
-
-      {/* Badge text */}
       {children}
     </span>
   );

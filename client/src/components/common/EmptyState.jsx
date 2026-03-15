@@ -1,72 +1,60 @@
-// Empty state component
-// Use for empty lists or zero data views
+// EmptyState — rich illustrated empty states with animated icon
 
-/**
- * EmptyState Component
- * @param {React.Component} icon - Icon component (from lucide-react)
- * @param {React.ReactNode} illustration - Custom illustration/image component
- * @param {string} title - Empty state title
- * @param {string} message - Empty state message
- * @param {React.ReactNode} action - Action button/element
- * @param {string} size - Size variant: 'sm', 'md', 'lg' (default: 'md')
- */
-export function EmptyState({ 
-  icon: Icon, 
+import { motion as Motion } from 'framer-motion';
+
+export function EmptyState({
+  icon: Icon,
   illustration,
-  title, 
-  message, 
+  title,
+  message,
   action,
-  size = 'md' 
+  size = 'md',
+  className = '',
 }) {
-  const sizes = {
-    sm: {
-      padding: 'p-6',
-      iconSize: 20,
-      iconContainer: 'h-10 w-10',
-      titleSize: 'text-base',
-      messageSize: 'text-sm',
-    },
-    md: {
-      padding: 'p-8',
-      iconSize: 22,
-      iconContainer: 'h-12 w-12',
-      titleSize: 'text-lg',
-      messageSize: 'text-base',
-    },
-    lg: {
-      padding: 'p-12',
-      iconSize: 28,
-      iconContainer: 'h-16 w-16',
-      titleSize: 'text-xl',
-      messageSize: 'text-lg',
-    },
+  const sizeConfig = {
+    sm: { padding: 'p-8',  iconBox: 'w-12 h-12', iconSize: 20, title: 'text-base', msg: 'text-sm' },
+    md: { padding: 'p-12', iconBox: 'w-16 h-16', iconSize: 24, title: 'text-xl',  msg: 'text-base' },
+    lg: { padding: 'p-16', iconBox: 'w-20 h-20', iconSize: 32, title: 'text-2xl',  msg: 'text-lg' },
   };
 
-  const currentSize = sizes[size];
+  const s = sizeConfig[size] || sizeConfig.md;
 
   return (
-    <div className={`rounded-xl border ${currentSize.padding} text-center border-gray-200 dark:border-dark-700 bg-white dark:bg-dark-800`}>
+    <Motion.div
+      initial={{ opacity: 0, scale: 0.97 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+      className={[
+        s.padding,
+        'rounded-2xl border text-center',
+        'border-neutral-200 dark:border-dark-700',
+        'bg-white dark:bg-dark-800',
+        className,
+      ].join(' ')}
+    >
+      {/* Visual */}
       {illustration ? (
-        <div className="mx-auto mb-4">
-          {illustration}
-        </div>
+        <div className="mx-auto mb-6">{illustration}</div>
       ) : Icon ? (
-        <div className={`mx-auto mb-4 flex ${currentSize.iconContainer} items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-accent-500 text-white`}>
-          <Icon size={currentSize.iconSize} />
-        </div>
+        <Motion.div
+          className={`mx-auto mb-6 ${s.iconBox} rounded-2xl bg-gradient-to-br from-brand-100 to-accent-100 dark:from-brand-500/20 dark:to-accent-500/20 flex items-center justify-center`}
+          animate={{ y: [0, -6, 0] }}
+          transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+        >
+          <Icon size={s.iconSize} className="text-brand-500 dark:text-brand-400" />
+        </Motion.div>
       ) : null}
-      
-      <h3 className={`${currentSize.titleSize} font-semibold text-gray-900 dark:text-gray-100`}>
+
+      {/* Copy */}
+      <h3 className={`${s.title} font-bold text-neutral-900 dark:text-neutral-100 mb-2`}>
         {title}
       </h3>
-      
       {message && (
-        <p className={`text-gray-600 dark:text-gray-400 mt-2 ${currentSize.messageSize}`}>
+        <p className={`${s.msg} text-neutral-500 dark:text-neutral-400 max-w-sm mx-auto leading-relaxed`}>
           {message}
         </p>
       )}
-      
-      {action && <div className="mt-4">{action}</div>}
-    </div>
+      {action && <div className="mt-6">{action}</div>}
+    </Motion.div>
   );
 }

@@ -12,10 +12,12 @@ export { Badge } from '../ui/Badge';
 export { Spinner, LoadingOverlay, LoadingButton } from '../ui/Spinner';
 export { Modal, ModalFooter } from '../ui/Modal';
 export { ConfirmDialog } from '../ui/ConfirmDialog';
-export { Skeleton, BookingCardSkeleton, StatGridSkeleton, SkeletonContainer } from '../ui/Skeleton';
+export { Checkbox } from '../ui/Checkbox';
+
+export { Skeleton, BookingCardSkeleton, StatGridSkeleton, SkeletonContainer, ListItemSkeleton } from '../ui/Skeleton';
 
 // ── Domain-aware shared components ──
-export { BookingStatusBadge, PaymentStatusBadge, VerificationStatusBadge, RoleBadge } from './StatusBadges';
+export { BookingStatusBadge, PaymentStatusBadge, VerificationStatusBadge, RoleBadge, WorkerTierBadge } from './StatusBadges';
 export { PageHeader } from './PageHeader';
 export { EmptyState } from './EmptyState';
 export { ErrorBoundary } from './ErrorBoundary';

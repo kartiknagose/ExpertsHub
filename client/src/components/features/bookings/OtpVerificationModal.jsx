@@ -1,28 +1,36 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 
 import { Modal, Button, Input, ImageUpload } from '../../common';
-import { verifyBookingStart, verifyBookingCompletion } from '../../../api/bookings';
+import { verifyBookingStart, verifyBookingCompletion, refreshBookingOtp } from '../../../api/bookings';
 import { uploadBookingPhoto } from '../../../api/uploads';
 
 /**
  * Shared OTP Verification Modal used across worker pages.
- *
- * @param {Object} props
- * @param {boolean}  props.isOpen       - Whether the modal is visible
- * @param {Function} props.onClose      - Called when the modal should close
- * @param {'start'|'complete'} props.otpAction - Whether this is a start or completion verification
- * @param {number|string} props.bookingId     - The booking being verified
- * @param {string[]}      props.invalidateKeys - Query key arrays to invalidate on success
- * @param {Function}      [props.onSuccess]    - Optional callback after successful verification
  */
 export function OtpVerificationModal({ isOpen, onClose, otpAction, bookingId, invalidateKeys = [], onSuccess }) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
 
   const [otpCode, setOtpCode] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setResendCooldown(0);
+  }, [isOpen, bookingId, otpAction]);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return undefined;
+    const timer = setInterval(() => {
+      setResendCooldown((prev) => (prev <= 1 ? 0 : prev - 1));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
 
   const resetState = useCallback(() => {
     setOtpCode('');
@@ -39,13 +47,13 @@ export function OtpVerificationModal({ isOpen, onClose, otpAction, bookingId, in
     mutationFn: ({ bookingId: bId, otp }) => verifyBookingStart(bId, otp),
     onSuccess: () => {
       invalidateKeys.forEach((key) => queryClient.invalidateQueries({ queryKey: key }));
-      toast.success('Work started successfully!');
+      toast.success(t('Work started successfully!'));
       resetState();
       onSuccess?.();
       onClose();
     },
     onError: (error) => {
-      const msg = error.response?.data?.error || error.response?.data?.message || 'Invalid OTP';
+      const msg = error.response?.data?.error || error.response?.data?.message || t('Invalid OTP');
       toast.error(msg);
     },
   });
@@ -54,28 +62,52 @@ export function OtpVerificationModal({ isOpen, onClose, otpAction, bookingId, in
     mutationFn: ({ bookingId: bId, otp }) => verifyBookingCompletion(bId, otp),
     onSuccess: () => {
       invalidateKeys.forEach((key) => queryClient.invalidateQueries({ queryKey: key }));
-      toast.success('Job completed successfully!');
+      toast.success(t('Job completed successfully!'));
       resetState();
       onSuccess?.();
       onClose();
     },
     onError: (error) => {
-      const msg = error.response?.data?.error || error.response?.data?.message || 'Invalid OTP';
+      const msg = error.response?.data?.error || error.response?.data?.message || t('Invalid OTP');
       toast.error(msg);
     },
   });
 
+  const refreshOtpMutation = useMutation({
+    mutationFn: ({ bookingId: bId, type }) => refreshBookingOtp(bId, type),
+    onSuccess: (result) => {
+      setOtpCode('');
+      setResendCooldown(30);
+      const otpLabel = result?.otpType === 'COMPLETE' ? t('completion') : t('start');
+      toast.success(t('New {{type}} OTP sent to customer. Ask them to check Booking Details.', { type: otpLabel }));
+    },
+    onError: (error) => {
+      const msg = error.response?.data?.error || error.response?.data?.message || t('Failed to refresh OTP. Please try again.');
+      toast.error(msg);
+    },
+  });
+
+  const handleRefreshOtp = () => {
+    if (!bookingId) {
+      toast.error(t('No booking selected. Please close and try again.'));
+      return;
+    }
+
+    const type = otpAction === 'complete' ? 'COMPLETE' : 'START';
+    refreshOtpMutation.mutate({ bookingId, type });
+  };
+
   const handleSubmit = async () => {
     if (!bookingId) {
-      toast.error('No booking selected. Please close and try again.');
+      toast.error(t('No booking selected. Please close and try again.'));
       return;
     }
     if (!selectedFile) {
-      toast.error(`Please upload a ${otpAction === 'start' ? 'BEFORE' : 'AFTER'} photo as proof.`);
+      toast.error(t('Please upload a {{type}} photo as proof.', { type: t(otpAction === 'start' ? 'BEFORE' : 'AFTER') }));
       return;
     }
     if (!otpCode || otpCode.length < 4) {
-      toast.error('Please enter a valid 4-digit OTP.');
+      toast.error(t('Please enter a valid 4-digit OTP.'));
       return;
     }
 
@@ -91,73 +123,90 @@ export function OtpVerificationModal({ isOpen, onClose, otpAction, bookingId, in
       }
     } catch {
       // Mutation onError handles the toast for verify failures.
-      // This catch handles uploadBookingPhoto failures.
     } finally {
       setIsUploading(false);
     }
   };
 
   const isPending = isUploading || verifyStartMutation.isPending || verifyCompleteMutation.isPending;
+  const isRefreshPending = refreshOtpMutation.isPending;
 
   return (
     <Modal
       isOpen={isOpen}
       onClose={handleClose}
-      title={otpAction === 'start' ? 'Start Verification' : 'Completion Verification'}
+      title={otpAction === 'start' ? t('Start Verification') : t('Completion Verification')}
       size="sm"
     >
-      <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-2 custom-scrollbar">
+      <div className="space-y-3 max-h-[68vh] overflow-y-auto pr-1 custom-scrollbar">
         {/* Step 1: Photo Evidence */}
-        <div className="p-4 rounded-2xl border bg-brand-50 dark:bg-brand-900/10 border-brand-100 dark:border-brand-800">
-          <p className="text-sm font-black uppercase tracking-widest text-brand-800 dark:text-brand-300">
-            Step 1: Visual Proof
+        <div className="p-3 rounded-xl border bg-brand-50 dark:bg-brand-900/10 border-brand-100 dark:border-brand-800">
+          <p className="text-xs font-black uppercase tracking-widest text-brand-800 dark:text-brand-300">
+            {t('Step 1: Visual Proof')}
           </p>
-          <p className="text-xs mt-1 text-brand-600 dark:text-brand-400">
-            Please upload a photo of the {otpAction === 'start' ? 'work area' : 'finished result'}.
+          <p className="text-[11px] mt-1 text-brand-600 dark:text-brand-400">
+            {t('Please upload a photo of the')} {otpAction === 'start' ? t('work area') : t('finished result')}.
           </p>
         </div>
 
         <ImageUpload
-          label={otpAction === 'start' ? 'Before photo (capture or upload)' : 'After photo (capture or upload)'}
+          label={otpAction === 'start' ? t('Before photo (capture or upload)') : t('After photo (capture or upload)')}
           onUpload={setSelectedFile}
           value={selectedFile}
         />
 
         {/* Step 2: OTP Input */}
-        <div className="border-t pt-6 border-gray-100 dark:border-dark-700">
-          <p className="text-sm font-black uppercase tracking-widest mb-4 text-gray-700 dark:text-gray-200">
-            Step 2: Customer OTP
+        <div className="border-t pt-4 border-gray-100 dark:border-dark-700">
+          <p className="text-xs font-black uppercase tracking-widest mb-2 text-gray-700 dark:text-gray-200">
+            {t('Step 2: Customer OTP')}
           </p>
           <Input
-            label="Customer OTP"
-            placeholder="0 0 0 0"
+            label={t("Customer OTP")}
+            placeholder="0000"
             value={otpCode}
-            onChange={(e) => setOtpCode(e.target.value)}
-            className="text-center text-4xl tracking-[1rem] font-black h-20 rounded-2xl border-2 focus:border-brand-500"
+            onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
+            size="compact"
+            className="max-w-[280px] mx-auto"
+            inputClassName="text-center text-sm tracking-[0.24em] font-semibold"
             maxLength={4}
             inputMode="numeric"
             pattern="[0-9]*"
             autoComplete="one-time-code"
+            hint={t('Ask customer for the 4-digit code')}
           />
-          <p className="text-xs text-center mt-3 text-gray-500 font-bold uppercase tracking-widest">
-            Ask customer for the 4-digit code
+          <div className="mt-2 flex items-center justify-center">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={handleRefreshOtp}
+              loading={isRefreshPending}
+              disabled={isRefreshPending || resendCooldown > 0}
+              className="h-8 px-3 text-[11px] font-bold uppercase tracking-wider"
+            >
+              {resendCooldown > 0
+                ? t('Resend OTP in {{seconds}}s', { seconds: resendCooldown })
+                : t('Resend OTP to Customer')}
+            </Button>
+          </div>
+          <p className="mt-1 text-center text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+            {t('New code is shown on customer booking details and sent by SMS (if enabled).')}
           </p>
         </div>
 
         {/* Actions */}
-        <div className="flex gap-3 pt-4 sticky bottom-0 bg-inherit pb-2">
-          <Button variant="ghost" fullWidth onClick={handleClose}>
-            Cancel
+        <div className="flex gap-2 pt-2 pb-1">
+          <Button variant="ghost" fullWidth onClick={handleClose} className="h-11 font-bold">
+            {t('Cancel')}
           </Button>
           <Button
             fullWidth
-            size="lg"
             onClick={handleSubmit}
             loading={isPending}
             disabled={!selectedFile || otpCode.length < 4}
-            className="bg-brand-600 text-white shadow-xl shadow-brand-500/20"
+            className="h-11 bg-brand-600 text-white shadow-xl shadow-brand-500/20 text-sm font-bold whitespace-nowrap"
           >
-            Verify & Proceed
+            {t('Verify & Proceed')}
           </Button>
         </div>
       </div>

@@ -2,15 +2,17 @@ import { useMemo, memo } from 'react';
 import {
     Calendar, MapPin, CheckCircle,
     XCircle, PlayCircle, Phone, Mail,
-    ArrowRight, User, IndianRupee, CreditCard, MessageSquare, Download
+    ArrowRight, User, IndianRupee, CreditCard, MessageSquare, Download,
+    RotateCcw, Repeat
 } from 'lucide-react';
 import { Button } from '../ui/Button';
-import { BookingStatusBadge } from './StatusBadges';
+import { BookingStatusBadge, WorkerTierBadge } from './StatusBadges';
 import { Card } from '../ui/Card';
 import { useNavigate } from 'react-router-dom';
 import { QuickReview } from './QuickReview';
 import { useAuth } from '../../hooks/useAuth';
 import { ChatToggle } from '../features/chat/ChatWindow';
+import { useTranslation } from 'react-i18next';
 
 /**
  * BookingCard Component
@@ -27,6 +29,7 @@ export const BookingCard = memo(function BookingCard({
     isActionLoading = false,
     activeActionId = null
 }) {
+    const { t, i18n } = useTranslation();
     const { user } = useAuth();
     const navigate = useNavigate();
 
@@ -37,11 +40,12 @@ export const BookingCard = memo(function BookingCard({
 
     const formattedDate = useMemo(() => {
         const d = new Date(booking.scheduledAt || booking.scheduledDate);
+        const locale = i18n.language === 'en' ? 'en-IN' : i18n.language;
         return {
-            date: d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }),
-            time: d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+            date: d.toLocaleDateString(locale, { day: '2-digit', month: 'short' }),
+            time: d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })
         };
-    }, [booking.scheduledAt, booking.scheduledDate]);
+    }, [booking.scheduledAt, booking.scheduledDate, i18n.language]);
 
     const price = booking.totalPrice || booking.estimatedPrice || booking.service?.basePrice || 0;
 
@@ -64,7 +68,13 @@ export const BookingCard = memo(function BookingCard({
                 hover:border-brand-500/20 dark:hover:border-brand-500/50
                 ${booking.status === 'IN_PROGRESS' ? 'ring-2 ring-accent-500 ring-offset-2 ring-offset-transparent' : ''}
             `}
-            onClick={() => navigate(role === 'CUSTOMER' ? `/bookings/${booking.id}` : `/worker/bookings/${booking.id}`)}
+            onClick={() => {
+                if (role === 'CUSTOMER') {
+                    navigate(`/customer/bookings/${booking.id}`);
+                } else if (role === 'WORKER') {
+                    navigate(`/worker/bookings/${booking.id}`);
+                }
+            }}
         >
             <div className="p-5">
                 {/* Top Row: Service + Status */}
@@ -89,9 +99,12 @@ export const BookingCard = memo(function BookingCard({
                                 <User size={12} className="opacity-50 shrink-0" />
                                 <span className="truncate">
                                     {role === 'CUSTOMER'
-                                        ? (booking.workerProfile?.user?.name || 'Finding provider...')
-                                        : (booking.customer?.name || 'Customer')}
+                                        ? (booking.workerProfile?.user?.name || t('Finding provider...'))
+                                        : (booking.customer?.name || t('Customer'))}
                                 </span>
+                                {role === 'CUSTOMER' && booking.workerProfile && (
+                                    <WorkerTierBadge totalJobs={booking.workerProfile.totalReviews || 0} size="sm" />
+                                )}
                             </div>
                         </div>
                     </div>
@@ -109,9 +122,17 @@ export const BookingCard = memo(function BookingCard({
                     <div className="flex items-center gap-1.5 min-w-0">
                         <MapPin size={13} className="text-success-500 shrink-0" />
                         <span className="font-bold truncate max-w-[180px] text-gray-600 dark:text-gray-300">
-                            {booking.address || booking.addressDetails || 'Service location'}
+                            {booking.address || booking.addressDetails || t('Service location')}
                         </span>
                     </div>
+                    {booking.frequency && booking.frequency !== 'ONE_TIME' && (
+                        <div className="flex items-center gap-1 bg-brand-50 dark:bg-brand-500/10 text-brand-600 dark:text-brand-400 px-2 py-0.5 rounded flex-shrink-0">
+                            <Repeat size={10} />
+                            <span className="font-bold text-[10px] tracking-widest uppercase">
+                                {t(booking.frequency.replace('_', ' '))}
+                            </span>
+                        </div>
+                    )}
                     {price > 0 && (
                         <div className="flex items-center gap-1">
                             <IndianRupee size={12} className="text-brand-500 shrink-0" />
@@ -127,7 +148,7 @@ export const BookingCard = memo(function BookingCard({
                     <div className="flex items-center gap-2 mb-3" onClick={(e) => e.stopPropagation()}>
                         <ChatToggle
                             bookingId={booking.id}
-                            label={role === 'CUSTOMER' ? 'Chat with Provider' : 'Chat with Customer'}
+                            label={role === 'CUSTOMER' ? t('Chat with Provider') : t('Chat with Customer')}
                         />
                         {otherParty?.mobile && (
                             <a
@@ -135,7 +156,7 @@ export const BookingCard = memo(function BookingCard({
                                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors
                                     bg-green-50 dark:bg-dark-800 text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/30"
                             >
-                                <Phone size={12} /> Call
+                                <Phone size={12} /> {t('Call')}
                             </a>
                         )}
                         {otherParty?.email && (
@@ -144,7 +165,7 @@ export const BookingCard = memo(function BookingCard({
                                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors
                                     bg-blue-50 dark:bg-dark-800 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30"
                             >
-                                <Mail size={12} /> Email
+                                <Mail size={12} /> {t('Email')}
                             </a>
                         )}
                     </div>
@@ -165,7 +186,7 @@ export const BookingCard = memo(function BookingCard({
                                         onClick={(e) => handleAction(e, 'CANCEL')}
                                         loading={isActionLoading && activeActionId === booking.id}
                                     >
-                                        Cancel Booking
+                                        {t('Cancel Booking')}
                                     </Button>
                                 )}
 
@@ -179,7 +200,7 @@ export const BookingCard = memo(function BookingCard({
                                         loading={isActionLoading && activeActionId === booking.id}
                                         icon={CreditCard}
                                     >
-                                        Pay Now
+                                        {t('Pay Now')}
                                     </Button>
                                 )}
 
@@ -192,7 +213,27 @@ export const BookingCard = memo(function BookingCard({
                                         onClick={(e) => handleAction(e, 'DOWNLOAD_INVOICE')}
                                         icon={Download}
                                     >
-                                        Invoice
+                                        {t('Invoice')}
+                                    </Button>
+                                )}
+
+                                {/* Book Again — one-click rebook with same worker (Sprint 17 #77) */}
+                                {booking.status === 'COMPLETED' && (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="rounded-xl px-5 h-9 text-xs border-success-200 text-success-700 hover:bg-success-50 dark:border-success-500/20 dark:text-success-400 dark:hover:bg-success-500/10"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            const params = new URLSearchParams();
+                                            if (booking.workerProfile?.id) params.set('worker', booking.workerProfile.id);
+                                            if (booking.address) params.set('address', booking.address);
+                                            const qs = params.toString();
+                                            navigate(`/services/${booking.serviceId}${qs ? `?${qs}` : ''}`);
+                                        }}
+                                        icon={RotateCcw}
+                                    >
+                                        {t('Book Again')}
                                     </Button>
                                 )}
 
@@ -222,7 +263,7 @@ export const BookingCard = memo(function BookingCard({
                                             loading={isActionLoading && activeActionId === booking.id}
                                             icon={CheckCircle}
                                         >
-                                            Accept
+                                            {t('Accept')}
                                         </Button>
                                         <Button
                                             size="sm"
@@ -230,7 +271,7 @@ export const BookingCard = memo(function BookingCard({
                                             className="rounded-xl border-error-500/30 text-error-500 hover:bg-error-50 h-9 text-xs"
                                             onClick={(e) => handleAction(e, 'CANCEL')}
                                         >
-                                            Decline
+                                            {t('Decline')}
                                         </Button>
                                     </div>
                                 )}
@@ -243,7 +284,7 @@ export const BookingCard = memo(function BookingCard({
                                         onClick={(e) => handleAction(e, 'START_OTP')}
                                         icon={PlayCircle}
                                     >
-                                        Start Job
+                                        {t('Start Job')}
                                     </Button>
                                 )}
 
@@ -254,7 +295,7 @@ export const BookingCard = memo(function BookingCard({
                                         onClick={(e) => handleAction(e, 'COMPLETE_OTP')}
                                         icon={CheckCircle}
                                     >
-                                        Finish Job
+                                        {t('Finish Job')}
                                     </Button>
                                 )}
 
@@ -266,7 +307,7 @@ export const BookingCard = memo(function BookingCard({
                                         onClick={(e) => handleAction(e, 'DOWNLOAD_INVOICE')}
                                         icon={Download}
                                     >
-                                        Invoice
+                                        {t('Invoice')}
                                     </Button>
                                 )}
 
@@ -295,7 +336,7 @@ export const BookingCard = memo(function BookingCard({
             {/* Visual Indicator for Active Jobs */}
             {booking.status === 'IN_PROGRESS' && (
                 <div className="absolute top-0 right-0 p-1 px-2.5 bg-accent-500 text-white font-black text-[7px] uppercase tracking-widest rounded-bl-lg shadow-lg animate-pulse">
-                    Live
+                    {t('Live')}
                 </div>
             )}
         </Card>

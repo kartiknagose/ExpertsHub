@@ -235,6 +235,42 @@ async function removeWorkerService(userId, serviceId) {
   });
 }
 
+// Get Top Workers (Leaderboard) Sprint 17 - #81
+async function getTopWorkers(limit = 20) {
+  return prisma.workerProfile.findMany({
+    take: limit,
+    orderBy: [
+      { user: { rating: 'desc' } },
+      { user: { totalReviews: 'desc' } }
+    ],
+    where: {
+      user: {
+        totalReviews: { gt: 0 }
+      }
+    },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          profilePhotoUrl: true,
+          rating: true,
+          totalReviews: true,
+          createdAt: true,
+        }
+      },
+      services: {
+        include: {
+          service: {
+            select: { id: true, name: true, category: true }
+          }
+        },
+        take: 3
+      }
+    }
+  });
+}
+
 module.exports = {
   upsertWorkerProfile,
   getMyWorkerProfile,
@@ -244,4 +280,5 @@ module.exports = {
   getWorkerProfileById,
   getWorkerProfileByUserId,
   removeWorkerService,
+  getTopWorkers,
 };

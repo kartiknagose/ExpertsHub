@@ -1,8 +1,10 @@
+import { useTranslation } from 'react-i18next';
 import { CheckCircle, AlertCircle } from 'lucide-react';
 
 const STATUSES = ['PENDING', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED'];
 
 export function BookingTimeline({ booking }) {
+    const { t } = useTranslation();
     return (
         <div className="p-5 rounded-2xl border shadow-sm bg-white border-gray-100 dark:bg-dark-800/40 dark:border-dark-700">
             <div className="flex flex-col gap-4">
@@ -11,7 +13,7 @@ export function BookingTimeline({ booking }) {
                         <AlertCircle size={20} className="text-error-500 shrink-0 mt-1" />
                         <div className="space-y-1">
                             <p className="text-2xs font-black uppercase tracking-widest text-error-600/70 dark:text-error-400/70">
-                                Cancellation Reason
+                                {t('Cancellation Reason')}
                             </p>
                             <p className="text-sm font-bold leading-relaxed text-error-800 dark:text-error-300">
                                 {booking.cancellationReason}
@@ -35,7 +37,7 @@ export function BookingTimeline({ booking }) {
                                     {isPassed ? <CheckCircle size={16} /> : <div className="w-1 h-1 rounded-full bg-current" />}
                                 </div>
                                 <span className={`text-micro font-black mt-2 uppercase tracking-tight ${isPassed ? 'text-brand-500' : 'text-gray-400'}`}>
-                                    {s}
+                                    {t(s)}
                                 </span>
                             </div>
                         );

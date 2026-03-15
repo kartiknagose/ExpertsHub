@@ -1,57 +1,48 @@
-// Reset password page
-// Sets a new password using reset token
+// ResetPasswordPage — premium alerts, gradient button, strength hints
 
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Lock, Save } from 'lucide-react';
+import { Lock, Save, CheckCircle, AlertCircle, ArrowLeft } from 'lucide-react';
+import { motion as Motion } from 'framer-motion';
 import { AuthLayout } from '../../components/layout/AuthLayout';
 import { Input, Button } from '../../components/common';
 import { resetPassword } from '../../api/auth';
 import { usePageTitle } from '../../hooks/usePageTitle';
 
-const resetPasswordSchema = z.object({
-  password: z.string().min(8, 'Password must be at least 8 characters'),
+const schema = z.object({
+  password:        z.string().min(8, 'Password must be at least 8 characters'),
   confirmPassword: z.string(),
-}).refine((data) => data.password === data.confirmPassword, {
+}).refine((d) => d.password === d.confirmPassword, {
   message: 'Passwords do not match',
   path: ['confirmPassword'],
 });
 
 export function ResetPasswordPage() {
-    usePageTitle('Reset Password');
+  usePageTitle('Reset Password');
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [serverError, setServerError] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
-
   const token = searchParams.get('token') || '';
+  const [serverError, setServerError] = useState('');
+  const [success, setSuccess] = useState(false);
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-  } = useForm({
-    resolver: zodResolver(resetPasswordSchema),
+  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm({
+    resolver: zodResolver(schema),
   });
 
   const onSubmit = async (data) => {
     setServerError('');
-    setSuccessMessage('');
-
     if (!token) {
       setServerError('Reset token is missing. Please use the link from your email.');
       return;
     }
-
     try {
       await resetPassword({ token, password: data.password });
-      setSuccessMessage('Password reset successfully. You can sign in now.');
+      setSuccess(true);
     } catch (error) {
-      const errorMessage = error.response?.data?.message || 'Failed to reset password.';
-      setServerError(errorMessage);
+      setServerError(error.response?.data?.message || 'Failed to reset password. The link may have expired.');
     }
   };
 
@@ -60,65 +51,92 @@ export function ResetPasswordPage() {
       title="Set your new password"
       subtitle="Choose a strong, unique password to keep your account secure."
     >
-      <div className="mb-8">
-        <h2 className="text-3xl font-bold mb-2 text-gray-900 dark:text-white">Reset Password</h2>
-        <p className="text-sm text-gray-600 dark:text-gray-400">
-          Choose a new password for your account.
+      <Motion.div
+        initial={{ opacity: 0, y: -8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="mb-8"
+      >
+        <h2 className="text-3xl font-bold text-neutral-900 dark:text-white mb-2 tracking-tight">
+          {success ? 'Password Updated!' : 'Reset Password'}
+        </h2>
+        <p className="text-sm text-neutral-500 dark:text-neutral-400">
+          {success ? 'Your password has been changed successfully.' : 'Create a new strong password for your account.'}
         </p>
-      </div>
+      </Motion.div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-            <Input
-              label="New Password"
-              type="password"
-              placeholder="Create a strong password"
-              icon={Lock}
-              error={errors.password?.message}
-              {...register('password')}
-            />
+      {success ? (
+        <Motion.div
+          initial={{ opacity: 0, scale: 0.92 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="text-center"
+        >
+          <div className="w-20 h-20 bg-gradient-to-br from-success-100 to-success-200 dark:from-success-500/20 dark:to-success-500/10 rounded-3xl flex items-center justify-center mx-auto mb-6 border border-success-200 dark:border-success-500/30">
+            <CheckCircle size={36} className="text-success-600 dark:text-success-400" />
+          </div>
+          <p className="text-neutral-500 dark:text-neutral-400 mb-8 leading-relaxed">
+            You can now sign in with your new password.
+          </p>
+          <Button fullWidth variant="gradient" size="lg" className="h-14 font-bold rounded-2xl" onClick={() => navigate('/login')}>
+            Sign In Now
+          </Button>
+        </Motion.div>
+      ) : (
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          <Input
+            label="New Password"
+            type="password"
+            placeholder="Create a strong password"
+            icon={Lock}
+            error={errors.password?.message}
+            hint="At least 8 characters with letters and numbers"
+            {...register('password')}
+          />
+          <Input
+            label="Confirm Password"
+            type="password"
+            placeholder="Confirm your new password"
+            icon={Lock}
+            error={errors.confirmPassword?.message}
+            {...register('confirmPassword')}
+          />
 
-            <Input
-              label="Confirm Password"
-              type="password"
-              placeholder="Confirm your password"
-              icon={Lock}
-              error={errors.confirmPassword?.message}
-              {...register('confirmPassword')}
-            />
-
-            {serverError && (
-              <p className="text-sm text-error-500">{serverError}</p>
-            )}
-
-            {successMessage && (
-              <p className="text-sm text-success-600 dark:text-success-400">
-                {successMessage}
-              </p>
-            )}
-
-            <Button
-              type="submit"
-              fullWidth
-              loading={isSubmitting}
-              icon={Save}
-              iconPosition="right"
+          {serverError && (
+            <Motion.div
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="p-4 rounded-2xl bg-error-50 dark:bg-error-500/10 border border-error-200 dark:border-error-500/30 flex items-center gap-3 text-sm font-medium text-error-700 dark:text-error-400"
             >
-              Update Password
-            </Button>
+              <AlertCircle size={16} className="shrink-0" />
+              {serverError}
+            </Motion.div>
+          )}
 
-            <div className="text-center text-sm">
-              <p className="text-gray-600 dark:text-gray-400">
-                Go back to{' '}
-                <button
-                  type="button"
-                  onClick={() => navigate('/login')}
-                  className="text-brand-500 hover:text-brand-600 font-medium"
-                >
-                  Sign in
-                </button>
-              </p>
-            </div>
-          </form>
+          <Button
+            type="submit"
+            fullWidth
+            size="lg"
+            variant="gradient"
+            loading={isSubmitting}
+            icon={Save}
+            iconPosition="right"
+            className="h-14 font-bold rounded-2xl shadow-xl shadow-brand-500/20"
+          >
+            Update Password
+          </Button>
+
+          <div className="text-center">
+            <button
+              type="button"
+              onClick={() => navigate('/login')}
+              className="inline-flex items-center gap-1.5 text-sm font-semibold text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300 transition-colors"
+            >
+              <ArrowLeft size={14} />
+              Back to Login
+            </button>
+          </div>
+        </form>
+      )}
     </AuthLayout>
   );
 }

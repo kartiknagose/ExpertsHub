@@ -13,6 +13,7 @@ const AUTH_ENDPOINTS = {
   VERIFY_EMAIL: '/auth/verify-email',
   FORGOT_PASSWORD: '/auth/forgot-password',
   RESET_PASSWORD: '/auth/reset-password',
+  CHANGE_PASSWORD: '/auth/change-password',
 };
 
 /**
@@ -105,5 +106,15 @@ export const requestPasswordReset = async (email) => {
  */
 export const resetPassword = async (data) => {
   const response = await axiosInstance.post(AUTH_ENDPOINTS.RESET_PASSWORD, data);
+  return response.data;
+};
+
+/**
+ * Change authenticated user's password
+ * @param {Object} data - { currentPassword, newPassword }
+ * @returns {Promise}
+ */
+export const changePassword = async (data) => {
+  const response = await axiosInstance.post(AUTH_ENDPOINTS.CHANGE_PASSWORD, data);
   return response.data;
 };

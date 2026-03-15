@@ -1,7 +1,7 @@
 const prisma = require('../../config/prisma');
 
 // Create or update customer profile (address + optional profile photo)
-async function upsertCustomerProfile(userId, { line1, line2, city, state, postalCode, country, profilePhotoUrl }) {
+async function upsertCustomerProfile(userId, { name, line1, line2, city, state, postalCode, country, profilePhotoUrl }) {
   return prisma.$transaction(async (tx) => {
     const existingAddress = await tx.address.findFirst({ where: { userId } });
 
@@ -25,6 +25,7 @@ async function upsertCustomerProfile(userId, { line1, line2, city, state, postal
     await tx.user.update({
       where: { id: userId },
       data: {
+        name: name || undefined,
         profilePhotoUrl: profilePhotoUrl || undefined,
         isProfileComplete: true,
       },

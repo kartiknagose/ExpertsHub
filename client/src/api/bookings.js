@@ -151,6 +151,16 @@ export const verifyBookingCompletion = async (bookingId, otp) => {
   return response.data;
 };
 
+/**
+ * Refresh booking OTP (WORKER only)
+ * @param {string} bookingId - Booking ID
+ * @param {'START'|'COMPLETE'} otpType - OTP type to refresh
+ */
+export const refreshBookingOtp = async (bookingId, otpType) => {
+  const response = await axiosInstance.post(`/bookings/${bookingId}/otp/refresh`, { otpType });
+  return response.data;
+};
+
 // ─── Session Management (Phase 7) ──────────────────────────────────
 
 export const getBookingSessions = async (bookingId) => {

@@ -18,9 +18,23 @@ const crypto = require('crypto');
 const bookingService = require('../bookings/booking.service');
 
 exports.razorpayWebhook = asyncHandler(async (req, res) => {
-  const secret = process.env.RAZORPAY_WEBHOOK_SECRET || 'xxxxxxxxxxxxxx';
+  const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
+  if (!secret) {
+    console.error('Razorpay Webhook: missing RAZORPAY_WEBHOOK_SECRET');
+    return res.status(500).send('Webhook secret is not configured');
+  }
+
   const signature = req.headers['x-razorpay-signature'];
-  const bodyString = JSON.stringify(req.body);
+  if (!signature) {
+    return res.status(400).send('Missing signature');
+  }
+
+  const bodyString = req.rawBody;
+  if (!bodyString) {
+    console.error('Razorpay Webhook: missing raw body payload');
+    return res.status(400).send('Invalid payload');
+  }
+
   const expectedSignature = crypto.createHmac('sha256', secret).update(bodyString).digest('hex');
 
   // To prevent the webhook from crashing if the signature mismatch, we simply log and return 400
@@ -29,9 +43,13 @@ exports.razorpayWebhook = asyncHandler(async (req, res) => {
     return res.status(400).send('Invalid signature');
   }
 
-  const event = req.body;
+  const event = typeof req.body === 'object' ? req.body : JSON.parse(bodyString);
   if (event.event === 'order.paid' || event.event === 'payment.captured') {
-    const paymentEntity = event.payload.payment.entity;
+    const paymentEntity = event?.payload?.payment?.entity;
+    if (!paymentEntity) {
+      return res.status(200).send('Ignored');
+    }
+
     const bookingId = paymentEntity.notes?.bookingId;
 
     if (bookingId) {
@@ -40,7 +58,12 @@ exports.razorpayWebhook = asyncHandler(async (req, res) => {
           Number(bookingId),
           null, // Webhook has no user ID
           'WEBHOOK',
-          { paymentReference: paymentEntity.id, isWebhook: true }
+          {
+            paymentReference: paymentEntity.id,
+            paymentOrderId: paymentEntity.order_id,
+            paymentSignature: signature,
+            isWebhook: true,
+          }
         );
       } catch (err) {
         if (!err.message.includes('already paid')) {

@@ -1,8 +1,9 @@
 // Multi-step worker KYC onboarding wizard
 // Steps: 1. Personal Info → 2. Aadhaar Upload → 3. PAN Upload → 4. Selfie → 5. Address Proof → 6. Preview & Submit
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import {
   User, CreditCard, Camera, FileText, MapPin, CheckCircle2,
   UploadCloud, X, ChevronRight, ChevronLeft, AlertCircle, Loader2, ShieldCheck
@@ -13,7 +14,7 @@ import { applyForVerification } from '../../../api/verification';
 import { toast } from 'sonner';
 import { queryKeys } from '../../../utils/queryKeys';
 
-const STEPS = [
+const STEPS_CONFIG = [
   { id: 1, title: 'Personal Info', description: 'Tell us about yourself', icon: User },
   { id: 2, title: 'Aadhaar Card', description: 'Upload your Aadhaar card', icon: CreditCard },
   { id: 3, title: 'PAN Card', description: 'Upload your PAN card', icon: CreditCard },
@@ -26,14 +27,12 @@ const ACCEPTED_DOC_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'
 const ACCEPTED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
-function ProgressBar({ currentStep, totalSteps }) {
-  const progress = ((currentStep - 1) / (totalSteps - 1)) * 100;
-
+function ProgressBar({ currentStep, totalSteps, steps }) {
   return (
     <div className="mb-8">
       {/* Step indicators */}
       <div className="flex items-center justify-between mb-3">
-        {STEPS.map((step, idx) => {
+        {steps.map((step, idx) => {
           const isCompleted = currentStep > step.id;
           const isCurrent = currentStep === step.id;
           const StepIcon = step.icon;
@@ -56,7 +55,7 @@ function ProgressBar({ currentStep, totalSteps }) {
                   {step.title}
                 </span>
               </div>
-              {idx < STEPS.length - 1 && (
+              {idx < steps.length - 1 && (
                 <div className={`flex-1 h-0.5 mx-2 mt-[-14px] sm:mt-0 transition-colors duration-300 ${currentStep > step.id ? 'bg-success-500' : 'bg-gray-200 dark:bg-dark-600'
                   }`} />
               )}
@@ -68,14 +67,14 @@ function ProgressBar({ currentStep, totalSteps }) {
       <div className="w-full bg-gray-100 dark:bg-dark-700 rounded-full h-1.5 overflow-hidden">
         <div
           className="bg-gradient-to-r from-brand-500 to-brand-600 h-full rounded-full transition-all duration-500 ease-out"
-          style={{ width: `${progress}%` }}
+          style={{ width: `${((currentStep - 1) / (totalSteps - 1)) * 100}%` }}
         />
       </div>
     </div>
   );
 }
 
-function FileUploadZone({ acceptTypes, file, preview, error, onFileChange, onRemove, helpText }) {
+function FileUploadZone({ acceptTypes, file, preview, error, onFileChange, onRemove, helpText, t }) {
   const [isDragging, setIsDragging] = useState(false);
 
   const handleDragOver = (e) => {
@@ -114,7 +113,7 @@ function FileUploadZone({ acceptTypes, file, preview, error, onFileChange, onRem
             <p className="text-xs text-gray-400 mt-0.5">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
             <div className="flex items-center gap-1 mt-1">
               <CheckCircle2 size={12} className="text-success-500" />
-              <span className="text-xs text-success-600 font-medium">File ready</span>
+              <span className="text-xs text-success-600 font-medium">{t('File ready')}</span>
             </div>
           </div>
           <button
@@ -150,9 +149,9 @@ function FileUploadZone({ acceptTypes, file, preview, error, onFileChange, onRem
             <UploadCloud className="w-6 h-6 text-brand-500" />
           </div>
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            <span className="font-semibold text-brand-600 dark:text-brand-400">Click to upload</span> or drag and drop
+            <span className="font-semibold text-brand-600 dark:text-brand-400">{t('Click to upload')}</span> {t('or drag and drop')}
           </p>
-          <p className="text-xs text-gray-400 mt-1">{helpText || 'PNG, JPG, WebP, or PDF up to 10MB'}</p>
+          <p className="text-xs text-gray-400 mt-1">{helpText || t('PNG, JPG, WebP, or PDF up to 10MB')}</p>
         </div>
         <input
           type="file"
@@ -171,9 +170,16 @@ function FileUploadZone({ acceptTypes, file, preview, error, onFileChange, onRem
 }
 
 export function WorkerOnboardingWizard({ onComplete }) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [step, setStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
+
+  const STEPS = useMemo(() => STEPS_CONFIG.map(s => ({
+    ...s,
+    title: t(s.title),
+    description: t(s.description)
+  })), [t]);
 
   // Step 1: Personal Info
   const [personalInfo, setPersonalInfo] = useState({
@@ -204,12 +210,12 @@ export function WorkerOnboardingWizard({ onComplete }) {
   const handleFileSelect = useCallback((key, acceptedTypes) => (file) => {
     // Validate type
     if (!acceptedTypes.includes(file.type)) {
-      setFileErrors(prev => ({ ...prev, [key]: 'Invalid file type. Please use PNG, JPG, or PDF.' }));
+      setFileErrors(prev => ({ ...prev, [key]: t('Invalid file type. Please use PNG, JPG, or PDF.') }));
       return;
     }
     // Validate size
     if (file.size > MAX_FILE_SIZE) {
-      setFileErrors(prev => ({ ...prev, [key]: 'File is too large. Maximum 10MB allowed.' }));
+      setFileErrors(prev => ({ ...prev, [key]: t('File is too large. Maximum 10MB allowed.') }));
       return;
     }
     setFileErrors(prev => ({ ...prev, [key]: '' }));
@@ -220,7 +226,7 @@ export function WorkerOnboardingWizard({ onComplete }) {
     } else {
       setPreviews(prev => ({ ...prev, [key]: null }));
     }
-  }, []);
+  }, [t]);
 
   const removeFile = useCallback((key) => {
     setFiles(prev => ({ ...prev, [key]: null }));
@@ -231,7 +237,7 @@ export function WorkerOnboardingWizard({ onComplete }) {
   // Navigation
   const canGoNext = () => {
     switch (step) {
-      case 1: return true; // Personal info is optional notes
+      case 1: return true;
       case 2: return !!files.aadhaar;
       case 3: return !!files.pan;
       case 4: return !!files.selfie;
@@ -253,7 +259,6 @@ export function WorkerOnboardingWizard({ onComplete }) {
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
-      // 1. Upload all files
       const uploadPromises = [];
       const docMapping = {
         aadhaar: 'ID_PROOF',
@@ -275,18 +280,17 @@ export function WorkerOnboardingWizard({ onComplete }) {
 
       const uploadedDocs = await Promise.all(uploadPromises);
 
-      // 2. Submit verification application
       await applyForVerification({
         notes: [personalInfo.experience, personalInfo.notes].filter(Boolean).join('\n\n'),
         documents: uploadedDocs,
       });
 
       queryClient.invalidateQueries({ queryKey: queryKeys.verification.my() });
-      toast.success('Verification application submitted successfully! We\'ll review it shortly.');
+      toast.success(t('Verification application submitted successfully! We\'ll review it shortly.'));
 
       if (onComplete) onComplete();
     } catch (err) {
-      const msg = err?.response?.data?.error || err?.message || 'Failed to submit application';
+      const msg = err?.response?.data?.error || err?.message || t('Failed to submit application');
       toast.error(msg);
     } finally {
       setSubmitting(false);
@@ -295,7 +299,7 @@ export function WorkerOnboardingWizard({ onComplete }) {
 
   return (
     <div className="space-y-6">
-      <ProgressBar currentStep={step} totalSteps={6} />
+      <ProgressBar currentStep={step} totalSteps={6} steps={STEPS} />
 
       <Card>
         <CardHeader>
@@ -311,7 +315,7 @@ export function WorkerOnboardingWizard({ onComplete }) {
               <CardDescription>{STEPS[step - 1].description}</CardDescription>
             </div>
           </div>
-          <p className="text-xs text-gray-400 mt-2">Step {step} of {STEPS.length}</p>
+          <p className="text-xs text-gray-400 mt-2">{t('Step')} {step} {t('of')} {STEPS.length}</p>
         </CardHeader>
 
         <div className="px-6 pb-6">
@@ -320,31 +324,31 @@ export function WorkerOnboardingWizard({ onComplete }) {
             <div className="space-y-5">
               <div>
                 <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-200">
-                  Work Experience & Skills
+                  {t('Work Experience & Skills')}
                 </label>
                 <textarea
                   className="w-full px-4 py-3 rounded-xl border text-sm outline-none transition-all bg-gray-50 dark:bg-dark-900 border-gray-200 dark:border-dark-600 text-gray-900 dark:text-white focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
                   rows={4}
                   value={personalInfo.experience}
                   onChange={(e) => setPersonalInfo(prev => ({ ...prev, experience: e.target.value }))}
-                  placeholder="Describe your work experience, years in the field, any specializations..."
+                  placeholder={t("Describe your work experience, years in the field, any specializations...")}
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-200">
-                  Additional Notes (Optional)
+                  {t('Additional Notes (Optional)')}
                 </label>
                 <textarea
                   className="w-full px-4 py-3 rounded-xl border text-sm outline-none transition-all bg-gray-50 dark:bg-dark-900 border-gray-200 dark:border-dark-600 text-gray-900 dark:text-white focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
                   rows={3}
                   value={personalInfo.notes}
                   onChange={(e) => setPersonalInfo(prev => ({ ...prev, notes: e.target.value }))}
-                  placeholder="Any references, certifications, or additional info to support your application..."
+                  placeholder={t("Any references, certifications, or additional info to support your application...")}
                 />
               </div>
               <div className="p-4 rounded-xl bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30">
                 <p className="text-sm text-blue-700 dark:text-blue-300">
-                  <strong>Tip:</strong> Providing detailed work experience and references increases your chances of faster approval.
+                  <strong>{t('Tip:')}</strong> {t('Providing detailed work experience and references increases your chances of faster approval.')}
                 </p>
               </div>
             </div>
@@ -354,18 +358,19 @@ export function WorkerOnboardingWizard({ onComplete }) {
           {step === 2 && (
             <div className="space-y-4">
               <FileUploadZone
-                label="Aadhaar Card"
+                label={t("Aadhaar Card")}
                 acceptTypes={ACCEPTED_DOC_TYPES}
                 file={files.aadhaar}
                 preview={previews.aadhaar}
                 error={fileErrors.aadhaar}
                 onFileChange={handleFileSelect('aadhaar', ACCEPTED_DOC_TYPES)}
                 onRemove={() => removeFile('aadhaar')}
-                helpText="Upload front/back of your Aadhaar card (PNG, JPG, PDF up to 10MB)"
+                helpText={t("Upload front/back of your Aadhaar card (PNG, JPG, PDF up to 10MB)")}
+                t={t}
               />
               <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-800/30">
                 <p className="text-sm text-amber-700 dark:text-amber-300">
-                  <strong>Important:</strong> Ensure your Aadhaar card details are clearly visible. Blurry images will be rejected.
+                  <strong>{t('Important:')}</strong> {t('Ensure your Aadhaar card details are clearly visible. Blurry images will be rejected.')}
                 </p>
               </div>
             </div>
@@ -375,14 +380,15 @@ export function WorkerOnboardingWizard({ onComplete }) {
           {step === 3 && (
             <div className="space-y-4">
               <FileUploadZone
-                label="PAN Card"
+                label={t("PAN Card")}
                 acceptTypes={ACCEPTED_DOC_TYPES}
                 file={files.pan}
                 preview={previews.pan}
                 error={fileErrors.pan}
                 onFileChange={handleFileSelect('pan', ACCEPTED_DOC_TYPES)}
                 onRemove={() => removeFile('pan')}
-                helpText="Upload your PAN card (PNG, JPG, PDF up to 10MB)"
+                helpText={t("Upload your PAN card (PNG, JPG, PDF up to 10MB)")}
+                t={t}
               />
             </div>
           )}
@@ -391,18 +397,19 @@ export function WorkerOnboardingWizard({ onComplete }) {
           {step === 4 && (
             <div className="space-y-4">
               <FileUploadZone
-                label="Live Selfie"
+                label={t("Live Selfie")}
                 acceptTypes={ACCEPTED_IMAGE_TYPES}
                 file={files.selfie}
                 preview={previews.selfie}
                 error={fileErrors.selfie}
                 onFileChange={handleFileSelect('selfie', ACCEPTED_IMAGE_TYPES)}
                 onRemove={() => removeFile('selfie')}
-                helpText="Take a clear, well-lit selfie photo (PNG, JPG only)"
+                helpText={t("Take a clear, well-lit selfie photo (PNG, JPG only)")}
+                t={t}
               />
               <div className="p-4 rounded-xl bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30">
                 <p className="text-sm text-blue-700 dark:text-blue-300">
-                  <strong>Tips:</strong> Face the camera directly, ensure good lighting, remove hats/sunglasses.
+                  <strong>{t('Tips:')}</strong> {t('Face the camera directly, ensure good lighting, remove hats or sunglasses.')}
                 </p>
               </div>
             </div>
@@ -412,14 +419,15 @@ export function WorkerOnboardingWizard({ onComplete }) {
           {step === 5 && (
             <div className="space-y-4">
               <FileUploadZone
-                label="Address Proof"
+                label={t("Address Proof")}
                 acceptTypes={ACCEPTED_DOC_TYPES}
                 file={files.addressProof}
                 preview={previews.addressProof}
                 error={fileErrors.addressProof}
                 onFileChange={handleFileSelect('addressProof', ACCEPTED_DOC_TYPES)}
                 onRemove={() => removeFile('addressProof')}
-                helpText="Utility bill, rent agreement, or bank statement (PNG, JPG, PDF up to 10MB)"
+                helpText={t("Utility bill, rent agreement, or bank statement (PNG, JPG, PDF up to 10MB)")}
+                t={t}
               />
             </div>
           )}
@@ -430,20 +438,20 @@ export function WorkerOnboardingWizard({ onComplete }) {
               <div className="p-4 rounded-xl bg-success-50 dark:bg-success-900/10 border border-success-100 dark:border-success-800/30">
                 <div className="flex items-center gap-2 mb-2">
                   <ShieldCheck size={18} className="text-success-600" />
-                  <span className="font-semibold text-success-700 dark:text-success-400">All documents ready!</span>
+                  <span className="font-semibold text-success-700 dark:text-success-400">{t('All documents ready!')}</span>
                 </div>
                 <p className="text-sm text-success-600 dark:text-success-400">
-                  Review your uploaded documents below before submitting.
+                  {t('Review your uploaded documents below before submitting.')}
                 </p>
               </div>
 
               {/* Document Summary Grid */}
               <div className="grid grid-cols-2 gap-4">
                 {[
-                  { key: 'aadhaar', label: 'Aadhaar Card' },
-                  { key: 'pan', label: 'PAN Card' },
-                  { key: 'selfie', label: 'Selfie Photo' },
-                  { key: 'addressProof', label: 'Address Proof' },
+                  { key: 'aadhaar', label: t('Aadhaar Card') },
+                  { key: 'pan', label: t('PAN Card') },
+                  { key: 'selfie', label: t('Selfie Photo') },
+                  { key: 'addressProof', label: t('Address Proof') },
                 ].map(({ key, label }) => (
                   <div key={key} className="border rounded-xl p-3 border-gray-200 dark:border-dark-600">
                     {files[key] ? (
@@ -460,7 +468,7 @@ export function WorkerOnboardingWizard({ onComplete }) {
                           <p className="text-[10px] text-gray-400 truncate">{files[key].name}</p>
                           <div className="flex items-center gap-1 mt-0.5">
                             <CheckCircle2 size={10} className="text-success-500" />
-                            <span className="text-[10px] text-success-600 font-medium">Uploaded</span>
+                            <span className="text-[10px] text-success-600 font-medium">{t('Uploaded')}</span>
                           </div>
                         </div>
                       </div>
@@ -471,7 +479,7 @@ export function WorkerOnboardingWizard({ onComplete }) {
                         </div>
                         <div>
                           <p className="text-xs font-semibold text-gray-500">{label}</p>
-                          <p className="text-[10px] text-gray-400">Not uploaded</p>
+                          <p className="text-[10px] text-gray-400">{t('Not uploaded')}</p>
                         </div>
                       </div>
                     )}
@@ -482,7 +490,7 @@ export function WorkerOnboardingWizard({ onComplete }) {
               {/* Experience Notes Preview */}
               {(personalInfo.experience || personalInfo.notes) && (
                 <div className="p-4 rounded-xl bg-gray-50 dark:bg-dark-800 border border-gray-100 dark:border-dark-700">
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Your Notes</p>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">{t('Your Notes')}</p>
                   {personalInfo.experience && (
                     <p className="text-sm text-gray-700 dark:text-gray-300 mb-1">{personalInfo.experience}</p>
                   )}
@@ -503,7 +511,7 @@ export function WorkerOnboardingWizard({ onComplete }) {
             disabled={step === 1}
             icon={ChevronLeft}
           >
-            Back
+            {t('Back')}
           </Button>
 
           {step < 6 ? (
@@ -513,17 +521,17 @@ export function WorkerOnboardingWizard({ onComplete }) {
               icon={ChevronRight}
               iconPosition="right"
             >
-              Continue
+              {t('Continue')}
             </Button>
           ) : (
             <Button
               onClick={handleSubmit}
               loading={submitting}
-              disabled={!files.aadhaar || !files.addressProof}
+              disabled={!files.aadhaar || !files.pan || !files.selfie || !files.addressProof}
               icon={ShieldCheck}
               className="bg-success-600 hover:bg-success-700"
             >
-              Submit Application
+              {t('Submit Application')}
             </Button>
           )}
         </div>

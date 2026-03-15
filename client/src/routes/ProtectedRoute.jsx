@@ -94,7 +94,7 @@ export function PublicRoute({ children }) {
       return <Navigate to="/worker/dashboard" replace />;
     }
     // Default for CUSTOMER
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/customer/dashboard" replace />;
   }
 
   // Step 3: User is not logged in → show the page (login/register)
@@ -126,7 +126,7 @@ export function WorkerRoute({ children }) {
     if (user?.role === 'ADMIN') {
       return <Navigate to="/admin/dashboard" replace />;
     }
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/customer/dashboard" replace />;
   }
 
   return children;

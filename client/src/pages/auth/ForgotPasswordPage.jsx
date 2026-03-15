@@ -1,127 +1,134 @@
-// Forgot password page
-// Requests a password reset link
+// ForgotPasswordPage — upgraded alerts and gradient button
 
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useNavigate } from 'react-router-dom';
-import { Mail, ArrowRight } from 'lucide-react';
+import { Mail, ArrowRight, ArrowLeft, CheckCircle, AlertCircle, ExternalLink } from 'lucide-react';
+import { motion as Motion } from 'framer-motion';
 import { AuthLayout } from '../../components/layout/AuthLayout';
 import { Input, Button } from '../../components/common';
 import { requestPasswordReset } from '../../api/auth';
 import { usePageTitle } from '../../hooks/usePageTitle';
 
-const forgotPasswordSchema = z.object({
+const schema = z.object({
   email: z.string().email('Please enter a valid email'),
 });
 
 export function ForgotPasswordPage() {
-    usePageTitle('Forgot Password');
+  usePageTitle('Forgot Password');
   const navigate = useNavigate();
   const [serverError, setServerError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [resetLink, setResetLink] = useState('');
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-  } = useForm({
-    resolver: zodResolver(forgotPasswordSchema),
+  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm({
+    resolver: zodResolver(schema),
   });
 
   const onSubmit = async (data) => {
     setServerError('');
     setSuccessMessage('');
     setResetLink('');
-
     try {
       const response = await requestPasswordReset(data.email);
-      setSuccessMessage(response.message || 'If an account exists, a reset link has been created.');
-      if (response.resetLink) {
-        setResetLink(response.resetLink);
-      }
+      setSuccessMessage(response.message || 'If an account exists with that email, a reset link has been sent.');
+      if (response.resetLink) setResetLink(response.resetLink);
     } catch (error) {
-      const errorMessage = error.response?.data?.message || 'Failed to request password reset.';
-      setServerError(errorMessage);
+      setServerError(error.response?.data?.message || 'Failed to send reset email. Please try again.');
     }
   };
 
   return (
     <AuthLayout
-      title="Forgot your password?"
-      subtitle="No worries — we'll help you get back into your account securely."
+      title="Reset your password"
+      subtitle="Don't worry — it happens to the best of us. We'll get you back in securely."
     >
-      <div className="mb-8">
-        <h2 className="text-3xl font-bold mb-2 text-gray-900 dark:text-white">Reset Password</h2>
-        <p className="text-sm text-gray-600 dark:text-gray-400">
-          Enter your email and we'll send a reset link.
+      <Motion.div
+        initial={{ opacity: 0, y: -8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+        className="mb-8"
+      >
+        <h2 className="text-3xl font-bold text-neutral-900 dark:text-white mb-2 tracking-tight">Forgot Password?</h2>
+        <p className="text-sm text-neutral-500 dark:text-neutral-400">
+          Enter the email linked to your account and we'll send a reset link.
         </p>
-      </div>
+      </Motion.div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-            <Input
-              label="Email"
-              type="email"
-              placeholder="you@example.com"
-              icon={Mail}
-              error={errors.email?.message}
-              {...register('email')}
-            />
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        <Input
+          label="Email Address"
+          type="email"
+          placeholder="you@example.com"
+          icon={Mail}
+          error={errors.email?.message}
+          {...register('email')}
+        />
 
-            {serverError && (
-              <p className="text-sm text-error-500">{serverError}</p>
-            )}
+        {/* Error */}
+        {serverError && (
+          <Motion.div
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="p-4 rounded-2xl bg-error-50 dark:bg-error-500/10 border border-error-200 dark:border-error-500/30 flex items-center gap-3 text-sm font-medium text-error-700 dark:text-error-400"
+          >
+            <AlertCircle size={16} className="shrink-0" />
+            {serverError}
+          </Motion.div>
+        )}
 
-            {successMessage && (
-              <p className="text-sm text-success-600 dark:text-success-400">
-                {successMessage}
-              </p>
-            )}
+        {/* Success */}
+        {successMessage && (
+          <Motion.div
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="p-4 rounded-2xl bg-success-50 dark:bg-success-500/10 border border-success-200 dark:border-success-500/30 flex items-start gap-3 text-sm"
+          >
+            <CheckCircle size={16} className="text-success-600 dark:text-success-400 shrink-0 mt-0.5" />
+            <span className="text-success-700 dark:text-success-400">{successMessage}</span>
+          </Motion.div>
+        )}
 
-            {import.meta.env.DEV && resetLink && (
-              <div className="text-sm text-gray-700 dark:text-gray-300">
-                <p>Reset link (dev only):</p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (resetLink.startsWith('http')) {
-                      window.location.href = resetLink;
-                    } else {
-                      navigate(resetLink);
-                    }
-                  }}
-                  className="text-brand-500 hover:text-brand-600 font-medium"
-                >
-                  Open reset link
-                </button>
-              </div>
-            )}
-
-            <Button
-              type="submit"
-              fullWidth
-              loading={isSubmitting}
-              icon={ArrowRight}
-              iconPosition="right"
+        {/* Dev-only reset link */}
+        {import.meta.env.DEV && resetLink && (
+          <div className="p-3 rounded-xl bg-neutral-100 dark:bg-dark-800 border border-neutral-200 dark:border-dark-700 text-xs">
+            <p className="font-bold text-neutral-600 dark:text-neutral-400 mb-1">Dev: Reset link</p>
+            <button
+              type="button"
+              onClick={() => resetLink.startsWith('http') ? (window.location.href = resetLink) : navigate(resetLink)}
+              className="text-brand-500 hover:text-brand-600 font-semibold flex items-center gap-1 uppercase tracking-widest text-[10px]"
             >
-              Send Reset Link
-            </Button>
+              Open reset link <ExternalLink size={11} />
+            </button>
+          </div>
+        )}
 
-            <div className="text-center text-sm">
-              <p className="text-gray-600 dark:text-gray-400">
-                Remembered your password?{' '}
-                <button
-                  type="button"
-                  onClick={() => navigate('/login')}
-                  className="text-brand-500 hover:text-brand-600 font-medium"
-                >
-                  Sign in
-                </button>
-              </p>
-            </div>
-          </form>
+        <Button
+          type="submit"
+          fullWidth
+          size="lg"
+          variant="gradient"
+          loading={isSubmitting}
+          icon={ArrowRight}
+          iconPosition="right"
+          className="h-14 font-bold rounded-2xl shadow-xl shadow-brand-500/20"
+        >
+          Send Reset Link
+        </Button>
+
+        <div className="text-center">
+          <button
+            type="button"
+            onClick={() => navigate('/login')}
+            className="inline-flex items-center gap-1.5 text-sm font-semibold text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300 transition-colors"
+          >
+            <ArrowLeft size={14} />
+            Back to Login
+          </button>
+        </div>
+      </form>
     </AuthLayout>
   );
 }

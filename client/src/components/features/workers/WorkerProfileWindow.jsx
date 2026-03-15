@@ -1,21 +1,32 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, User, Star, ShieldCheck, MapPin, Hammer, Calendar, MessageSquare, Award, Clock, IndianRupee } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { X, User, Star, ShieldCheck, MapPin, Hammer, Calendar, MessageSquare, Award, Clock, IndianRupee, Heart } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { getWorkerPublicProfile } from '../../../api/workers';
 import { resolveProfilePhotoUrl } from '../../../utils/profilePhoto';
 import { useAuth } from '../../../hooks/useAuth';
 import { Button, Badge, Spinner } from '../../common';
 import { queryKeys } from '../../../utils/queryKeys';
+import { checkFavoriteWorker, toggleFavoriteWorker } from '../../../api/growth';
+import { toast } from 'sonner';
+
+const getSkillBadge = (completions) => {
+    if (completions >= 100) return { label: "Master", color: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 border-purple-200 dark:border-purple-800" };
+    if (completions >= 50) return { label: "Top Rated", color: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-800" };
+    if (completions >= 10) return { label: "Pro", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800" };
+    if (completions >= 1) return { label: "Rising Star", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800" };
+    return null;
+};
 
 /**
  * WorkerProfileWindow
  * Displays detailed worker information in a floating, chat-style window.
  */
 export function WorkerProfileWindow({ workerId, isOpen, onClose }) {
-    const { isAuthenticated } = useAuth();
+    const { isAuthenticated, user } = useAuth();
     const navigate = useNavigate();
+    const queryClient = useQueryClient();
     const [activeTab, setActiveTab] = useState('overview');
 
     // Close on Escape key
@@ -29,6 +40,24 @@ export function WorkerProfileWindow({ workerId, isOpen, onClose }) {
         queryKey: queryKeys.worker.profileWindow(workerId),
         queryFn: () => getWorkerPublicProfile(workerId),
         enabled: !!workerId && isOpen,
+    });
+
+    // Favorite Status
+    const { data: isFavorited } = useQuery({
+        queryKey: ['favorite-check', workerId],
+        queryFn: () => checkFavoriteWorker(workerId),
+        enabled: !!workerId && isOpen && isAuthenticated && user?.role === 'CUSTOMER',
+    });
+
+    const favoriteMutation = useMutation({
+        mutationFn: () => toggleFavoriteWorker(workerId),
+        onSuccess: (res) => {
+            queryClient.setQueryData(['favorite-check', workerId], res.favorited);
+            queryClient.invalidateQueries({ queryKey: ['favorites'] });
+            queryClient.invalidateQueries({ queryKey: ['favorite-ids'] });
+            toast.success(res.favorited ? 'Added to favorites' : 'Removed from favorites');
+        },
+        onError: () => toast.error('Failed to update favorites'),
     });
 
     const profile = data?.profile;
@@ -45,15 +74,30 @@ export function WorkerProfileWindow({ workerId, isOpen, onClose }) {
                     <div className="p-1.5 rounded-lg bg-white/10 backdrop-blur-md">
                         <User size={18} className="text-white dark:text-brand-400" />
                     </div>
-                    <span className="font-black text-sm uppercase tracking-widest">Expert Profile</span>
+                    <span className="font-bold text-sm uppercase tracking-widest">Expert Profile</span>
                 </div>
-                <button
-                    onClick={onClose}
-                    className="p-2 rounded-full transition-all hover:bg-black/10 active:scale-90"
-                    aria-label="Close profile"
-                >
-                    <X size={20} />
-                </button>
+                <div className="flex items-center gap-2">
+                    {isAuthenticated && user?.role === 'CUSTOMER' && profile && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                favoriteMutation.mutate();
+                            }}
+                            className="p-2 rounded-full transition-all hover:bg-black/10 active:scale-90 text-white"
+                            title={isFavorited ? "Remove from favorites" : "Save to favorites"}
+                            disabled={favoriteMutation.isPending}
+                        >
+                            <Heart size={20} fill={isFavorited ? 'currentColor' : 'none'} className={isFavorited ? 'text-red-400' : ''} />
+                        </button>
+                    )}
+                    <button
+                        onClick={onClose}
+                        className="p-2 rounded-full transition-all hover:bg-black/10 active:scale-90"
+                        aria-label="Close profile"
+                    >
+                        <X size={20} />
+                    </button>
+                </div>
             </div>
 
             {/* Content Body */}
@@ -61,7 +105,7 @@ export function WorkerProfileWindow({ workerId, isOpen, onClose }) {
                 {isLoading ? (
                     <div className="flex flex-col items-center justify-center h-full gap-4 opacity-50">
                         <Spinner size="lg" className="text-brand-500" />
-                        <p className="text-xs font-black uppercase tracking-[0.2em] animate-pulse">Retrieving Credentials...</p>
+                        <p className="text-xs font-bold uppercase tracking-[0.2em] animate-pulse">Retrieving Credentials...</p>
                     </div>
                 ) : isError || !profile ? (
                     <div className="flex flex-col items-center justify-center h-full p-10 text-center gap-6">
@@ -69,7 +113,7 @@ export function WorkerProfileWindow({ workerId, isOpen, onClose }) {
                             <ShieldCheck size={40} />
                         </div>
                         <div>
-                            <p className="text-lg font-black tracking-tight">Profile Locked or Missing</p>
+                            <p className="text-lg font-bold tracking-tight">Profile Locked or Missing</p>
                             <p className="text-sm mt-1 opacity-60 text-gray-600 dark:text-gray-400">We could not fetch the verified details for this professional right now.</p>
                         </div>
                         <Button variant="outline" fullWidth onClick={onClose}>Close Window</Button>
@@ -97,24 +141,33 @@ export function WorkerProfileWindow({ workerId, isOpen, onClose }) {
                                     )}
                                 </div>
                                 <div className="flex-1 min-w-0 pt-1">
-                                    <h3 className="text-2xl font-black tracking-tight leading-tight truncate text-gray-900 dark:text-white">
+                                    <h3 className="text-2xl font-bold tracking-tight leading-tight truncate text-gray-900 dark:text-white">
                                         {profile.user?.name}
                                     </h3>
                                     <div className="flex flex-wrap items-center gap-3 mt-2">
                                         <div className="flex items-center text-yellow-500 gap-1 bg-yellow-500/10 px-2 py-0.5 rounded-lg">
                                             <Star size={14} fill="currentColor" />
-                                            <span className="text-sm font-black">{profile.user?.rating?.toFixed(1) || '4.9'}</span>
+                                            <span className="text-sm font-bold">{profile.user?.rating?.toFixed(1) || '4.9'}</span>
                                         </div>
                                         <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">• {profile.totalReviews || 0} Successful Jobs</span>
+                                        {(() => {
+                                            const badge = getSkillBadge(profile.totalReviews || 0);
+                                            if (!badge) return null;
+                                            return (
+                                                <span className={`px-1.5 py-0.5 rounded border text-[10px] font-bold uppercase tracking-widest ${badge.color}`}>
+                                                    {badge.label}
+                                                </span>
+                                            );
+                                        })()}
                                     </div>
                                     <div className="mt-3 flex gap-2">
                                         {profile.isVerified && (
-                                            <Badge variant="success" className="bg-green-500/10 text-green-600 dark:text-green-400 border-none font-black text-[10px] uppercase tracking-widest px-2">
+                                            <Badge variant="success" className="bg-green-500/10 text-green-600 dark:text-green-400 border-none font-bold text-[10px] uppercase tracking-widest px-2">
                                                 Verified Professional
                                             </Badge>
                                         )}
                                         {profile.verificationLevel === 'PREMIUM' && (
-                                            <Badge variant="info" className="bg-blue-500/10 text-blue-600 dark:text-blue-400 border-none font-black text-[10px] uppercase tracking-widest px-2">
+                                            <Badge variant="info" className="bg-blue-500/10 text-blue-600 dark:text-blue-400 border-none font-bold text-[10px] uppercase tracking-widest px-2">
                                                 Premium Pro
                                             </Badge>
                                         )}
@@ -129,7 +182,7 @@ export function WorkerProfileWindow({ workerId, isOpen, onClose }) {
                                 <button
                                     key={tab}
                                     onClick={() => setActiveTab(tab)}
-                                    className={`pb-3 text-[10px] font-black uppercase tracking-[0.2em] transition-all relative ${activeTab === tab ? 'text-brand-500' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-200'}`}
+                                    className={`pb-3 text-[10px] font-bold uppercase tracking-[0.2em] transition-all relative ${activeTab === tab ? 'text-brand-500' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-200'}`}
                                 >
                                     {tab}
                                     {activeTab === tab && (
@@ -148,16 +201,16 @@ export function WorkerProfileWindow({ workerId, isOpen, onClose }) {
                                         <div className="p-4 rounded-2xl border bg-gray-50 border-gray-100 dark:bg-dark-900/50 dark:border-dark-700 ring-1 ring-black/5">
                                             <div className="flex items-center gap-2 mb-2 opacity-50">
                                                 <Clock size={12} className="text-brand-500" />
-                                                <p className="text-[10px] font-black uppercase tracking-widest">Experience</p>
+                                                <p className="text-[10px] font-bold uppercase tracking-widest">Experience</p>
                                             </div>
-                                            <p className="text-lg font-black tracking-tight">{profile.experienceYears || '5+'} Years</p>
+                                            <p className="text-lg font-bold tracking-tight">{profile.experienceYears || '5+'} Years</p>
                                         </div>
                                         <div className="p-4 rounded-2xl border bg-gray-50 border-gray-100 dark:bg-dark-900/50 dark:border-dark-700 ring-1 ring-black/5">
                                             <div className="flex items-center gap-2 mb-2 opacity-50">
                                                 <IndianRupee size={12} className="text-green-500" />
-                                                <p className="text-[10px] font-black uppercase tracking-widest">Base Rate</p>
+                                                <p className="text-[10px] font-bold uppercase tracking-widest">Base Rate</p>
                                             </div>
-                                            <p className="text-lg font-black tracking-tight text-brand-500 italic">₹{profile.hourlyRate}<span className="text-xs opacity-50 font-normal">/hr</span></p>
+                                            <p className="text-lg font-bold tracking-tight text-brand-500 italic">₹{profile.hourlyRate}<span className="text-xs opacity-50 font-normal">/hr</span></p>
                                         </div>
                                     </div>
 
@@ -165,7 +218,7 @@ export function WorkerProfileWindow({ workerId, isOpen, onClose }) {
                                     <div className="space-y-3">
                                         <div className="flex items-center gap-2">
                                             <div className="w-1.5 h-6 bg-brand-500 rounded-full" />
-                                            <h4 className="text-[11px] font-black uppercase text-gray-400 tracking-widest">About Professional</h4>
+                                            <h4 className="text-[11px] font-bold uppercase text-gray-400 tracking-widest">About Professional</h4>
                                         </div>
                                         <p className="text-sm leading-relaxed font-medium text-gray-700 dark:text-gray-300">
                                             {profile.bio || "No biography provided. This professional is verified and background-checked for your safety."}
@@ -191,17 +244,17 @@ export function WorkerProfileWindow({ workerId, isOpen, onClose }) {
                                     <div className="space-y-4">
                                         <div className="flex items-center gap-2">
                                             <Hammer size={16} className="text-brand-500" />
-                                            <h4 className="text-[11px] font-black uppercase text-gray-400 tracking-widest">Services Offered</h4>
+                                            <h4 className="text-[11px] font-bold uppercase text-gray-400 tracking-widest">Services Offered</h4>
                                         </div>
                                         {services.length > 0 ? (
                                             <div className="grid gap-3">
-                                                {services.map(({ service }) => (
-                                                    <div key={service.id} className="p-4 rounded-xl border flex items-center justify-between bg-white border-gray-100 shadow-sm dark:bg-dark-900/50 dark:border-dark-700 dark:shadow-none">
+                                        {services.filter(s => s && s.service).map(({ service }) => (
+                                                    <div key={service?.id} className="p-4 rounded-xl border flex items-center justify-between bg-white border-gray-100 shadow-sm dark:bg-dark-900/50 dark:border-dark-700 dark:shadow-none">
                                                         <div className="flex items-center gap-3">
                                                             <div className="w-2 h-2 rounded-full bg-brand-500" />
-                                                            <span className="text-sm font-black">{service.name}</span>
+                                                            <span className="text-sm font-bold">{service?.name}</span>
                                                         </div>
-                                                        <Badge variant="outline" className="text-[9px] font-black uppercase">Active</Badge>
+                                                        <Badge variant="outline" className="text-[9px] font-bold uppercase">Active</Badge>
                                                     </div>
                                                 ))}
                                             </div>
@@ -211,7 +264,7 @@ export function WorkerProfileWindow({ workerId, isOpen, onClose }) {
                                     </div>
 
                                     <div className="p-5 rounded-2xl bg-brand-500/5 border border-brand-500/20 space-y-3">
-                                        <h5 className="text-[10px] font-black text-brand-600 uppercase tracking-widest flex items-center gap-2">
+                                        <h5 className="text-[10px] font-bold text-brand-600 uppercase tracking-widest flex items-center gap-2">
                                             <Calendar size={12} /> Availability
                                         </h5>
                                         <p className="text-xs font-medium text-gray-600 dark:text-gray-400">
@@ -226,7 +279,7 @@ export function WorkerProfileWindow({ workerId, isOpen, onClose }) {
                                     <div className="space-y-4">
                                         <div className="flex items-center gap-2">
                                             <MessageSquare size={16} className="text-yellow-500" />
-                                            <h4 className="text-[11px] font-black uppercase text-gray-400 tracking-widest">Client Testimonials</h4>
+                                            <h4 className="text-[11px] font-bold uppercase text-gray-400 tracking-widest">Client Testimonials</h4>
                                         </div>
                                         {reviews.length > 0 ? (
                                             <div className="space-y-4">
@@ -234,10 +287,10 @@ export function WorkerProfileWindow({ workerId, isOpen, onClose }) {
                                                     <div key={review.id} className="p-5 rounded-2xl border relative bg-gray-50 border-gray-100 dark:bg-dark-900 dark:border-dark-700">
                                                         <div className="flex justify-between items-start mb-3">
                                                             <div className="flex items-center gap-2">
-                                                                <div className="w-8 h-8 rounded-lg bg-brand-500 text-white flex items-center justify-center font-black text-xs">
+                                                                <div className="w-8 h-8 rounded-lg bg-brand-500 text-white flex items-center justify-center font-bold text-xs">
                                                                     {review.reviewer?.name?.charAt(0) || 'U'}
                                                                 </div>
-                                                                <span className="text-xs font-black">{review.reviewer?.name}</span>
+                                                                <span className="text-xs font-bold">{review.reviewer?.name}</span>
                                                             </div>
                                                             <div className="flex gap-0.5 text-yellow-500">
                                                                 {[...Array(5)].map((_, i) => <Star key={i} size={8} fill={i < review.rating ? "currentColor" : "none"} />)}
@@ -269,14 +322,14 @@ export function WorkerProfileWindow({ workerId, isOpen, onClose }) {
             <div className="p-5 border-t shrink-0 bg-white shadow-[0_-10px_30px_rgba(0,0,0,0.05)] dark:border-dark-700 dark:bg-dark-900 dark:shadow-none">
                 <div className="flex items-center gap-4">
                     <div className="hidden sm:block">
-                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-tighter">Est. Price</p>
-                        <p className="text-xl font-black text-gray-900 dark:text-white">₹{profile?.hourlyRate || '0'}</p>
+                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">Est. Price</p>
+                        <p className="text-xl font-bold text-gray-900 dark:text-white">₹{profile?.hourlyRate || '0'}</p>
                     </div>
                     <Button
                         fullWidth
                         size="lg"
                         disabled={services.length === 0}
-                        className="bg-brand-600 text-white font-black uppercase tracking-[0.2em] text-xs h-14 rounded-2xl shadow-xl shadow-brand-500/30 hover:scale-[1.02] active:scale-95 transition-all"
+                        className="bg-brand-600 text-white font-bold uppercase tracking-[0.2em] text-xs h-14 rounded-2xl shadow-xl shadow-brand-500/30 hover:scale-[1.02] active:scale-95 transition-all"
                         onClick={() => {
                             if (!isAuthenticated) {
                                 onClose();

@@ -188,10 +188,25 @@ async function resetPasswordWithToken({ token, password }) {
   });
 }
 
+async function changePassword(userId, { currentPassword, newPassword }) {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) throw new AppError(404, 'User not found');
+
+  const isPasswordValid = await comparePassword(currentPassword, user.passwordHash);
+  if (!isPasswordValid) throw new AppError(401, 'Invalid current password');
+
+  const newPasswordHash = await hashPassword(newPassword);
+  await prisma.user.update({
+    where: { id: userId },
+    data: { passwordHash: newPasswordHash },
+  });
+}
+
 module.exports = {
   registerUser,
   loginUser,
   verifyEmailToken,
   requestPasswordReset,
   resetPasswordWithToken,
+  changePassword,
 };

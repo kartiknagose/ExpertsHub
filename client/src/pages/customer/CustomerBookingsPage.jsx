@@ -1,19 +1,22 @@
+// CustomerBookingsPage — premium dashboard list with filter bar
+
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Search, Filter, CalendarCheck, Star } from 'lucide-react';
+import { Search, Filter, CalendarCheck, Star, CalendarDays } from 'lucide-react';
 import { toast } from 'sonner';
+import { motion as Motion } from 'framer-motion';
 
 import { MainLayout } from '../../components/layout/MainLayout';
 import {
   Button,
-  PageHeader,
   AsyncState,
   BookingCard,
   Input,
   Card,
   ConfirmDialog,
-  Pagination
+  Pagination,
+  BookingCardSkeleton
 } from '../../components/common';
 import { cancelBooking, getAllBookings } from '../../api/bookings';
 import { createReview } from '../../api/reviews';
@@ -22,9 +25,11 @@ import { getPageLayout } from '../../constants/layout';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcut';
 import { useDebounce } from '../../hooks/useDebounce';
 import { usePageTitle } from '../../hooks/usePageTitle';
+import { useTranslation } from 'react-i18next';
 
 export function CustomerBookingsPage() {
-    usePageTitle('My Bookings');
+  const { t } = useTranslation();
+  usePageTitle(t('My Bookings'));
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
@@ -34,29 +39,24 @@ export function CustomerBookingsPage() {
 
   // Keyboard shortcuts
   useKeyboardShortcuts([
-    { key: 'd', callback: () => navigate('/dashboard'), meta: true },
-    { key: 's', callback: () => navigate('/services'), meta: true },
+    { key: 'd', callback: () => navigate('/customer/dashboard'), meta: true, title: t('Dashboard') },
+    { key: 's', callback: () => navigate('/services'), meta: true, title: t('Browse Services') },
   ]);
 
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: queryKeys.bookings.customer(),
     queryFn: () => getAllBookings({ viewAs: 'CUSTOMER' }),
     refetchInterval: 30000,
-    refetchIntervalInBackground: false,
   });
 
   const cancelMutation = useMutation({
     mutationFn: (id) => cancelBooking(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.bookings.customer() });
-      toast.success('Booking cancelled successfully.');
+      toast.success(t('Booking cancelled successfully.'));
     },
     onError: (error) => {
-      toast.error(
-        error.response?.data?.message ||
-          error.response?.data?.error ||
-          'Failed to cancel booking',
-      );
+      toast.error(error.response?.data?.message || t('Failed to cancel booking'));
     },
   });
 
@@ -72,7 +72,6 @@ export function CustomerBookingsPage() {
     try {
       if (type === 'CANCEL') {
         setCancelConfirmId(payload.id);
-        return; // Dialog handles the rest
       } else if (type === 'REVIEW') {
         await reviewMutation.mutateAsync(payload);
       }
@@ -96,29 +95,57 @@ export function CustomerBookingsPage() {
   return (
     <MainLayout>
       <div className={getPageLayout('default')}>
-
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
-          <div>
-            <h1 className="text-4xl font-black tracking-tight mb-2 text-gray-900 dark:text-white">
-              My Missions
+        {/* Header Block */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
+          <Motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
+            <span className="text-xs font-bold uppercase tracking-widest text-brand-500 mb-2 block">{t('Service History')}</span>
+            <h1 className="text-4xl font-bold tracking-tight text-neutral-900 dark:text-white">
+              {t('My Bookings')}
             </h1>
-            <p className="text-gray-500 font-medium italic">Track, manage and review your service history.</p>
-          </div>
+          </Motion.div>
 
-          <div className="flex items-center gap-3">
-            <div className="relative group">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-brand-500 transition-colors" size={18} />
+          <Motion.div 
+            initial={{ opacity: 0, y: -10 }} 
+            animate={{ opacity: 1, y: 0 }} 
+            transition={{ delay: 0.1 }}
+            className="flex items-center gap-3 w-full md:w-auto"
+          >
+            <div className="flex-1 md:w-80">
               <Input
-                placeholder="Search by mission ID or service..."
-                className="pl-12 w-full md:w-80 h-14 rounded-2xl border-2 focus:border-brand-500 transition-all bg-transparent"
+                icon={Search}
+                placeholder={t("Search by service or ID...")}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <Button variant="outline" className="h-14 w-14 p-0 rounded-2xl border-2 hover:border-brand-500/50">
-              <Filter size={20} />
+            <Button variant="outline" className="h-14 w-14 p-0 rounded-2xl bg-white dark:bg-dark-800 shrink-0 shadow-sm border-none ring-1 ring-black/5 dark:ring-white/10">
+              <Filter size={18} />
             </Button>
-          </div>
+          </Motion.div>
+        </div>
+
+        {/* Global Stats Summary */}
+        <div className="grid grid-cols-2 gap-4 mb-8">
+          <Card className="p-6 flex items-center gap-4 border-none shadow-sm bg-gradient-to-br from-brand-50 to-brand-100/50 dark:from-brand-500/10 dark:to-brand-500/5">
+            <div className="w-12 h-12 rounded-xl bg-brand-500/10 flex items-center justify-center text-brand-600 dark:text-brand-400">
+              <CalendarDays size={24} />
+            </div>
+            <div>
+              <h4 className="font-bold text-xs uppercase tracking-wider text-neutral-500 dark:text-neutral-400 mb-0.5">{t('Total Bookings')}</h4>
+              <p className="text-2xl font-bold text-neutral-900 dark:text-white">{bookings.length}</p>
+            </div>
+          </Card>
+          <Card className="p-6 flex items-center gap-4 border-none shadow-sm bg-gradient-to-br from-success-50 to-success-100/50 dark:from-success-500/10 dark:to-success-500/5">
+            <div className="w-12 h-12 rounded-xl bg-success-500/10 flex items-center justify-center text-success-600 dark:text-success-400">
+              <Star size={24} />
+            </div>
+            <div>
+              <h4 className="font-bold text-xs uppercase tracking-wider text-neutral-500 dark:text-neutral-400 mb-0.5">{t('Success Rate')}</h4>
+              <p className="text-2xl font-bold text-neutral-900 dark:text-white">
+                {bookings.length > 0 ? `${((bookings.filter(b => b.status === 'COMPLETED').length / bookings.length) * 100).toFixed(0)}%` : t('N/A')}
+              </p>
+            </div>
+          </Card>
         </div>
 
         <AsyncState
@@ -127,15 +154,16 @@ export function CustomerBookingsPage() {
           error={error}
           onRetry={refetch}
           isEmpty={filteredBookings.length === 0}
-          emptyTitle={searchQuery ? "No matches found" : "Your mission log is empty"}
-          emptyMessage={searchQuery ? "Try searching for a different service name or ID." : "Start your first mission by booking a professional service."}
+          loadingFallback={<div className="space-y-4"><BookingCardSkeleton /><BookingCardSkeleton /></div>}
+          emptyTitle={searchQuery ? t("No matches found") : t("No bookings yet")}
+          emptyMessage={searchQuery ? t("Try searching for a different service name or ID.") : t("Start your first booking to experience our professional services.")}
           emptyAction={
-            <Button size="lg" className="rounded-2xl px-10 h-14 font-black uppercase text-[10px] tracking-widest" onClick={() => navigate('/services')}>
-              Deploy New Scout
+            <Button size="lg" variant="gradient" onClick={() => navigate('/services')} className="mt-2 text-sm">
+              {t('Book a Service')}
             </Button>
           }
         >
-          <div className="grid grid-cols-1 gap-8 mb-20">
+          <div className="flex flex-col gap-4 mb-10">
             {paginatedBookings.map((booking) => (
               <BookingCard
                 key={booking.id}
@@ -147,30 +175,13 @@ export function CustomerBookingsPage() {
               />
             ))}
           </div>
-          <Pagination page={safePage} totalPages={totalPages} onPageChange={setPage} totalItems={filteredBookings.length} pageSize={PAGE_SIZE} />
+          
+          {totalPages > 1 && (
+            <div className="flex justify-center">
+              <Pagination page={safePage} totalPages={totalPages} onPageChange={setPage} totalItems={filteredBookings.length} pageSize={PAGE_SIZE} />
+            </div>
+          )}
         </AsyncState>
-
-        {/* Global Stats Summary */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 opacity-80">
-          <Card className="p-6 rounded-[2rem] border-dashed border-2 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-brand-500/10 flex items-center justify-center text-brand-500">
-              <CalendarCheck size={24} />
-            </div>
-            <div>
-              <h4 className="font-black text-xs uppercase tracking-widest text-gray-400 mb-1">Total Deployments</h4>
-              <p className="text-xl font-black text-dark-900 dark:text-white">{bookings.length}</p>
-            </div>
-          </Card>
-          <Card className="p-6 rounded-[2rem] border-dashed border-2 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-success-500/10 flex items-center justify-center text-success-500">
-              <Star size={24} />
-            </div>
-            <div>
-              <h4 className="font-black text-xs uppercase tracking-widest text-gray-400 mb-1">Success Rate</h4>
-              <p className="text-xl font-black text-dark-900 dark:text-white">{bookings.length > 0 ? `${((bookings.filter(b => b.status === 'COMPLETED').length / bookings.length) * 100).toFixed(1)}%` : 'N/A'}</p>
-            </div>
-          </Card>
-        </div>
 
         <ConfirmDialog
           isOpen={cancelConfirmId !== null}
@@ -182,10 +193,10 @@ export function CustomerBookingsPage() {
               setCancelConfirmId(null);
             }
           }}
-          title="Cancel Booking"
-          message="Are you sure you want to cancel this booking? This action cannot be undone."
-          confirmText="Yes, Cancel"
-          cancelText="Keep Booking"
+          title={t("Cancel Booking")}
+          message={t("Are you sure you want to cancel this booking?") + " " + t("Cancellation fees may apply depending on the timing.")}
+          confirmText={t("Confirm Cancellation")}
+          cancelText={t("Keep Booking")}
           variant="danger"
           loading={cancelMutation.isPending}
         />

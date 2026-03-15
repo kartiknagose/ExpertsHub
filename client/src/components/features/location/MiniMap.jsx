@@ -1,8 +1,7 @@
 import { useState } from 'react';
-import { MapContainer, TileLayer, Marker } from 'react-leaflet';
-import { useTheme } from '../../../context/ThemeContext';
+import { MapContainer, TileLayer, Marker, Circle } from 'react-leaflet';
 import { MAP_TILES } from '../../../utils/mapTiles';
-import { Layers, Map as MapIcon, Mountain, Satellite, Moon } from 'lucide-react';
+import { Layers, Map as MapIcon, Mountain, Satellite, Moon, Zap } from 'lucide-react';
 import './map-styles.css';
 
 const LAYER_OPTIONS = [
@@ -17,10 +16,10 @@ const LAYER_OPTIONS = [
  *
  * A refined, premium map with an interactive layer switcher.
  * Supports streets, satellite, terrain, and dark map styles.
+ * Now supports visual radius visualization.
  */
-export function MiniMap({ lat, lng, height = "200px", zoom = 15 }) {
-    const { isDark } = useTheme();
-    const [activeLayer, setActiveLayer] = useState(isDark ? 'dark' : 'streets');
+export function MiniMap({ lat, lng, height = "200px", zoom = 14, radius = 0 }) {
+    const [activeLayer, setActiveLayer] = useState('satellite');
     const [isLayerMenuOpen, setIsLayerMenuOpen] = useState(false);
 
     const latitude = Number(lat);
@@ -53,6 +52,20 @@ export function MiniMap({ lat, lng, height = "200px", zoom = 15 }) {
             >
                 <TileLayer key={activeLayer} url={currentTile} />
                 <Marker position={position} />
+                
+                {radius > 0 && (
+                    <Circle
+                        center={position}
+                        radius={radius * 1000}
+                        pathOptions={{
+                            fillColor: '#3b82f6',
+                            fillOpacity: 0.1,
+                            color: '#3b82f6',
+                            weight: 1,
+                            dashArray: '4, 4'
+                        }}
+                    />
+                )}
             </MapContainer>
 
             {/* Premium Sophisticated Overlays */}
@@ -107,6 +120,16 @@ export function MiniMap({ lat, lng, height = "200px", zoom = 15 }) {
                                 </button>
                             );
                         })}
+                    </div>
+                )}
+            </div>
+
+            {/* Branded HUD Items */}
+            <div className="absolute bottom-3 left-3 z-[400] flex items-center gap-2">
+                {radius > 0 && (
+                    <div className="px-2 py-1 rounded-lg bg-brand-500/90 text-white text-[8px] font-black uppercase tracking-tighter flex items-center gap-1 shadow-lg backdrop-blur-md">
+                        <Zap size={10} />
+                        {radius} KM RADIAL SIGNAL
                     </div>
                 )}
             </div>

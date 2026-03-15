@@ -2,24 +2,37 @@ import { useEffect, useState, useMemo, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline, Circle } from 'react-leaflet';
 import L from 'leaflet';
 import { Navigation, Compass, Target, Clock, Zap, Layers, Map as MapIcon, CheckCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { MAP_TILES } from '../../../utils/mapTiles';
 import './map-styles.css';
 import axios from 'axios';
 
-// Professional Marker Icons
-// Professional Marker Icons (local self-hosted SVGs)
-const workerIcon = new L.Icon({
-    iconUrl: '/images/marker-worker.svg',
-    iconSize: [48, 48],
-    iconAnchor: [24, 48],
-    popupAnchor: [0, -48],
+const createSemanticMarker = ({ emoji, background, border, size }) =>
+    L.divIcon({
+        className: '',
+        iconSize: [size, size],
+        iconAnchor: [size / 2, size],
+        popupAnchor: [0, -size],
+        html: `
+            <div style="position: relative; width: ${size}px; height: ${size}px; display: flex; align-items: center; justify-content: center; border-radius: 999px; background: ${background}; border: 3px solid ${border}; box-shadow: 0 8px 18px rgba(0,0,0,0.2); font-size: ${Math.round(size * 0.45)}px; line-height: 1;">
+                <span aria-hidden="true">${emoji}</span>
+                <div style="position: absolute; bottom: -8px; left: 50%; width: 14px; height: 14px; background: ${background}; border-left: 3px solid ${border}; border-bottom: 3px solid ${border}; transform: translateX(-50%) rotate(-45deg);"></div>
+            </div>
+        `,
+    });
+
+const workerIcon = createSemanticMarker({
+    emoji: '🚚',
+    background: '#22c55e',
+    border: '#ffffff',
+    size: 46,
 });
 
-const customerIcon = new L.Icon({
-    iconUrl: '/images/marker-customer.svg',
-    iconSize: [42, 52],
-    iconAnchor: [21, 52],
-    popupAnchor: [0, -52],
+const customerIcon = createSemanticMarker({
+    emoji: '🏠',
+    background: '#2563eb',
+    border: '#ffffff',
+    size: 44,
 });
 
 // Calculate distance logic
@@ -42,6 +55,8 @@ function MapController({ workerPos, customerLocation, triggerRecenter }) {
 
     useEffect(() => {
         if (!workerPos || !customerLocation) return;
+        if (!workerPos.lat || !workerPos.lng || !customerLocation.lat || !customerLocation.lng) return;
+
         if (isFirstLoad.current) {
             const bounds = L.latLngBounds([
                 [customerLocation.lat, customerLocation.lng],
@@ -53,7 +68,7 @@ function MapController({ workerPos, customerLocation, triggerRecenter }) {
     }, [workerPos, customerLocation, map]);
 
     useEffect(() => {
-        if (triggerRecenter && workerPos) {
+        if (triggerRecenter && workerPos && workerPos.lat && workerPos.lng) {
             map.flyTo([workerPos.lat, workerPos.lng], 16, { animate: true, duration: 1.5 });
         }
     }, [triggerRecenter, workerPos, map]);
@@ -67,6 +82,7 @@ export function LiveTrackingMap({
     initialWorkerLocation,
     height = "400px"
 }) {
+    const { t } = useTranslation();
     const [workerPos, setWorkerPos] = useState(initialWorkerLocation);
     const [history, setHistory] = useState(initialWorkerLocation ? [[initialWorkerLocation.lat, initialWorkerLocation.lng]] : []);
     const [lastUpdated, setLastUpdated] = useState(new Date());
@@ -92,7 +108,7 @@ export function LiveTrackingMap({
     useEffect(() => {
         const handleLocationUpdate = (event) => {
             const data = event.detail;
-            if (data.workerProfileId === workerId) {
+            if (data.workerProfileId === workerId && typeof data.latitude === 'number' && typeof data.longitude === 'number') {
                 const newPos = { lat: data.latitude, lng: data.longitude };
                 setWorkerPos(newPos);
                 setHistory(prev => {
@@ -147,7 +163,16 @@ export function LiveTrackingMap({
     const etaMins = eta;
     const hasArrived = distance !== null && distance < 0.05; // 50 meters
 
-    if (!customerLocation) return null;
+    if (!customerLocation || typeof customerLocation.lat !== 'number' || typeof customerLocation.lng !== 'number' || isNaN(customerLocation.lat) || isNaN(customerLocation.lng)) {
+        return (
+            <div className="flex items-center justify-center bg-gray-50 dark:bg-dark-800 rounded-3xl border border-dashed border-gray-300 dark:border-dark-700" style={{ height }}>
+                <div className="text-center p-6">
+                    <MapIcon size={32} className="mx-auto text-gray-400 mb-2" />
+                    <p className="text-sm font-bold text-gray-500 uppercase tracking-widest">{t('Waiting for valid location...')}</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="relative w-full rounded-3xl overflow-hidden shadow-2xl border border-black/5" style={{ height }}>
@@ -181,7 +206,7 @@ export function LiveTrackingMap({
                 <Marker position={[customerLocation.lat, customerLocation.lng]} icon={customerIcon}>
                     <Popup className="upro-popup" autoPan={false}>
                         <div className="p-3 text-center min-w-[120px]">
-                            <span className="text-[11px] font-black uppercase tracking-[0.2em] text-indigo-600 block mb-1">Customer Location</span>
+                            <span className="text-[11px] font-black uppercase tracking-[0.2em] text-indigo-600 block mb-1">Customer Home</span>
                             <div className="h-px w-full bg-gray-100 dark:bg-white/10 my-1.5" />
                             <p className="text-[10px] text-gray-500 font-bold leading-tight">Service Site</p>
                         </div>
@@ -193,7 +218,7 @@ export function LiveTrackingMap({
                     <Marker position={[workerPos.lat, workerPos.lng]} icon={workerIcon}>
                         <Popup className="upro-popup" autoPan={false}>
                             <div className="p-3 text-center min-w-[120px]">
-                                <span className="text-[11px] font-black uppercase tracking-[0.2em] text-emerald-600 block mb-1">Professional</span>
+                                <span className="text-[11px] font-black uppercase tracking-[0.2em] text-emerald-600 block mb-1">Delivery Professional</span>
                                 <div className="h-px w-full bg-gray-100 dark:bg-white/10 my-1.5" />
                                 <div className="flex items-center justify-center gap-1.5 mt-1">
                                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />

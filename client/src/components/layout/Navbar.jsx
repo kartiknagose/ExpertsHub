@@ -1,134 +1,120 @@
-// Main navigation bar component
-// Adapts based on user role (Customer, Worker, Admin) and authentication state
+// Navbar — frosted glass, animated active indicator, premium typography
 
 import { useMemo, useState, useRef, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
 import {
-  Menu,
-  X,
-  Briefcase,
-  Settings,
-  Users,
-  Tag,
-  Mail,
-  LogOut,
-  LogIn,
-  UserPlus,
-  Sun,
-  Moon,
-  LayoutGrid,
-  ChevronDown,
-  MessageSquare
+  Menu, X, Briefcase, Settings, Users, Tag, Mail,
+  LogOut, LogIn, UserPlus, Sun, Moon, LayoutGrid,
+  ChevronDown, MessageSquare, Zap, Globe, MapPin
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth';
 import { useTheme } from '../../context/ThemeContext';
+import { useCity } from '../../context/CityContext';
 import { resolveProfilePhotoUrl } from '../../utils/profilePhoto';
-import { Button } from '../common';
+import { Button } from '../ui/Button';
 import { NotificationDropdown } from '../features/notifications/NotificationDropdown';
 
-/**
- * Navbar Component
- * Role-based navigation with mobile responsiveness
- */
-export function Navbar({ onOpenSidebar = () => { }, sidebarOffset = '', showBrand = true }) {
+export function Navbar({ onOpenSidebar = () => {}, sidebarOffset = '', showBrand = true }) {
   const { user, isAuthenticated, logout } = useAuth();
   const { isDark, toggleTheme } = useTheme();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [langMenuOpen, setLangMenuOpen] = useState(false);
+  const [cityMenuOpen, setCityMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const userMenuRef = useRef(null);
+  const langMenuRef = useRef(null);
+  const cityMenuRef = useRef(null);
+
+  // Detect scroll for enhanced frosted effect
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 10);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   // Close menus on route change
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setMobileMenuOpen(false);
-      setUserMenuOpen(false);
-    }, 0);
-
+    const timer = window.setTimeout(() => { setMobileMenuOpen(false); setUserMenuOpen(false); }, 0);
     return () => window.clearTimeout(timer);
   }, [location.pathname]);
 
-  // Close user dropdown when clicking outside
   useEffect(() => {
-    if (!userMenuOpen) return;
-    const handleClickOutside = (e) => {
-      if (userMenuRef.current && !userMenuRef.current.contains(e.target)) {
-        setUserMenuOpen(false);
-      }
+    if (!userMenuOpen && !langMenuOpen) return;
+    const handler = (e) => { 
+      if (userMenuOpen && userMenuRef.current && !userMenuRef.current.contains(e.target)) setUserMenuOpen(false); 
+      if (langMenuOpen && langMenuRef.current && !langMenuRef.current.contains(e.target)) setLangMenuOpen(false); 
+      if (cityMenuOpen && cityMenuRef.current && !cityMenuRef.current.contains(e.target)) setCityMenuOpen(false);
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [userMenuOpen]);
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [userMenuOpen, langMenuOpen, cityMenuOpen]);
 
   const publicLinks = [
-    { name: 'Services', href: '/services', icon: Briefcase },
-    { name: 'How It Works', href: '/how-it-works', icon: Settings },
-    { name: 'Pricing', href: '/pricing', icon: Tag },
-    { name: 'About', href: '/about', icon: Users },
-    { name: 'Contact', href: '/contact', icon: Mail },
+    { name: t('Services'),    href: '/services',    icon: Briefcase },
+    { name: t('Simple Process'),href: '/how-it-works', icon: Settings },
+    { name: t('Coupons'),     href: '/pricing',      icon: Tag },
+    { name: t('Users'),       href: '/about',        icon: Users },
+    { name: t('Messages'),     href: '/contact',      icon: Mail },
   ];
 
-  // Handle logout
-  const handleLogout = async () => {
-    await logout();
-    navigate('/login');
-    setMobileMenuOpen(false);
-  };
+  const { cities, selectedCity, changeCity } = useCity();
 
-  // Close mobile menu when clicking a link
+  const handleLogout = async () => { await logout(); navigate('/login'); setMobileMenuOpen(false); };
   const closeMobileMenu = () => setMobileMenuOpen(false);
 
   const userMenuItems = useMemo(() => {
     switch (user?.role) {
-      case 'WORKER':
-        return [
-          { label: 'Dashboard', href: '/worker/dashboard' },
-          { label: 'My Profile', href: '/worker/profile' },
-          { label: 'My Reviews', href: '/worker/reviews' },
-          { label: 'Verification', href: '/worker/verification' },
-        ];
-      case 'ADMIN':
-        return [
-          { label: 'Dashboard', href: '/admin/dashboard' },
-        ];
-      case 'CUSTOMER':
-      default:
-        return [
-          { label: 'Dashboard', href: '/dashboard' },
-          { label: 'My Profile', href: '/profile' },
-          { label: 'My Bookings', href: '/bookings' },
-        ];
+      case 'WORKER': return [
+        { label: t('Dashboard'),    href: '/worker/dashboard' },
+        { label: t('My Profile'),   href: '/worker/profile' },
+        { label: t('My Reviews'),   href: '/worker/reviews' },
+        { label: t('Verification'), href: '/worker/verification' },
+      ];
+      case 'ADMIN': return [{ label: t('Dashboard'), href: '/admin/dashboard' }];
+      default: return [
+        { label: t('Dashboard'),  href: '/customer/dashboard' },
+        { label: t('My Profile'), href: '/customer/profile' },
+        { label: t('My Bookings'),href: '/customer/bookings' },
+      ];
     }
-  }, [user?.role]);
+  }, [user?.role, t]);
 
   const profilePhotoUrl = resolveProfilePhotoUrl(user?.profilePhotoUrl);
-  const profileInitial = (user?.name || 'U').slice(0, 1).toUpperCase();
-
-  // Check if link is active
-  const isLinkActive = (href) => location.pathname === href || location.pathname.startsWith(href + '/');
+  const profileInitial  = (user?.name || 'U').slice(0, 1).toUpperCase();
+  const isLinkActive    = (href) => location.pathname === href || location.pathname.startsWith(href + '/');
 
   return (
-    <nav className={`sticky top-0 z-40 border-b backdrop-blur-xl transition-all duration-200
-        bg-white/90 dark:bg-dark-900/90 border-gray-200/80 dark:border-dark-700 shadow-sm dark:shadow-lg dark:shadow-black/30
-      ${sidebarOffset}`}>
+    <nav
+      className={[
+        'sticky top-0 z-40 border-b transition-all duration-300',
+        scrolled
+          ? 'backdrop-blur-2xl shadow-lg shadow-black/5 bg-white/80 dark:bg-dark-900/85 border-neutral-200/80 dark:border-dark-700'
+          : 'backdrop-blur-xl bg-white/70 dark:bg-dark-900/70 border-neutral-200/60 dark:border-dark-700/60',
+        sidebarOffset,
+      ].join(' ')}
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
 
-          {/* Logo */}
+          {/* ── Logo ────────────────────────────────────────────────────── */}
           {showBrand ? (
             <Link
               to={isAuthenticated
-                ? (user?.role === 'CUSTOMER' ? '/dashboard' : user?.role === 'WORKER' ? '/worker/dashboard' : '/admin/dashboard')
+                ? (user?.role === 'CUSTOMER' ? '/customer/dashboard' : user?.role === 'WORKER' ? '/worker/dashboard' : '/admin/dashboard')
                 : '/'
               }
-              className="flex items-center gap-2.5 shrink-0"
+              className="flex items-center gap-2.5 shrink-0 group"
             >
-              <div className="w-8 h-8 bg-gradient-to-br from-brand-500 to-accent-500 rounded-lg flex items-center justify-center shadow-md shadow-brand-500/30">
-                <span className="text-white font-bold text-lg leading-none">U</span>
+              <div className="w-8 h-8 bg-gradient-to-br from-brand-500 to-accent-500 rounded-xl flex items-center justify-center shadow-md shadow-brand-500/30 group-hover:shadow-brand-500/50 transition-shadow duration-200">
+                <span className="text-white font-black text-lg leading-none">U</span>
               </div>
-              <span className="text-xl font-bold bg-gradient-to-r from-brand-500 to-accent-500 bg-clip-text text-transparent">
+              <span className="text-xl font-black gradient-text tracking-tight">
                 UrbanPro
               </span>
             </Link>
@@ -136,7 +122,7 @@ export function Navbar({ onOpenSidebar = () => { }, sidebarOffset = '', showBran
             <div className="w-8 h-8" />
           )}
 
-          {/* Desktop Navigation - Public Links */}
+          {/* ── Desktop Nav Links ────────────────────────────────────────── */}
           <div className="hidden md:flex items-center gap-0.5">
             {(!isAuthenticated ? publicLinks : []).map((link) => {
               const active = isLinkActive(link.href);
@@ -144,16 +130,18 @@ export function Navbar({ onOpenSidebar = () => { }, sidebarOffset = '', showBran
                 <Link
                   key={link.href}
                   to={link.href}
-                  className={`relative px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${active
+                  className={[
+                    'relative px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200',
+                    active
                       ? 'text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-500/10'
-                      : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-dark-800'
-                    }`}
+                      : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-dark-800',
+                  ].join(' ')}
                 >
                   {link.name}
                   {active && (
                     <Motion.span
-                      layoutId="nav-indicator"
-                      className="absolute bottom-0 left-3 right-3 h-0.5 rounded-full bg-gradient-to-r from-brand-500 to-accent-500"
+                      layoutId="nav-active-indicator"
+                      className="absolute bottom-1 left-3 right-3 h-0.5 rounded-full bg-gradient-to-r from-brand-500 to-accent-500"
                     />
                   )}
                 </Link>
@@ -161,28 +149,26 @@ export function Navbar({ onOpenSidebar = () => { }, sidebarOffset = '', showBran
             })}
           </div>
 
-          {/* Right Actions */}
-          <div className="flex items-center gap-1">
+          {/* ── Right Actions ────────────────────────────────────────────── */}
+          <div className="flex items-center gap-0.5">
 
-            {/* Sidebar toggle (for authenticated users) */}
+            {/* Sidebar toggle */}
             {isAuthenticated && (
               <button
                 type="button"
                 onClick={onOpenSidebar}
-                className="p-2 rounded-lg transition-colors text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-dark-800
-                  "
+                className="p-2 rounded-xl transition-colors text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-dark-800"
                 aria-label="Open sidebar"
               >
                 <LayoutGrid size={20} />
               </button>
             )}
 
-            {/* Messages Link */}
+            {/* Messages */}
             {isAuthenticated && (
               <Link
                 to="/messages"
-                className="p-2 rounded-lg transition-colors text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-dark-800
-                  "
+                className="p-2 rounded-xl transition-colors text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-dark-800"
                 aria-label="Messages"
               >
                 <MessageSquare size={20} />
@@ -192,93 +178,186 @@ export function Navbar({ onOpenSidebar = () => { }, sidebarOffset = '', showBran
             {/* Notifications */}
             {isAuthenticated && <NotificationDropdown />}
 
-            {/* Theme Toggle */}
+            {/* City Selector */}
+            <div className="relative hidden lg:block" ref={cityMenuRef}>
+              <button
+                onClick={() => setCityMenuOpen(!cityMenuOpen)}
+                className="flex items-center gap-1.5 p-2 rounded-xl transition-colors text-neutral-500 dark:text-neutral-400 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-neutral-100 dark:hover:bg-dark-800 uppercase text-[10px] font-black tracking-widest"
+                aria-label="Toggle city"
+              >
+                <MapPin size={16} className="text-brand-500" />
+                {selectedCity?.name || 'Select City'}
+                <ChevronDown size={12} className={`transition-transform duration-200 ${cityMenuOpen ? 'rotate-180' : ''}`} />
+              </button>
+              <AnimatePresence>
+                {cityMenuOpen && (
+                  <Motion.div
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                    className="absolute right-0 mt-2 w-48 rounded-2xl border shadow-2xl py-2 z-50 bg-white dark:bg-dark-800 border-neutral-200 dark:border-dark-700 overflow-hidden"
+                  >
+                    <div className="px-4 py-2 border-b border-neutral-100 dark:border-dark-700">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-neutral-400">{t('Select City')}</p>
+                    </div>
+                    <div className="max-h-64 overflow-y-auto">
+                      {cities.map((city) => (
+                        <button
+                          key={city.id}
+                          onClick={() => { changeCity(city); setCityMenuOpen(false); }}
+                          className={`w-full text-left px-4 py-3 text-sm font-semibold transition-colors flex items-center justify-between ${selectedCity?.id === city.id ? 'text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-900/20' : 'text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-dark-700'}`}
+                        >
+                          {city.name}
+                          {selectedCity?.id === city.id && <Zap size={12} className="fill-current" />}
+                        </button>
+                      ))}
+                    </div>
+                  </Motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Language toggle */}
+            <div className="relative hidden md:block" ref={langMenuRef}>
+              <button
+                onClick={() => setLangMenuOpen(!langMenuOpen)}
+                className="flex items-center gap-1 p-2 rounded-xl transition-colors text-neutral-500 dark:text-neutral-400 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-neutral-100 dark:hover:bg-dark-800 uppercase text-xs font-black"
+                aria-label="Toggle language"
+              >
+                <Globe size={18} />
+                {i18n.language}
+              </button>
+              <AnimatePresence>
+                {langMenuOpen && (
+                  <Motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    className="absolute right-0 mt-2 w-32 rounded-xl border shadow-xl py-1.5 z-50 bg-white dark:bg-dark-800 border-neutral-200 dark:border-dark-700"
+                  >
+                    {[
+                      { code: 'en', name: 'English' },
+                      { code: 'hi', name: 'हिंदी' },
+                      { code: 'mr', name: 'मराठी' },
+                      { code: 'ta', name: 'தமிழ்' },
+                      { code: 'te', name: 'తెలుగు' }
+                    ].map((lang) => (
+                      <button
+                        key={lang.code}
+                        onClick={() => { i18n.changeLanguage(lang.code); setLangMenuOpen(false); }}
+                        className={`w-full text-left px-4 py-2 text-sm font-semibold transition-colors ${i18n.language === lang.code ? 'text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-900/20' : 'text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-dark-700'}`}
+                      >
+                        {lang.name}
+                      </button>
+                    ))}
+                  </Motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Theme toggle */}
             <button
               onClick={toggleTheme}
-              className="p-2 rounded-lg transition-colors text-gray-500 dark:text-gray-400 hover:text-brand-600 dark:hover:text-yellow-400 hover:bg-gray-100 dark:hover:bg-dark-800
-                "
+              className="p-2 rounded-xl transition-colors text-neutral-500 dark:text-neutral-400 hover:text-brand-600 dark:hover:text-yellow-400 hover:bg-neutral-100 dark:hover:bg-dark-800"
               aria-label="Toggle theme"
             >
-              {isDark ? <Sun size={20} /> : <Moon size={20} />}
+              <AnimatePresence mode="wait">
+                <Motion.span
+                  key={isDark ? 'sun' : 'moon'}
+                  initial={{ rotate: -90, opacity: 0, scale: 0.7 }}
+                  animate={{ rotate: 0, opacity: 1, scale: 1 }}
+                  exit={{ rotate: 90, opacity: 0, scale: 0.7 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  {isDark ? <Sun size={20} /> : <Moon size={20} />}
+                </Motion.span>
+              </AnimatePresence>
             </button>
 
-            {/* Auth - Desktop */}
-            <div className="hidden md:flex items-center gap-2">
+            {/* Desktop Auth */}
+            <div className="hidden md:flex items-center gap-2 ml-1">
               {isAuthenticated ? (
                 <div className="relative" ref={userMenuRef}>
+                  {/* Avatar trigger */}
                   <button
                     type="button"
-                    onClick={() => setUserMenuOpen((open) => !open)}
-                    className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-full border-2 transition-all duration-200
-                        border-gray-200 dark:border-dark-600 hover:border-brand-200 dark:hover:border-brand-500/50 hover:bg-gray-50 dark:hover:bg-dark-800
-                      "
-                    aria-label="Open user menu"
+                    onClick={() => setUserMenuOpen((o) => !o)}
+                    className={[
+                      'flex items-center gap-2 pl-1 pr-2.5 py-1 rounded-full border-2 transition-all duration-200',
+                      userMenuOpen
+                        ? 'border-brand-400 dark:border-brand-400 bg-brand-50 dark:bg-brand-500/10'
+                        : 'border-neutral-200 dark:border-dark-700 hover:border-brand-300 dark:hover:border-brand-500/50 hover:bg-neutral-50 dark:hover:bg-dark-800',
+                    ].join(' ')}
+                    aria-label="User menu"
                     aria-expanded={userMenuOpen}
                   >
                     {profilePhotoUrl ? (
-                      <img
-                        src={profilePhotoUrl}
-                        alt="Profile"
-                        className="w-7 h-7 rounded-full object-cover"
-                      />
+                      <img src={profilePhotoUrl} alt="Profile" className="w-7 h-7 rounded-full object-cover" />
                     ) : (
-                      <div className="w-7 h-7 rounded-full bg-gradient-to-br from-brand-500 to-accent-500 flex items-center justify-center text-white text-sm font-bold">
+                      <div className="w-7 h-7 rounded-full bg-gradient-to-br from-brand-500 to-accent-500 flex items-center justify-center text-white text-xs font-black">
                         {profileInitial}
                       </div>
                     )}
-                    <span className="text-sm font-medium max-w-[80px] truncate text-gray-700 dark:text-gray-300">
+                    <span className="text-sm font-semibold max-w-[80px] truncate text-neutral-700 dark:text-neutral-300">
                       {user?.name?.split(' ')[0]}
                     </span>
                     <Motion.span animate={{ rotate: userMenuOpen ? 180 : 0 }} transition={{ duration: 0.2 }}>
-                      <ChevronDown size={14} className="text-gray-500 dark:text-gray-400" />
+                      <ChevronDown size={14} className="text-neutral-400" />
                     </Motion.span>
                   </button>
 
+                  {/* Dropdown */}
                   <AnimatePresence>
                     {userMenuOpen && (
                       <Motion.div
-                        initial={{ opacity: 0, y: -8, scale: 0.96 }}
+                        initial={{ opacity: 0, y: -10, scale: 0.95 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: -8, scale: 0.96 }}
-                        transition={{ duration: 0.15 }}
-                        className="absolute right-0 mt-2 w-56 rounded-2xl border shadow-xl py-2 z-50 bg-white dark:bg-dark-900 border-gray-200 dark:border-dark-700
-                          "
+                        exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                        transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+                        className="absolute right-0 mt-2.5 w-60 rounded-2xl border shadow-2xl py-2 z-50 bg-white dark:bg-dark-800 border-neutral-200 dark:border-dark-700 overflow-hidden"
                       >
-                        <div className="px-4 py-3 border-b border-gray-100 dark:border-dark-700">
-                          <p className="text-sm font-bold text-gray-900 dark:text-white">
-                            {user?.name || 'User'}
-                          </p>
-                          <p className="text-xs mt-0.5 text-gray-500">
-                            {user?.email}
-                          </p>
-                          <span className="inline-flex mt-1.5 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-brand-50 dark:bg-brand-500/20 text-brand-600 dark:text-brand-300
-                            ">
-                            {user?.role}
+                        {/* Profile header */}
+                        <div className="px-4 py-3 border-b border-neutral-100 dark:border-dark-700">
+                          <div className="flex items-center gap-3">
+                            {profilePhotoUrl ? (
+                              <img src={profilePhotoUrl} alt="Profile" className="w-10 h-10 rounded-full object-cover" />
+                            ) : (
+                              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-500 to-accent-500 flex items-center justify-center text-white font-black">
+                                {profileInitial}
+                              </div>
+                            )}
+                            <div className="min-w-0">
+                              <p className="text-sm font-bold text-neutral-900 dark:text-neutral-100 truncate">{user?.name || 'User'}</p>
+                              <p className="text-xs text-neutral-400 truncate">{user?.email}</p>
+                            </div>
+                          </div>
+                          <span className="inline-flex mt-2 text-[10px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full bg-brand-50 dark:bg-brand-500/20 text-brand-600 dark:text-brand-300 border border-brand-200 dark:border-brand-500/30">
+                            {user?.role === 'CUSTOMER' ? t('Customer') : user?.role === 'WORKER' ? t('Professional') : t('Administrator')}
                           </span>
                         </div>
+
+                        {/* Nav items */}
                         <div className="py-1.5">
                           {userMenuItems.map((item) => (
                             <Link
                               key={item.href}
                               to={item.href}
                               onClick={() => setUserMenuOpen(false)}
-                              className="flex items-center px-4 py-2.5 text-sm font-medium transition-colors
-                                  text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-dark-800 hover:text-gray-900 dark:hover:text-white
-                                "
+                              className="flex items-center px-4 py-2.5 text-sm font-medium transition-colors text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-dark-700 hover:text-neutral-900 dark:hover:text-neutral-100"
                             >
                               {item.label}
                             </Link>
                           ))}
                         </div>
-                        <div className="border-t pt-1.5 border-gray-100 dark:border-dark-700">
+
+                        <div className="border-t pt-1.5 border-neutral-100 dark:border-dark-700">
                           <button
                             type="button"
                             onClick={handleLogout}
-                            className="w-full flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors text-error-500 hover:bg-error-50 dark:hover:bg-error-900/20
-                              "
+                            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-semibold text-error-600 hover:bg-error-50 dark:hover:bg-error-500/10 transition-colors"
                           >
                             <LogOut size={15} />
-                            Sign Out
+                            {t('Logout')}
                           </button>
                         </div>
                       </Motion.div>
@@ -287,31 +366,20 @@ export function Navbar({ onOpenSidebar = () => { }, sidebarOffset = '', showBran
                 </div>
               ) : (
                 <>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    icon={LogIn}
-                    onClick={() => navigate('/login')}
-                  >
-                    Login
+                  <Button variant="ghost" size="sm" icon={LogIn} onClick={() => navigate('/login')}>
+                    {t('Login')}
                   </Button>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    icon={UserPlus}
-                    onClick={() => navigate('/register')}
-                  >
-                    Sign Up
+                  <Button variant="gradient" size="sm" icon={UserPlus} onClick={() => navigate('/register')}>
+                    {t('Sign Up')}
                   </Button>
                 </>
               )}
             </div>
 
-            {/* Mobile Menu Toggle */}
+            {/* Mobile menu toggle */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 rounded-lg transition-colors text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-dark-800
-                "
+              className="md:hidden p-2 rounded-xl transition-colors text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-dark-800 ml-1"
               aria-label="Toggle mobile menu"
               aria-expanded={mobileMenuOpen}
             >
@@ -331,18 +399,18 @@ export function Navbar({ onOpenSidebar = () => { }, sidebarOffset = '', showBran
         </div>
       </div>
 
-      {/* Mobile Menu */}
+      {/* ── Mobile Menu ──────────────────────────────────────────────────── */}
       <AnimatePresence>
         {mobileMenuOpen && (
           <Motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.2, ease: 'easeInOut' }}
-            className={`md:hidden border-t overflow-hidden border-gray-200 dark:border-dark-700 bg-white/95 dark:bg-dark-900/95 backdrop-blur-xl`}
+            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+            className="md:hidden border-t overflow-hidden border-neutral-200 dark:border-dark-700 bg-white/95 dark:bg-dark-900/95 backdrop-blur-2xl"
           >
             <div className="px-4 py-4 space-y-1">
-              {/* Public Nav Links */}
+              {/* Public links */}
               {(!isAuthenticated ? publicLinks : []).map((link) => {
                 const Icon = link.icon;
                 const active = isLinkActive(link.href);
@@ -351,10 +419,12 @@ export function Navbar({ onOpenSidebar = () => { }, sidebarOffset = '', showBran
                     key={link.href}
                     to={link.href}
                     onClick={closeMobileMenu}
-                    className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-200 ${active
+                    className={[
+                      'flex items-center gap-3 px-4 py-3 rounded-xl font-semibold transition-all duration-200',
+                      active
                         ? 'bg-brand-50 dark:bg-brand-500/15 text-brand-600 dark:text-brand-400'
-                        : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-dark-800'
-                      }`}
+                        : 'text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-50 dark:hover:bg-dark-800',
+                    ].join(' ')}
                   >
                     <Icon size={18} />
                     {link.name}
@@ -362,30 +432,48 @@ export function Navbar({ onOpenSidebar = () => { }, sidebarOffset = '', showBran
                 );
               })}
 
-              {/* Theme Toggle */}
+              {/* Theme toggle */}
               <button
                 onClick={() => { toggleTheme(); closeMobileMenu(); }}
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-200 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-dark-800
-                  "
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-semibold transition-all text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-50 dark:hover:bg-dark-800"
               >
                 {isDark ? <Sun size={18} /> : <Moon size={18} />}
-                {isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+                {isDark ? t('Light Mode') : t('Dark Mode')}
               </button>
 
-              {/* Authenticated mobile items */}
+              {/* Language toggle mobile */}
+              <div className="flex border border-neutral-200 dark:border-dark-700 rounded-xl overflow-hidden mt-2 p-1 bg-neutral-50 dark:bg-dark-800">
+                {[
+                  { code: 'en', name: 'EN' },
+                  { code: 'hi', name: 'HI' },
+                  { code: 'mr', name: 'MR' },
+                  { code: 'ta', name: 'TA' },
+                  { code: 'te', name: 'TE' }
+                ].map((lang) => (
+                  <button
+                    key={lang.code}
+                    onClick={() => { i18n.changeLanguage(lang.code); }}
+                    className={`flex-1 flex items-center justify-center py-2 text-xs font-extrabold uppercase rounded-lg transition-all ${i18n.language === lang.code ? 'bg-white shadow text-brand-600 dark:bg-dark-900 dark:text-brand-400' : 'text-neutral-500 dark:text-neutral-400'}`}
+                  >
+                    {lang.name}
+                  </button>
+                ))}
+              </div>
+
+              {/* Auth UX on mobile */}
               {isAuthenticated ? (
-                <div className="pt-3 mt-3 border-t space-y-1 border-gray-100 dark:border-dark-700">
-                  <div className="flex items-center gap-3 px-4 py-2 mb-2">
+                <div className="pt-3 mt-3 border-t space-y-1 border-neutral-100 dark:border-dark-700">
+                  <div className="flex items-center gap-3 px-4 py-2 mb-1">
                     {profilePhotoUrl ? (
                       <img src={profilePhotoUrl} alt="Profile" className="w-10 h-10 rounded-full object-cover" />
                     ) : (
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-500 to-accent-500 flex items-center justify-center text-white font-bold">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-500 to-accent-500 flex items-center justify-center text-white font-black">
                         {profileInitial}
                       </div>
                     )}
                     <div>
-                      <p className="font-bold text-sm text-gray-900 dark:text-white">{user?.name}</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">{user?.role}</p>
+                      <p className="font-bold text-sm text-neutral-900 dark:text-neutral-100">{user?.name}</p>
+                      <p className="text-xs text-neutral-400">{user?.role === 'CUSTOMER' ? t('Customer') : user?.role === 'WORKER' ? t('Professional') : t('Administrator')}</p>
                     </div>
                   </div>
                   {userMenuItems.map((item) => (
@@ -393,39 +481,23 @@ export function Navbar({ onOpenSidebar = () => { }, sidebarOffset = '', showBran
                       key={item.href}
                       to={item.href}
                       onClick={closeMobileMenu}
-                      className="flex items-center px-4 py-3 rounded-xl font-medium transition-all text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-dark-800
-                        "
+                      className="flex items-center px-4 py-3 rounded-xl font-semibold transition-all text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-50 dark:hover:bg-dark-800"
                     >
                       {item.label}
                     </Link>
                   ))}
                   <button
                     onClick={handleLogout}
-                    className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all text-error-500 hover:bg-error-50 dark:hover:bg-error-900/20
-                      "
+                    className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-semibold transition-all text-error-600 hover:bg-error-50 dark:hover:bg-error-500/10"
                   >
                     <LogOut size={18} />
-                    Sign Out
+                    {t('Logout')}
                   </button>
                 </div>
               ) : (
-                <div className="pt-3 mt-3 border-t space-y-2 border-gray-100 dark:border-dark-700">
-                  <Button
-                    fullWidth
-                    variant="ghost"
-                    icon={LogIn}
-                    onClick={() => { navigate('/login'); closeMobileMenu(); }}
-                  >
-                    Login
-                  </Button>
-                  <Button
-                    fullWidth
-                    variant="primary"
-                    icon={UserPlus}
-                    onClick={() => { navigate('/register'); closeMobileMenu(); }}
-                  >
-                    Create Account
-                  </Button>
+                <div className="pt-3 mt-3 border-t space-y-2 border-neutral-100 dark:border-dark-700">
+                  <Button fullWidth variant="ghost" icon={LogIn} onClick={() => { navigate('/login'); closeMobileMenu(); }}>{t('Login')}</Button>
+                  <Button fullWidth variant="gradient" icon={UserPlus} onClick={() => { navigate('/register'); closeMobileMenu(); }}>{t('Sign Up')}</Button>
                 </div>
               )}
             </div>

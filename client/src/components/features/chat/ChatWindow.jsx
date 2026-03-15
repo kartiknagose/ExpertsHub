@@ -4,7 +4,7 @@ import {
     Send, X, MessageSquare, Loader2,
     Image as ImageIcon, Paperclip, Mic,
     FileText, Download, Check, AlertCircle, Sparkles,
-    Play, Pause, Globe, Languages, Trash2
+    Play, Trash2
 } from 'lucide-react';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -23,12 +23,7 @@ const QUICK_REPLIES = {
     WORKER: ["I'm on my way!", "I've arrived.", "Is there parking available?", "I'll need 20 more minutes."]
 };
 
-const MOCK_TRANSLATION_MAP = {
-    "When will you arrive?": "आप कब पहुंचेंगे?",
-    "I'm on my way!": "मैं रास्ते में हूँ!",
-    "Thank you!": "शुक्रिया!",
-    "I've arrived.": "मैं पहुँच गया हूँ।",
-};
+// Role-based quick replies for faster communication
 
 export function ChatWindow({ bookingId, onClose }) {
     const { user } = useAuth();
@@ -36,7 +31,6 @@ export function ChatWindow({ bookingId, onClose }) {
     const [isUploading, setIsUploading] = useState(false);
     const [isRecording, setIsRecording] = useState(false);
     const [recordingDuration, setRecordingDuration] = useState(0);
-    const [translatedMessages, setTranslatedMessages] = useState({}); // ID -> boolean (is translated)
 
     const scrollRef = useRef(null);
     const containerRef = useRef(null);
@@ -159,7 +153,7 @@ export function ChatWindow({ bookingId, onClose }) {
                 setRecordingDuration(prev => prev + 1);
             }, 1000);
         } catch (_err) {
-            toast.error('Microphone access denied');
+            toast.error('Microphone access denied', { id: 'mic-access-denied' });
         }
     };
 
@@ -177,9 +171,6 @@ export function ChatWindow({ bookingId, onClose }) {
         setIsRecording(false);
     };
 
-    const toggleTranslation = (id) => {
-        setTranslatedMessages(prev => ({ ...prev, [id]: !prev[id] }));
-    };
 
     const formatTime = (seconds) => {
         const m = Math.floor(seconds / 60);
@@ -262,8 +253,7 @@ export function ChatWindow({ bookingId, onClose }) {
                 ) : (
                     messages.map((m) => {
                         const isMe = m.senderId === user?.id;
-                        const isTranslated = translatedMessages[m.id];
-                        const displayContent = isTranslated ? (MOCK_TRANSLATION_MAP[m.content] || `[Trans]: ${m.content}`) : m.content;
+                        const displayContent = m.content;
 
                         return (
                             <div key={m.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
@@ -307,15 +297,6 @@ export function ChatWindow({ bookingId, onClose }) {
                                         {m.content && (
                                             <div className="relative group">
                                                 <p className="text-sm font-medium leading-relaxed break-words">{displayContent}</p>
-                                                {!isMe && (
-                                                    <button
-                                                        onClick={() => toggleTranslation(m.id, m.content)}
-                                                        className={`text-[8px] font-black uppercase py-0.5 px-1.5 rounded-md mt-1 mb-1 flex items-center gap-1 transition-all ${isTranslated ? 'bg-brand-500 text-white' : 'bg-brand-100 text-brand-600 dark:bg-dark-700 dark:text-brand-400'}`}
-                                                    >
-                                                        <Languages size={10} />
-                                                        {isTranslated ? 'Showing Translation' : 'Translate to Hindi'}
-                                                    </button>
-                                                )}
                                             </div>
                                         )}
                                         <div className={`flex items-center gap-1 mt-1 font-bold uppercase tracking-tighter text-[9px] ${isMe ? 'justify-end text-white/60' : 'justify-start opacity-40'}`}>

@@ -1,8 +1,19 @@
+import { useTranslation } from 'react-i18next';
 import { Calendar, MapPin, Clock, ExternalLink } from 'lucide-react';
 import { Card, Button, Badge } from '../../../components/common';
 import { MiniMap } from '../../../components/features/location/MiniMap';
 
+const formatInrAmount = (value) => {
+    const amount = Number(value);
+    if (!Number.isFinite(amount)) return '0';
+    return amount.toLocaleString('en-IN', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2,
+    });
+};
+
 export function BookingAssignmentDetails({ booking, onOpenMaps }) {
+    const { t, i18n } = useTranslation();
     return (
         <Card className="overflow-hidden border-none ring-1 ring-black/5 dark:ring-white/10 shadow-lg">
             <div className="p-6 space-y-6">
@@ -12,13 +23,13 @@ export function BookingAssignmentDetails({ booking, onOpenMaps }) {
                             <Calendar size={18} />
                         </div>
                         <div>
-                            <span className="block text-2xs font-black text-gray-400 uppercase tracking-widest mb-0.5">Appointment</span>
+                            <span className="block text-2xs font-black text-gray-400 uppercase tracking-widest mb-0.5">{t('Appointment')}</span>
                             <div className="text-sm font-bold text-gray-900 dark:text-white">
-                                {new Date(booking.scheduledAt || booking.scheduledDate).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}
+                                {new Date(booking.scheduledAt || booking.scheduledDate).toLocaleDateString(i18n.language, { weekday: 'short', month: 'short', day: 'numeric' })}
                             </div>
                             <div className="flex items-center gap-1 text-2xs font-bold text-blue-500">
                                 <Clock size={12} />
-                                {new Date(booking.scheduledAt || booking.scheduledDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                {new Date(booking.scheduledAt || booking.scheduledDate).toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit' })}
                             </div>
                         </div>
                     </div>
@@ -28,7 +39,7 @@ export function BookingAssignmentDetails({ booking, onOpenMaps }) {
                             <MapPin size={18} />
                         </div>
                         <div className="min-w-0">
-                            <span className="block text-2xs font-black text-gray-400 uppercase tracking-widest mb-0.5">Location</span>
+                            <span className="block text-2xs font-black text-gray-400 uppercase tracking-widest mb-0.5">{t('Location')}</span>
                             <span className="text-sm font-bold block truncate text-gray-900 dark:text-gray-100">
                                 {booking.address || booking.addressDetails}
                             </span>
@@ -38,7 +49,7 @@ export function BookingAssignmentDetails({ booking, onOpenMaps }) {
                                 className="p-0 h-auto text-2xs text-brand-500 font-bold flex items-center gap-1"
                                 onClick={onOpenMaps}
                             >
-                                Open Maps <ExternalLink size={10} />
+                                {t('Open Maps')} <ExternalLink size={10} />
                             </Button>
                         </div>
                     </div>
@@ -49,17 +60,17 @@ export function BookingAssignmentDetails({ booking, onOpenMaps }) {
                     )}
 
                     <div className="md:text-right lg:text-left">
-                        <span className="block text-2xs font-black text-gray-400 uppercase tracking-widest mb-0.5">Estimated Payout</span>
+                        <span className="block text-2xs font-black text-gray-400 uppercase tracking-widest mb-0.5">{t('Estimated Payout')}</span>
                         <div className="text-2xl font-black text-gray-900 dark:text-white">
-                            ₹{booking.totalPrice || booking.estimatedPrice || booking.service?.basePrice || 0}
+                            ₹{formatInrAmount(booking.totalPrice ?? booking.estimatedPrice ?? booking.service?.basePrice ?? 0)}
                         </div>
-                        <Badge variant="outline" className="text-micro font-black uppercase bg-success-50 text-success-700 border-success-200">Guaranteed</Badge>
+                        <Badge variant="outline" className="text-micro font-black uppercase bg-success-50 text-success-700 border-success-200">{t('Guaranteed')}</Badge>
                     </div>
                 </div>
 
                 {booking.notes && (
                     <div className="p-4 rounded-xl border-l-4 border-l-brand-500 bg-gray-50 border-gray-100 dark:bg-dark-900/50 dark:border-dark-700">
-                        <span className="block text-2xs font-black text-gray-400 uppercase tracking-widest mb-1 pointer-events-none opacity-50">Customer Notes</span>
+                        <span className="block text-2xs font-black text-gray-400 uppercase tracking-widest mb-1 pointer-events-none opacity-50">{t('Customer Notes')}</span>
                         <p className="text-sm font-medium italic text-gray-600 dark:text-gray-300">
                             &ldquo;{booking.notes}&rdquo;
                         </p>

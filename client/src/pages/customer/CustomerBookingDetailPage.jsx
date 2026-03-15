@@ -10,6 +10,7 @@ import {
     Compass,
     Download,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import { MainLayout } from '../../components/layout/MainLayout';
 import { Card, Button, AsyncState, Breadcrumbs } from '../../components/common';
@@ -31,9 +32,21 @@ import { CustomerWorkerSection } from './components/CustomerWorkerSection';
 import { CustomerOTPSection } from './components/CustomerOTPSection';
 import { CustomerMobileActions } from './components/CustomerMobileActions';
 import { usePageTitle } from '../../hooks/usePageTitle';
+import { useRazorpay } from '../../hooks/useRazorpay';
+import { getRazorpayKeyId, ensureRazorpayLoaded } from '../../utils/razorpay';
+
+const formatInrAmount = (value) => {
+    const amount = Number(value);
+    if (!Number.isFinite(amount)) return '0';
+    return amount.toLocaleString('en-IN', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2,
+    });
+};
 
 export function CustomerBookingDetailPage() {
-    usePageTitle('Booking Details');
+    const { t } = useTranslation();
+    usePageTitle(t('Booking Details'));
     const { id: bookingId } = useParams();
     const { user } = useAuth();
     const navigate = useNavigate();
@@ -43,14 +56,21 @@ export function CustomerBookingDetailPage() {
     const [workerLocation, setWorkerLocation] = useState(null);
     const [activeReview, setActiveReview] = useState({ rating: 0, comment: '' });
     const [photoModal, setPhotoModal] = useState(null);
+    const razorpayKeyId = getRazorpayKeyId();
+
+    useRazorpay({
+        onError: () => {
+            toast.error(t('Payment system failed to load. Please refresh and try again.'));
+        },
+    });
 
     const { data, isLoading, isError, refetch } = useQuery({
         queryKey: queryKeys.bookings.detail(bookingId),
         queryFn: () => getBookingById(bookingId),
         refetchInterval: (query) => {
-            // Polling is useful for customers to see worker acceptance or progress
+            // Polling keeps OTP/status in sync even if realtime socket events are delayed.
             const bookingData = query.state.data;
-            if (['PENDING', 'IN_PROGRESS'].includes(bookingData?.booking?.status)) return 10000;
+            if (['PENDING', 'CONFIRMED', 'IN_PROGRESS'].includes(bookingData?.booking?.status)) return 10000;
             return false;
         },
         refetchIntervalInBackground: false,
@@ -61,8 +81,20 @@ export function CustomerBookingDetailPage() {
 
     // Razorpay checkout handler
     function launchRazorpayCheckout(order, booking, user, onSuccess, onFailure) {
+        if (!window?.Razorpay) {
+            toast.error(t('Payment system unavailable. Please try again in a moment.'));
+            onFailure?.();
+            return;
+        }
+
+        if (!razorpayKeyId) {
+            toast.error(t('Payment is not configured. Please contact support.'));
+            onFailure?.();
+            return;
+        }
+
         const options = {
-            key: 'rzp_test_xxxxxxxx', // Test key
+            key: razorpayKeyId,
             amount: order.amount,
             currency: order.currency,
             name: 'UrbanPro V2',
@@ -80,31 +112,54 @@ export function CustomerBookingDetailPage() {
                 ondismiss: onFailure,
             },
         };
-        const rzp = new window.Razorpay(options);
-        rzp.open();
+
+        try {
+            const rzp = new window.Razorpay(options);
+            rzp.open();
+        } catch (_error) {
+            toast.error(t('Unable to open payment window. Please try again.'));
+            onFailure?.();
+        }
     }
 
     const payMutation = useMutation({
         mutationFn: async () => {
+            if (!razorpayKeyId) {
+                toast.error(t('Payment is not configured. Please contact support.'));
+                return;
+            }
+
+            await ensureRazorpayLoaded();
+
             // 1. Call backend to create Razorpay order
             const orderResp = await payBooking(bookingId, { createRazorpayOrder: true });
             const order = orderResp.order;
+
+            if (!order) {
+                toast.error(t('Failed to initiate payment. Please try again.'));
+                return;
+            }
+
             // 2. Launch Razorpay modal
             launchRazorpayCheckout(order, booking, user,
                 async (razorpayResponse) => {
                     // 3. On success, update payment status
-                    await payBooking(bookingId, { paymentReference: razorpayResponse.razorpay_payment_id });
+                    await payBooking(bookingId, {
+                        paymentReference: razorpayResponse.razorpay_payment_id,
+                        paymentOrderId: razorpayResponse.razorpay_order_id,
+                        paymentSignature: razorpayResponse.razorpay_signature,
+                    });
                     queryClient.invalidateQueries({ queryKey: queryKeys.bookings.detail(bookingId) });
                     queryClient.invalidateQueries({ queryKey: queryKeys.bookings.customer() });
-                    toast.success('Payment successful! Thank you.');
+                    toast.success(t('Payment successful! Thank you.'));
                 },
                 () => {
-                    toast.error('Payment cancelled or failed.');
+                    toast.error(t('Payment cancelled or failed.'));
                 }
             );
         },
         onError: (err) => {
-            toast.error(err?.response?.data?.message || 'Payment failed.');
+            toast.error(err?.response?.data?.message || t('Payment failed.'));
         },
     });
 
@@ -113,11 +168,11 @@ export function CustomerBookingDetailPage() {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: queryKeys.bookings.detail(bookingId) });
             queryClient.invalidateQueries({ queryKey: queryKeys.bookings.customer() });
-            toast.success('Thank you for your feedback!');
+            toast.success(t('Thank you for your feedback!'));
             setActiveReview({ rating: 0, comment: '' });
         },
         onError: (error) => {
-            toast.error(error.response?.data?.error || 'Failed to submit review');
+            toast.error(error.response?.data?.error || t('Failed to submit review'));
         }
     });
 
@@ -184,11 +239,11 @@ export function CustomerBookingDetailPage() {
 
         const getStatusMessage = (status) => {
             switch (status) {
-                case 'CONFIRMED': return 'Worker accepted your booking';
-                case 'IN_PROGRESS': return 'Worker started your service';
-                case 'COMPLETED': return 'Service marked as completed';
-                case 'CANCELLED': return 'Booking was cancelled';
-                default: return 'Booking updated';
+                case 'CONFIRMED': return t('Worker accepted your booking');
+                case 'IN_PROGRESS': return t('Worker started your service');
+                case 'COMPLETED': return t('Service marked as completed');
+                case 'CANCELLED': return t('Booking was cancelled');
+                default: return t('Booking updated');
             }
         };
 
@@ -196,6 +251,33 @@ export function CustomerBookingDetailPage() {
         queryClient.invalidateQueries({ queryKey: queryKeys.bookings.customer() });
         toast.info(getStatusMessage(payload?.status));
     }, [bookingId, user?.id]);
+
+    useSocketEvent('booking:otp_refreshed', (payload) => {
+        if (!user?.id || !bookingId) return;
+
+        const eventBookingId = payload?.bookingId;
+        const eventCustomerId = payload?.customerId;
+        const isForMe = String(eventBookingId) === String(bookingId) && String(eventCustomerId) === String(user.id);
+        if (!isForMe) return;
+
+        if (payload?.otpCode && payload?.otpType) {
+            queryClient.setQueryData(queryKeys.bookings.detail(bookingId), (prev) => {
+                if (!prev?.booking) return prev;
+                const nextBooking = { ...prev.booking };
+                if (payload.otpType === 'START') {
+                    nextBooking.startOtp = payload.otpCode;
+                } else if (payload.otpType === 'COMPLETE') {
+                    nextBooking.completionOtp = payload.otpCode;
+                }
+                return { ...prev, booking: nextBooking };
+            });
+        }
+
+        queryClient.invalidateQueries({ queryKey: queryKeys.bookings.detail(bookingId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.bookings.customer() });
+        refetch();
+        toast.info(t('A new OTP has been generated.'));
+    }, [bookingId, user?.id, refetch]);
 
     const handleOpenMaps = () => {
         if (!booking) return;
@@ -212,7 +294,7 @@ export function CustomerBookingDetailPage() {
 
     if (isLoading) return <MainLayout><div className="flex items-center justify-center min-h-[60vh]"><AsyncState isLoading={true} /></div></MainLayout>;
     if (isError) return <MainLayout><div className={`${getPageLayout('narrow')} py-10`}><AsyncState isError={true} onRetry={refetch} /></div></MainLayout>;
-    if (!booking) return <MainLayout><div className={`${getPageLayout('narrow')} py-10`}><AsyncState isEmpty={true} emptyTitle="Booking not found" /></div></MainLayout>;
+    if (!booking) return <MainLayout><div className={`${getPageLayout('narrow')} py-10`}><AsyncState isEmpty={true} emptyTitle={t("Booking not found")} /></div></MainLayout>;
 
     // Helper: Filter booking photos
     const beforePhotos = booking?.photos?.filter(p => p.type === 'BEFORE') || [];
@@ -222,9 +304,9 @@ export function CustomerBookingDetailPage() {
         <MainLayout>
             <div className={`${getPageLayout('default')} pb-32 lg:pb-10 min-h-screen`}>
                 <Breadcrumbs items={[
-                    { label: 'Dashboard', to: '/dashboard' },
-                    { label: 'Bookings', to: '/bookings' },
-                    { label: `Booking #${bookingId}` },
+                    { label: t('Dashboard'), to: '/customer/dashboard' },
+                    { label: t('Bookings'), to: '/customer/bookings' },
+                    { label: `${t('Booking')} #${bookingId}` },
                 ]} />
 
                 <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
@@ -236,7 +318,7 @@ export function CustomerBookingDetailPage() {
                                 <div>
                                     <div className="flex items-center gap-3 mb-1">
                                         <h1 className="text-3xl font-black tracking-tight text-gray-900 dark:text-white">
-                                            Booking #{booking.id}
+                                            {t('Booking')} #{booking.id}
                                         </h1>
                                         <BookingStatusBadge status={booking.status} className="px-2 py-0.5 text-2xs font-black uppercase" />
                                     </div>
@@ -256,14 +338,14 @@ export function CustomerBookingDetailPage() {
                                             icon={Download}
                                             onClick={() => {
                                                 toast.promise(downloadInvoice(booking.id), {
-                                                    loading: 'Generating Invoice...',
-                                                    success: 'Invoice Downloaded Successfully',
-                                                    error: 'Failed to generate invoice'
+                                                    loading: t('Generating Invoice...'),
+                                                    success: t('Invoice Downloaded Successfully'),
+                                                    error: t('Failed to generate invoice')
                                                 });
                                             }}
                                             className="h-12 px-6 rounded-xl font-bold"
                                         >
-                                            Invoice
+                                            {t('Invoice')}
                                         </Button>
                                     )}
                                     {booking.status === 'COMPLETED' && booking.paymentStatus !== 'PAID' && (
@@ -274,7 +356,7 @@ export function CustomerBookingDetailPage() {
                                             loading={payMutation.isPending}
                                             className="bg-brand-600 hover:bg-brand-700 text-white shadow-lg px-6 h-12 rounded-xl font-bold"
                                         >
-                                            Pay Now
+                                            {t('Pay Now')}
                                         </Button>
                                     )}
                                     {['PENDING', 'CONFIRMED'].includes(booking.status) && (
@@ -285,7 +367,7 @@ export function CustomerBookingDetailPage() {
                                             onClick={() => setIsCancelModalOpen(true)}
                                             className="text-error-500 hover:bg-error-50 h-12 px-6 rounded-xl font-bold"
                                         >
-                                            Cancel Booking
+                                            {t('Cancel Booking')}
                                         </Button>
                                     )}
                                 </div>
@@ -297,21 +379,21 @@ export function CustomerBookingDetailPage() {
                                     <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-brand-50 text-brand-600 dark:bg-brand-900/30 dark:text-brand-400">
                                         <ShieldAlert size={24} />
                                     </div>
-                                    <div>
-                                        <p className="text-2xs font-black uppercase text-gray-500 tracking-widest leading-none mb-1">Live Status</p>
+                                     <div>
+                                        <p className="text-2xs font-black uppercase text-gray-500 tracking-widest leading-none mb-1">{t('Live Status')}</p>
                                         <h3 className="text-sm font-black text-gray-900 dark:text-gray-100">
-                                            {booking.status === 'PENDING' ? 'Awaiting professional acceptance' :
-                                                booking.status === 'CONFIRMED' ? 'Professional is assigned and ready' :
-                                                    booking.status === 'IN_PROGRESS' ? 'Service is currently in progress' :
-                                                        booking.status === 'COMPLETED' ? 'Job finished successfully' :
-                                                            'Booking has been cancelled'}
+                                            {booking.status === 'PENDING' ? t('Awaiting professional acceptance') :
+                                                booking.status === 'CONFIRMED' ? t('Professional is assigned and ready') :
+                                                    booking.status === 'IN_PROGRESS' ? t('Service is currently in progress') :
+                                                        booking.status === 'COMPLETED' ? t('Job finished successfully') :
+                                                            t('Booking has been cancelled')}
                                         </h3>
                                     </div>
                                 </div>
-                                {booking.status === 'IN_PROGRESS' && (
+                                 {booking.status === 'IN_PROGRESS' && (
                                     <div className="flex items-center gap-2">
                                         <div className="w-2 h-2 rounded-full bg-green-500 animate-ping" aria-hidden="true"></div>
-                                        <span className="text-2xs font-black uppercase text-green-500">Live</span>
+                                        <span className="text-2xs font-black uppercase text-green-500">{t('Live')}</span>
                                     </div>
                                 )}
                             </div>
@@ -322,16 +404,16 @@ export function CustomerBookingDetailPage() {
                             <section className="animate-in fade-in slide-in-from-bottom-4 duration-700 mb-8">
                                 <div className="flex items-center justify-between mb-4">
                                     <div className="flex items-center gap-2">
-                                        <div className="p-1.5 rounded-lg bg-brand-500/10 text-brand-500">
+                                         <div className="p-1.5 rounded-lg bg-brand-500/10 text-brand-500">
                                             <Compass size={18} />
                                         </div>
                                         <h3 className="text-sm font-black uppercase tracking-[0.2em] text-gray-700 dark:text-gray-300">
-                                            Live Professional Tracking
+                                            {t('Live Professional Tracking')}
                                         </h3>
                                     </div>
-                                    <div className="px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 bg-green-50 text-green-600 dark:bg-green-500/10 dark:text-green-400">
+                                     <div className="px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 bg-green-50 text-green-600 dark:bg-green-500/10 dark:text-green-400">
                                         <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" aria-hidden="true" />
-                                        Active Stream
+                                        {t('Active Stream')}
                                     </div>
                                 </div>
                                 <LiveTrackingMap
@@ -348,10 +430,10 @@ export function CustomerBookingDetailPage() {
                         {/* Photo Proof Review Gallery */}
                         {(beforePhotos.length > 0 || afterPhotos.length > 0) && (
                             <section className="mt-8">
-                                <h3 className="text-lg font-bold mb-3 text-gray-800 dark:text-gray-200">Photo Proof of Work</h3>
+                                <h3 className="text-lg font-bold mb-3 text-gray-800 dark:text-gray-200">{t('Photo Proof of Work')}</h3>
                                 <div className="flex flex-wrap gap-6">
                                     <div>
-                                        <h4 className="text-sm font-semibold mb-2">Before Photos</h4>
+                                        <h4 className="text-sm font-semibold mb-2">{t('Before Photos')}</h4>
                                         <div className="flex gap-3">
                                             {beforePhotos.map(photo => (
                                                 <button key={photo.id} className="w-32 h-32 rounded-lg border overflow-hidden bg-gray-50 dark:bg-dark-800 focus:outline-none" onClick={() => setPhotoModal(photo)}>
@@ -361,7 +443,7 @@ export function CustomerBookingDetailPage() {
                                         </div>
                                     </div>
                                     <div>
-                                        <h4 className="text-sm font-semibold mb-2">After Photos</h4>
+                                        <h4 className="text-sm font-semibold mb-2">{t('After Photos')}</h4>
                                         <div className="flex gap-3">
                                             {afterPhotos.map(photo => (
                                                 <button key={photo.id} className="w-32 h-32 rounded-lg border overflow-hidden bg-gray-50 dark:bg-dark-800 focus:outline-none" onClick={() => setPhotoModal(photo)}>
@@ -371,7 +453,7 @@ export function CustomerBookingDetailPage() {
                                         </div>
                                     </div>
                                 </div>
-                                <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">Review the photos before confirming completion. If you notice any issues, flag the booking or contact support.</p>
+                                <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">{t('Review the photos before confirming completion. If you notice any issues, flag the booking or contact support.')}</p>
                             </section>
                         )}
                         {/* Modal for photo preview */}
@@ -386,7 +468,7 @@ export function CustomerBookingDetailPage() {
                                         <span style={{ fontSize: 24 }}>&times;</span>
                                     </button>
                                     <img src={photoModal.url.replace('/upload/', '/upload/f_auto,q_auto/')} alt={photoModal.type} className="w-full max-h-96 object-contain rounded" style={{ minHeight: 400 }} loading="lazy" srcSet={`${photoModal.url.replace('/upload/', '/upload/f_auto,q_auto/')} 1x, ${photoModal.url.replace('/upload/', '/upload/f_auto,q_auto/')} 2x`} />
-                                    <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">{photoModal.type === 'BEFORE' ? 'Before Work' : 'After Work'}</div>
+                                    <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">{photoModal.type === 'BEFORE' ? t('Before Work') : t('After Work')}</div>
                                 </div>
                             </div>
                         )}
@@ -412,12 +494,12 @@ export function CustomerBookingDetailPage() {
 
                         {/* Payment Info */}
                         <Card className="p-5 border-none bg-gradient-to-br from-brand-500 to-accent-500 text-white shadow-xl shadow-brand-500/20">
-                            <h3 className="text-2xs font-black uppercase tracking-widest opacity-80 mb-1">Billing Summary</h3>
+                            <h3 className="text-2xs font-black uppercase tracking-widest opacity-80 mb-1">{t('Billing Summary')}</h3>
                             <div className="flex justify-between items-end">
-                                <div>
-                                    <p className="text-3xl font-black">₹{booking.totalPrice || booking.estimatedPrice}</p>
+                                 <div>
+                                    <p className="text-3xl font-black">₹{formatInrAmount(booking.totalPrice ?? booking.estimatedPrice)}</p>
                                     <p className="text-2xs font-bold opacity-80 uppercase tracking-tighter">
-                                        Payment: {getPaymentDisplayText(booking)}
+                                        {t('Payment')}: {t(getPaymentDisplayText(booking))}
                                     </p>
                                 </div>
                                 <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
