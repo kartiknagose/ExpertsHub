@@ -1,0 +1,168 @@
+02:02:22.854 Running build in Washington, D.C., USA (East) – iad1
+02:02:22.855 Build machine configuration: 2 cores, 8 GB
+02:02:22.865 Cloning github.com/kartiknagose/UrbanProV2 (Branch: master, Commit: 8f12259)
+02:02:22.866 Skipping build cache, deployment was triggered without cache.
+02:02:23.514 Cloning completed: 649.000ms
+02:02:23.953 Running "vercel build"
+02:02:24.612 Vercel CLI 50.32.4
+02:02:25.516 Installing dependencies...
+02:02:40.795 
+02:02:40.796 added 577 packages in 15s
+02:02:40.797 
+02:02:40.797 142 packages are looking for funding
+02:02:40.798   run `npm fund` for details
+02:02:40.875 Running "npm run build"
+02:02:40.973 
+02:02:40.974 > urbanpro-client@1.0.0 build
+02:02:40.974 > node --max-old-space-size=8192 node_modules/vite/bin/vite.js build
+02:02:40.974 
+02:02:41.238 [36mvite v7.3.1 [32mbuilding client environment for production...[36m[39m
+02:02:41.316 transforming...
+02:02:49.762 [32m✓[39m 2904 modules transformed.
+02:02:50.395 rendering chunks...
+02:02:51.133 computing gzip size...
+02:02:51.582 [2mdist/[22m[32mmanifest.webmanifest                            [39m[1m[2m  0.45 kB[22m[1m[22m
+02:02:51.583 [2mdist/[22m[32mindex.html                                      [39m[1m[2m  3.17 kB[22m[1m[22m[2m │ gzip:   0.87 kB[22m
+02:02:51.583 [2mdist/[22m[2massets/[22m[35mMiniMap-t7jyExu5.css                     [39m[1m[2m  0.72 kB[22m[1m[22m[2m │ gzip:   0.29 kB[22m
+02:02:51.583 [2mdist/[22m[2massets/[22m[35mindex-Do5FhybJ.css                       [39m[1m[2m177.59 kB[22m[1m[22m[2m │ gzip:  28.77 kB[22m
+02:02:51.591 [2mdist/[22m[2massets/[22m[36mshield-CuwbRWd3.js                       [39m[1m[2m  0.15 kB[22m[1m[22m[2m │ gzip:   0.16 kB[22m
+02:02:51.591 [2mdist/[22m[2massets/[22m[36mplus-B9LExpSp.js                         [39m[1m[2m  0.15 kB[22m[1m[22m[2m │ gzip:   0.15 kB[22m
+02:02:51.591 [2mdist/[22m[2massets/[22m[36mmessage-circle-DjbPWgah.js               [39m[1m[2m  0.15 kB[22m[1m[22m[2m │ gzip:   0.15 kB[22m
+02:02:51.592 [2mdist/[22m[2massets/[22m[36mfilter-CeMm_08n.js                       [39m[1m[2m  0.16 kB[22m[1m[22m[2m │ gzip:   0.16 kB[22m
+02:02:51.592 [2mdist/[22m[2massets/[22m[36marrow-left-Bq1QYZj_.js                   [39m[1m[2m  0.16 kB[22m[1m[22m[2m │ gzip:   0.16 kB[22m
+02:02:51.592 [2mdist/[22m[2massets/[22m[36marrow-down-left-B_zx0vuT.js              [39m[1m[2m  0.16 kB[22m[1m[22m[2m │ gzip:   0.16 kB[22m
+02:02:51.592 [2mdist/[22m[2massets/[22m[36mrating-CvWffv92.js                       [39m[1m[2m  0.18 kB[22m[1m[22m[2m │ gzip:   0.14 kB[22m
+02:02:51.592 [2mdist/[22m[2massets/[22m[36mlocation-CW6yzNq4.js                     [39m[1m[2m  0.18 kB[22m[1m[22m[2m │ gzip:   0.16 kB[22m
+02:02:51.592 [2mdist/[22m[2massets/[22m[36maward-D_z1Xyh-.js                        [39m[1m[2m  0.19 kB[22m[1m[22m[2m │ gzip:   0.18 kB[22m
+02:02:51.592 [2mdist/[22m[2massets/[22m[36mlayout-DDcM5Vr_.js                       [39m[1m[2m  0.19 kB[22m[1m[22m[2m │ gzip:   0.16 kB[22m
+02:02:51.592 [2mdist/[22m[2massets/[22m[36museDebounce-DyREDwT0.js                  [39m[1m[2m  0.19 kB[22m[1m[22m[2m │ gzip:   0.17 kB[22m
+02:02:51.592 [2mdist/[22m[2massets/[22m[36musePageTitle-CsVpnrgo.js                 [39m[1m[2m  0.19 kB[22m[1m[22m[2m │ gzip:   0.17 kB[22m
+02:02:51.592 [2mdist/[22m[2massets/[22m[36msmartphone-EekOSitv.js                   [39m[1m[2m  0.19 kB[22m[1m[22m[2m │ gzip:   0.18 kB[22m
+02:02:51.592 [2mdist/[22m[2massets/[22m[36minfo-DywxhQmy.js                         [39m[1m[2m  0.20 kB[22m[1m[22m[2m │ gzip:   0.18 kB[22m
+02:02:51.598 [2mdist/[22m[2massets/[22m[36mplus-circle-CEsbkExw.js                  [39m[1m[2m  0.20 kB[22m[1m[22m[2m │ gzip:   0.17 kB[22m
+02:02:51.599 [2mdist/[22m[2massets/[22m[36museRazorpay-jtTRl45A.js                  [39m[1m[2m  0.21 kB[22m[1m[22m[2m │ gzip:   0.19 kB[22m
+02:02:51.599 [2mdist/[22m[2massets/[22m[36mtarget-D_NMpgbS.js                       [39m[1m[2m  0.22 kB[22m[1m[22m[2m │ gzip:   0.16 kB[22m
+02:02:51.599 [2mdist/[22m[2massets/[22m[36mcheck-circle-2-Cig32clp.js               [39m[1m[2m  0.22 kB[22m[1m[22m[2m │ gzip:   0.19 kB[22m
+02:02:51.599 [2mdist/[22m[2massets/[22m[36mcopy-PQ1RS3MH.js                         [39m[1m[2m  0.23 kB[22m[1m[22m[2m │ gzip:   0.20 kB[22m
+02:02:51.599 [2mdist/[22m[2massets/[22m[36mhistory-CRWQU3R8.js                      [39m[1m[2m  0.23 kB[22m[1m[22m[2m │ gzip:   0.19 kB[22m
+02:02:51.599 [2mdist/[22m[2massets/[22m[36mcamera-1vF9rI1T.js                       [39m[1m[2m  0.25 kB[22m[1m[22m[2m │ gzip:   0.21 kB[22m
+02:02:51.599 [2mdist/[22m[2massets/[22m[36mlayers-BXnJ17tC.js                       [39m[1m[2m  0.25 kB[22m[1m[22m[2m │ gzip:   0.18 kB[22m
+02:02:51.600 [2mdist/[22m[2massets/[22m[36mmap-BhyfAmGV.js                          [39m[1m[2m  0.26 kB[22m[1m[22m[2m │ gzip:   0.21 kB[22m
+02:02:51.600 [2mdist/[22m[2massets/[22m[36mexternal-link-DQjCGtp5.js                [39m[1m[2m  0.28 kB[22m[1m[22m[2m │ gzip:   0.23 kB[22m
+02:02:51.600 [2mdist/[22m[2massets/[22m[36msave-oUPTTaVW.js                         [39m[1m[2m  0.28 kB[22m[1m[22m[2m │ gzip:   0.22 kB[22m
+02:02:51.600 [2mdist/[22m[2massets/[22m[36muser-x-TsFinkeZ.js                       [39m[1m[2m  0.30 kB[22m[1m[22m[2m │ gzip:   0.23 kB[22m
+02:02:51.600 [2mdist/[22m[2massets/[22m[36mrefresh-cw-C9xFEBUo.js                   [39m[1m[2m  0.32 kB[22m[1m[22m[2m │ gzip:   0.23 kB[22m
+02:02:51.607 [2mdist/[22m[2massets/[22m[36mhooks-DrAscq4C.js                        [39m[1m[2m  0.34 kB[22m[1m[22m[2m │ gzip:   0.25 kB[22m
+02:02:51.607 [2mdist/[22m[2massets/[22m[36mshare-2-DU9FBbmH.js                      [39m[1m[2m  0.35 kB[22m[1m[22m[2m │ gzip:   0.23 kB[22m
+02:02:51.607 [2mdist/[22m[2massets/[22m[36mreviews-D-xhRIdZ.js                      [39m[1m[2m  0.35 kB[22m[1m[22m[2m │ gzip:   0.23 kB[22m
+02:02:51.607 [2mdist/[22m[2massets/[22m[36mgift-rr8ynxaW.js                         [39m[1m[2m  0.39 kB[22m[1m[22m[2m │ gzip:   0.27 kB[22m
+02:02:51.607 [2mdist/[22m[2massets/[22m[36mverification-BE4h8twB.js                 [39m[1m[2m  0.39 kB[22m[1m[22m[2m │ gzip:   0.25 kB[22m
+02:02:51.607 [2mdist/[22m[2massets/[22m[36mcalendar-clock-C8K_4nFe.js               [39m[1m[2m  0.40 kB[22m[1m[22m[2m │ gzip:   0.26 kB[22m
+02:02:51.607 [2mdist/[22m[2massets/[22m[36muser-circle-Cr0yXTdd.js                  [39m[1m[2m  0.43 kB[22m[1m[22m[2m │ gzip:   0.28 kB[22m
+02:02:51.607 [2mdist/[22m[2massets/[22m[36msiren-DFK_QfhL.js                        [39m[1m[2m  0.46 kB[22m[1m[22m[2m │ gzip:   0.27 kB[22m
+02:02:51.607 [2mdist/[22m[2massets/[22m[36mtrophy-Bdu2_9cA.js                       [39m[1m[2m  0.46 kB[22m[1m[22m[2m │ gzip:   0.28 kB[22m
+02:02:51.607 [2mdist/[22m[2massets/[22m[36museKeyboardShortcut-GadmZ_c-.js          [39m[1m[2m  0.56 kB[22m[1m[22m[2m │ gzip:   0.35 kB[22m
+02:02:51.607 [2mdist/[22m[2massets/[22m[36mBreadcrumbs-2vByaRW5.js                  [39m[1m[2m  0.63 kB[22m[1m[22m[2m │ gzip:   0.37 kB[22m
+02:02:51.607 [2mdist/[22m[2massets/[22m[36mworkers-D50-jdWO.js                      [39m[1m[2m  0.73 kB[22m[1m[22m[2m │ gzip:   0.35 kB[22m
+02:02:51.607 [2mdist/[22m[2massets/[22m[36mrazorpay-CSZZjOe0.js                     [39m[1m[2m  0.78 kB[22m[1m[22m[2m │ gzip:   0.43 kB[22m
+02:02:51.607 [2mdist/[22m[2massets/[22m[36mservices-D5OGBpzd.js                     [39m[1m[2m  0.82 kB[22m[1m[22m[2m │ gzip:   0.41 kB[22m
+02:02:51.609 [2mdist/[22m[2massets/[22m[36mPagination-yuCL3Ftv.js                   [39m[1m[2m  0.91 kB[22m[1m[22m[2m │ gzip:   0.49 kB[22m
+02:02:51.609 [2mdist/[22m[2massets/[22m[36mPageHeader-Cf0nboLZ.js                   [39m[1m[2m  0.97 kB[22m[1m[22m[2m │ gzip:   0.53 kB[22m
+02:02:51.609 [2mdist/[22m[2massets/[22m[36mgrowth-D-xceNV8.js                       [39m[1m[2m  1.05 kB[22m[1m[22m[2m │ gzip:   0.39 kB[22m
+02:02:51.609 [2mdist/[22m[2massets/[22m[36mCareersPage-CTGLZdlZ.js                  [39m[1m[2m  1.05 kB[22m[1m[22m[2m │ gzip:   0.53 kB[22m
+02:02:51.609 [2mdist/[22m[2massets/[22m[36madmin-C-aFX5gb.js                        [39m[1m[2m  1.07 kB[22m[1m[22m[2m │ gzip:   0.59 kB[22m
+02:02:51.609 [2mdist/[22m[2massets/[22m[36mBlogPage-Cf8O98Nh.js                     [39m[1m[2m  1.08 kB[22m[1m[22m[2m │ gzip:   0.61 kB[22m
+02:02:51.609 [2mdist/[22m[2massets/[22m[36mAvatar-WH-Omcxg.js                       [39m[1m[2m  1.47 kB[22m[1m[22m[2m │ gzip:   0.81 kB[22m
+02:02:51.609 [2mdist/[22m[2massets/[22m[36mConfirmDialog-XqXkxMDG.js                [39m[1m[2m  1.47 kB[22m[1m[22m[2m │ gzip:   0.64 kB[22m
+02:02:51.609 [2mdist/[22m[2massets/[22m[36mSecurityPage-CIvpjfHS.js                 [39m[1m[2m  1.57 kB[22m[1m[22m[2m │ gzip:   0.64 kB[22m
+02:02:51.609 [2mdist/[22m[2massets/[22m[36mLegalLayout-CFDXfz_f.js                  [39m[1m[2m  1.59 kB[22m[1m[22m[2m │ gzip:   0.66 kB[22m
+02:02:51.610 [2mdist/[22m[2massets/[22m[36mbookings-DjQQXHey.js                     [39m[1m[2m  1.62 kB[22m[1m[22m[2m │ gzip:   0.66 kB[22m
+02:02:51.610 [2mdist/[22m[2massets/[22m[36mSocialShare-DWa3uhp1.js                  [39m[1m[2m  1.99 kB[22m[1m[22m[2m │ gzip:   0.98 kB[22m
+02:02:51.610 [2mdist/[22m[2massets/[22m[36mSkeleton-1w0cUP87.js                     [39m[1m[2m  2.13 kB[22m[1m[22m[2m │ gzip:   0.73 kB[22m
+02:02:51.610 [2mdist/[22m[2massets/[22m[36mAsyncState-DSWhc_aB.js                   [39m[1m[2m  2.33 kB[22m[1m[22m[2m │ gzip:   1.08 kB[22m
+02:02:51.613 [2mdist/[22m[2massets/[22m[36mNotFoundPage-C5CdZR8w.js                 [39m[1m[2m  2.53 kB[22m[1m[22m[2m │ gzip:   1.13 kB[22m
+02:02:51.613 [2mdist/[22m[2massets/[22m[36mPrivacyPage-vXhjgTga.js                  [39m[1m[2m  2.58 kB[22m[1m[22m[2m │ gzip:   1.15 kB[22m
+02:02:51.614 [2mdist/[22m[2massets/[22m[36mCookiesPage-OjA3OzkS.js                  [39m[1m[2m  2.61 kB[22m[1m[22m[2m │ gzip:   1.14 kB[22m
+02:02:51.614 [2mdist/[22m[2massets/[22m[36museWorkerLocation-aptRDObf.js            [39m[1m[2m  2.77 kB[22m[1m[22m[2m │ gzip:   1.33 kB[22m
+02:02:51.614 [2mdist/[22m[2massets/[22m[36mimages-B7oEfGoD.js                       [39m[1m[2m  2.77 kB[22m[1m[22m[2m │ gzip:   0.80 kB[22m
+02:02:51.614 [2mdist/[22m[2massets/[22m[36mAdminWorkersPage-CSYqdB2o.js             [39m[1m[2m  2.77 kB[22m[1m[22m[2m │ gzip:   1.21 kB[22m
+02:02:51.614 [2mdist/[22m[2massets/[22m[36mForgotPasswordPage-BCwHgXmK.js           [39m[1m[2m  2.87 kB[22m[1m[22m[2m │ gzip:   1.33 kB[22m
+02:02:51.614 [2mdist/[22m[2massets/[22m[36mSimpleChart-BymLIGX1.js                  [39m[1m[2m  2.92 kB[22m[1m[22m[2m │ gzip:   1.17 kB[22m
+02:02:51.619 [2mdist/[22m[2massets/[22m[36mTermsPage-ByT9Kegr.js                    [39m[1m[2m  2.95 kB[22m[1m[22m[2m │ gzip:   1.30 kB[22m
+02:02:51.619 [2mdist/[22m[2massets/[22m[36museBookingActions-EJ-o7668.js            [39m[1m[2m  3.11 kB[22m[1m[22m[2m │ gzip:   1.43 kB[22m
+02:02:51.619 [2mdist/[22m[2massets/[22m[36mModal-P9pzpT6h.js                        [39m[1m[2m  3.20 kB[22m[1m[22m[2m │ gzip:   1.46 kB[22m
+02:02:51.619 [2mdist/[22m[2massets/[22m[36mMessagesPage-CoFg4qsK.js                 [39m[1m[2m  3.35 kB[22m[1m[22m[2m │ gzip:   1.53 kB[22m
+02:02:51.619 [2mdist/[22m[2massets/[22m[36mResetPasswordPage-DzPXocuz.js            [39m[1m[2m  3.60 kB[22m[1m[22m[2m │ gzip:   1.56 kB[22m
+02:02:51.619 [2mdist/[22m[2massets/[22m[36mSystemStatusPage-ejVrU73M.js             [39m[1m[2m  3.66 kB[22m[1m[22m[2m │ gzip:   1.33 kB[22m
+02:02:51.622 [2mdist/[22m[2massets/[22m[36mLoginPage-D9gsyetv.js                    [39m[1m[2m  3.75 kB[22m[1m[22m[2m │ gzip:   1.58 kB[22m
+02:02:51.623 [2mdist/[22m[2massets/[22m[36mVerifyEmailPage-CUNatlT2.js              [39m[1m[2m  3.77 kB[22m[1m[22m[2m │ gzip:   1.53 kB[22m
+02:02:51.623 [2mdist/[22m[2massets/[22m[36mAuthLayout-DzjW_ijU.js                   [39m[1m[2m  3.91 kB[22m[1m[22m[2m │ gzip:   1.36 kB[22m
+02:02:51.623 [2mdist/[22m[2massets/[22m[36mMiniMap-DpxEt4ID.js                      [39m[1m[2m  4.29 kB[22m[1m[22m[2m │ gzip:   1.75 kB[22m
+02:02:51.623 [2mdist/[22m[2massets/[22m[36mAdminFraudPage-DC68t6si.js               [39m[1m[2m  4.98 kB[22m[1m[22m[2m │ gzip:   2.01 kB[22m
+02:02:51.623 [2mdist/[22m[2massets/[22m[36mmapTiles-CVvFOcZw.js                     [39m[1m[2m  5.00 kB[22m[1m[22m[2m │ gzip:   1.90 kB[22m
+02:02:51.623 [2mdist/[22m[2massets/[22m[36mAdminCouponsPage-BNSaU1Y9.js             [39m[1m[2m  5.06 kB[22m[1m[22m[2m │ gzip:   2.00 kB[22m
+02:02:51.623 [2mdist/[22m[2massets/[22m[36mCustomerReferralsPage-B-94rbXG.js        [39m[1m[2m  5.17 kB[22m[1m[22m[2m │ gzip:   1.96 kB[22m
+02:02:51.623 [2mdist/[22m[2massets/[22m[36mPricingPage-_zQ-FjUM.js                  [39m[1m[2m  5.20 kB[22m[1m[22m[2m │ gzip:   2.11 kB[22m
+02:02:51.625 [2mdist/[22m[2massets/[22m[36mCustomerFavoritesPage-DJ92zOco.js        [39m[1m[2m  5.48 kB[22m[1m[22m[2m │ gzip:   2.11 kB[22m
+02:02:51.625 [2mdist/[22m[2massets/[22m[36mworkbox-window.prod.es5-BIl4cyR9.js      [39m[1m[2m  5.76 kB[22m[1m[22m[2m │ gzip:   2.37 kB[22m
+02:02:51.625 [2mdist/[22m[2massets/[22m[36mCustomerBookingsPage-DUiJdt94.js         [39m[1m[2m  5.93 kB[22m[1m[22m[2m │ gzip:   2.45 kB[22m
+02:02:51.625 [2mdist/[22m[2massets/[22m[36mContactPage-D7WCI40G.js                  [39m[1m[2m  5.97 kB[22m[1m[22m[2m │ gzip:   2.21 kB[22m
+02:02:51.625 [2mdist/[22m[2massets/[22m[36mAdminServicesPage-pBWMfitG.js            [39m[1m[2m  5.99 kB[22m[1m[22m[2m │ gzip:   2.34 kB[22m
+02:02:51.635 [2mdist/[22m[2massets/[22m[36mAdminBookingsPage-CTebYrEg.js            [39m[1m[2m  6.33 kB[22m[1m[22m[2m │ gzip:   2.54 kB[22m
+02:02:51.635 [2mdist/[22m[2massets/[22m[36mBookingSessionsTimeline-BQtUksWk.js      [39m[1m[2m  6.43 kB[22m[1m[22m[2m │ gzip:   2.25 kB[22m
+02:02:51.635 [2mdist/[22m[2massets/[22m[36mAdminUsersPage-zWHsZ_t1.js               [39m[1m[2m  6.48 kB[22m[1m[22m[2m │ gzip:   2.54 kB[22m
+02:02:51.635 [2mdist/[22m[2massets/[22m[36mRegisterPage-BUruzKd9.js                 [39m[1m[2m  6.49 kB[22m[1m[22m[2m │ gzip:   2.59 kB[22m
+02:02:51.635 [2mdist/[22m[2massets/[22m[36mOtpVerificationModal-lsinhwiZ.js         [39m[1m[2m  6.89 kB[22m[1m[22m[2m │ gzip:   2.78 kB[22m
+02:02:51.635 [2mdist/[22m[2massets/[22m[36mCustomerLoyaltyPage-DLr8juex.js          [39m[1m[2m  6.96 kB[22m[1m[22m[2m │ gzip:   2.46 kB[22m
+02:02:51.635 [2mdist/[22m[2massets/[22m[36mHowItWorksPage-DmHX4HwY.js               [39m[1m[2m  7.02 kB[22m[1m[22m[2m │ gzip:   2.56 kB[22m
+02:02:51.636 [2mdist/[22m[2massets/[22m[36mFaqPage-D2FOVy5B.js                      [39m[1m[2m  7.02 kB[22m[1m[22m[2m │ gzip:   2.80 kB[22m
+02:02:51.636 [2mdist/[22m[2massets/[22m[36mAboutPage-k1uMCNLt.js                    [39m[1m[2m  7.13 kB[22m[1m[22m[2m │ gzip:   2.53 kB[22m
+02:02:51.636 [2mdist/[22m[2massets/[22m[36mAdminSOSAlertsPage-E3P9ncKn.js           [39m[1m[2m  7.62 kB[22m[1m[22m[2m │ gzip:   2.80 kB[22m
+02:02:51.636 [2mdist/[22m[2massets/[22m[36mWorkerAvailabilityPage-DubKzdve.js       [39m[1m[2m  7.69 kB[22m[1m[22m[2m │ gzip:   2.55 kB[22m
+02:02:51.636 [2mdist/[22m[2massets/[22m[36mCustomerProPlusPage-Ci8OmgDR.js          [39m[1m[2m  8.27 kB[22m[1m[22m[2m │ gzip:   2.43 kB[22m
+02:02:51.636 [2mdist/[22m[2massets/[22m[36mAdminVerificationPage-B9ej6Cb9.js        [39m[1m[2m  8.34 kB[22m[1m[22m[2m │ gzip:   3.01 kB[22m
+02:02:51.639 [2mdist/[22m[2massets/[22m[36mCustomerReviewsPage-C3NG-iGM.js          [39m[1m[2m  8.39 kB[22m[1m[22m[2m │ gzip:   2.69 kB[22m
+02:02:51.639 [2mdist/[22m[2massets/[22m[36mAdminDashboardPage-EI0pikJU.js           [39m[1m[2m  9.17 kB[22m[1m[22m[2m │ gzip:   2.81 kB[22m
+02:02:51.639 [2mdist/[22m[2massets/[22m[36mEmergencyContactsPage-CuagEK0X.js        [39m[1m[2m  9.49 kB[22m[1m[22m[2m │ gzip:   2.98 kB[22m
+02:02:51.639 [2mdist/[22m[2massets/[22m[36mWorkerServicesPage-20q1qJAG.js           [39m[1m[2m  9.60 kB[22m[1m[22m[2m │ gzip:   3.08 kB[22m
+02:02:51.640 [2mdist/[22m[2massets/[22m[36mLocationPicker-a9kD1NuD.js               [39m[1m[2m 11.00 kB[22m[1m[22m[2m │ gzip:   3.95 kB[22m
+02:02:51.640 [2mdist/[22m[2massets/[22m[36mNotificationPreferencesPage-BxUMuMnP.js  [39m[1m[2m 11.03 kB[22m[1m[22m[2m │ gzip:   3.67 kB[22m
+02:02:51.640 [2mdist/[22m[2massets/[22m[36mWorkerBookingsPage-BZiPUxNT.js           [39m[1m[2m 11.13 kB[22m[1m[22m[2m │ gzip:   3.20 kB[22m
+02:02:51.640 [2mdist/[22m[2massets/[22m[36mCustomerDashboardPage-DYiaVA4N.js        [39m[1m[2m 11.51 kB[22m[1m[22m[2m │ gzip:   3.88 kB[22m
+02:02:51.640 [2mdist/[22m[2massets/[22m[36mServicesPage-Qx071v4q.js                 [39m[1m[2m 12.25 kB[22m[1m[22m[2m │ gzip:   4.25 kB[22m
+02:02:51.641 [2mdist/[22m[2massets/[22m[36mWorkerEarningsPage-AcLp1lU5.js           [39m[1m[2m 13.28 kB[22m[1m[22m[2m │ gzip:   4.12 kB[22m
+02:02:51.641 [2mdist/[22m[2massets/[22m[36mWorkerProfileWindow-BjgZEjed.js          [39m[1m[2m 13.76 kB[22m[1m[22m[2m │ gzip:   4.19 kB[22m
+02:02:51.641 [2mdist/[22m[2massets/[22m[36mWorkerReviewsPage-B2vosf6W.js            [39m[1m[2m 15.05 kB[22m[1m[22m[2m │ gzip:   4.35 kB[22m
+02:02:51.641 [2mdist/[22m[2massets/[22m[36mWorkerDashboardPage-BTLFasy3.js          [39m[1m[2m 16.10 kB[22m[1m[22m[2m │ gzip:   4.64 kB[22m
+02:02:51.641 [2mdist/[22m[2massets/[22m[36mWorkerVerificationPage-gQA0nWZ2.js       [39m[1m[2m 18.52 kB[22m[1m[22m[2m │ gzip:   5.56 kB[22m
+02:02:51.641 [2mdist/[22m[2massets/[22m[36mWorkerProfilePage-hmzf0hiO.js            [39m[1m[2m 19.10 kB[22m[1m[22m[2m │ gzip:   5.29 kB[22m
+02:02:51.641 [2mdist/[22m[2massets/[22m[36mLandingPage-B_w5LA4R.js                  [39m[1m[2m 22.25 kB[22m[1m[22m[2m │ gzip:   6.23 kB[22m
+02:02:51.678 [2mdist/[22m[2massets/[22m[36mWorkerBookingDetailPage-BDzLzvmN.js      [39m[1m[2m 27.50 kB[22m[1m[22m[2m │ gzip:   7.52 kB[22m
+02:02:51.679 [2mdist/[22m[2massets/[22m[36mServiceDetailPage-CXKLJkbk.js            [39m[1m[2m 29.66 kB[22m[1m[22m[2m │ gzip:   8.68 kB[22m
+02:02:51.679 [2mdist/[22m[2massets/[22m[36mCustomerWalletPage-BrdtKNqD.js           [39m[1m[2m 31.99 kB[22m[1m[22m[2m │ gzip:   9.34 kB[22m
+02:02:51.679 [2mdist/[22m[2massets/[22m[36mCustomerProfilePage-Gofo4Vsw.js          [39m[1m[2m 32.71 kB[22m[1m[22m[2m │ gzip:   8.39 kB[22m
+02:02:51.680 [2mdist/[22m[2massets/[22m[36mCustomerBookingDetailPage-BmBkqAyt.js    [39m[1m[2m 37.51 kB[22m[1m[22m[2m │ gzip:  10.32 kB[22m
+02:02:51.680 [2mdist/[22m[2massets/[22m[36mMainLayout-oJrsI5TN.js                   [39m[1m[2m 40.12 kB[22m[1m[22m[2m │ gzip:  10.76 kB[22m
+02:02:51.680 [2mdist/[22m[2massets/[22m[36mtypes-V3Kgt9VZ.js                        [39m[1m[2m 79.68 kB[22m[1m[22m[2m │ gzip:  21.85 kB[22m
+02:02:51.680 [2mdist/[22m[2massets/[22m[36mAdminAnalyticsPage-CmmAE5vi.js           [39m[1m[2m387.02 kB[22m[1m[22m[2m │ gzip: 113.71 kB[22m
+02:02:51.680 [2mdist/[22m[2massets/[22m[36mindex-pN_BRoaK.js                        [39m[1m[33m854.75 kB[39m[22m[2m │ gzip: 262.62 kB[22m
+02:02:51.681 [32m✓ built in 10.41s[39m
+02:02:51.681 [33m
+02:02:51.681 (!) Some chunks are larger than 500 kB after minification. Consider:
+02:02:51.681 - Using dynamic import() to code-split the application
+02:02:51.682 - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+02:02:51.682 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.[39m
+02:02:54.364 
+02:02:54.364 PWA v1.2.0
+02:02:54.364 mode      generateSW
+02:02:54.364 precache  128 entries (2103.21 KiB)
+02:02:54.364 files generated
+02:02:54.364   dist/sw.js
+02:02:54.364   dist/workbox-1ef09536.js
+02:02:54.673 Build Completed in /vercel/output [29s]
+02:02:54.779 Deploying outputs...
+02:02:56.662 Deployment completed
+02:02:57.668 Creating build cache...
+02:03:11.590 Created build cache: 14s
+02:03:11.590 Uploading build cache [40.89 MB]
+02:03:12.268 Build cache uploaded: 679.936ms

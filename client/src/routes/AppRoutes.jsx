@@ -1,9 +1,10 @@
 // AppRoutes — centralized routing configuration with lazy loading
 // HMR Refresh Trigger - Standard Imports Reinstated
-import { lazy, Suspense } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { lazy, Suspense, useEffect, useRef } from 'react';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { PublicRoute, WorkerRoute, CustomerRoute, AdminRoute, ProtectedRoute } from './ProtectedRoute';
 import { LoadingOverlay } from '../components/common';
+import { useAuth } from '../hooks/useAuth';
 
 // Lazy load all pages for better performance (Code Splitting)
 const LandingPage = lazy(() => import('../pages/public/LandingPage.jsx').then(m => ({ default: m.LandingPage })));
@@ -72,6 +73,68 @@ const AdminAnalyticsPage = lazy(() => import('../pages/admin/AdminAnalyticsPage.
 const AdminFraudPage = lazy(() => import('../pages/admin/AdminFraudPage.jsx').then(m => ({ default: m.AdminFraudPage })));
 const AdminCouponsPage = lazy(() => import('../pages/admin/AdminCouponsPage.jsx').then(m => ({ default: m.AdminCouponsPage })));
 
+function RoutePrefetcher() {
+  const { isAuthenticated, user } = useAuth();
+  const location = useLocation();
+  const prefetched = useRef(new Set());
+
+  useEffect(() => {
+    let timeoutId;
+    let idleId;
+
+    const run = () => {
+      const jobs = [];
+
+      if (!isAuthenticated && !prefetched.current.has('public-core')) {
+        jobs.push(import('../pages/auth/LoginPage.jsx'));
+        jobs.push(import('../pages/auth/RegisterPage.jsx'));
+        jobs.push(import('../pages/services/ServicesPage.jsx'));
+        prefetched.current.add('public-core');
+      }
+
+      if (isAuthenticated && user?.role === 'CUSTOMER' && !prefetched.current.has('customer-core')) {
+        jobs.push(import('../pages/customer/CustomerDashboardPage.jsx'));
+        jobs.push(import('../pages/customer/CustomerBookingsPage.jsx'));
+        jobs.push(import('../pages/profile/MessagesPage.jsx'));
+        prefetched.current.add('customer-core');
+      }
+
+      if (isAuthenticated && user?.role === 'WORKER' && !prefetched.current.has('worker-core')) {
+        jobs.push(import('../pages/worker/WorkerDashboardPage.jsx'));
+        jobs.push(import('../pages/worker/WorkerBookingsPage.jsx'));
+        jobs.push(import('../pages/profile/MessagesPage.jsx'));
+        prefetched.current.add('worker-core');
+      }
+
+      if (isAuthenticated && user?.role === 'ADMIN' && !prefetched.current.has('admin-core')) {
+        jobs.push(import('../pages/admin/AdminDashboardPage.jsx'));
+        jobs.push(import('../pages/admin/AdminBookingsPage.jsx'));
+        jobs.push(import('../pages/admin/AdminUsersPage.jsx'));
+        prefetched.current.add('admin-core');
+      }
+
+      if (jobs.length > 0) {
+        void Promise.allSettled(jobs);
+      }
+    };
+
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      idleId = window.requestIdleCallback(run, { timeout: 1500 });
+    } else {
+      timeoutId = setTimeout(run, 250);
+    }
+
+    return () => {
+      if (idleId && typeof window !== 'undefined' && 'cancelIdleCallback' in window) {
+        window.cancelIdleCallback(idleId);
+      }
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [isAuthenticated, user?.role, location.pathname]);
+
+  return null;
+}
+
 /**
  * AppRoutes Component
  * 
@@ -81,6 +144,7 @@ const AdminCouponsPage = lazy(() => import('../pages/admin/AdminCouponsPage.jsx'
 export function AppRoutes() {
   return (
     <Suspense fallback={<LoadingOverlay />}>
+      <RoutePrefetcher />
       <Routes>
         {/* ===== PUBLIC ROUTES (No authentication required) ===== */}
         <Route path="/" element={<PublicRoute><LandingPage /></PublicRoute>} />

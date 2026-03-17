@@ -1,0 +1,50 @@
+2026-03-15T20:41:04.930754901Z ==> Deploying...
+2026-03-15T20:41:04.995641272Z ==> Setting WEB_CONCURRENCY=1 by default, based on available CPUs in the instance
+2026-03-15T20:41:20.603952354Z ==> Running 'npm run start'
+2026-03-15T20:41:21.606843569Z 
+2026-03-15T20:41:21.60687005Z > server@1.0.0 start
+2026-03-15T20:41:21.606874321Z > prisma migrate deploy && node src/index.js
+2026-03-15T20:41:21.606878711Z 
+2026-03-15T20:41:25.111157635Z Prisma schema loaded from prisma/schema.prisma
+2026-03-15T20:41:25.199151639Z Datasource "db": PostgreSQL database "postgres", schema "public" at "aws-1-ap-south-1.pooler.supabase.com:5432"
+2026-03-15T20:41:28.204260434Z 
+2026-03-15T20:41:28.204317127Z 24 migrations found in prisma/migrations
+2026-03-15T20:41:28.204329878Z 
+2026-03-15T20:41:31.838902667Z 
+2026-03-15T20:41:31.838931079Z No pending migrations to apply.
+2026-03-15T20:41:33.704820029Z [dotenv@17.2.3] injecting env (0) from .env -- tip: 🔐 prevent building .env in docker: https://dotenvx.com/prebuild
+2026-03-15T20:41:37.506880827Z {"level":"info","message":"Cloudinary configured (cloud: %s)","timestamp":"2026-03-15 20:41:37"}
+2026-03-15T20:41:39.40191078Z Socket.IO Redis adapter enabled
+2026-03-15T20:41:39.402021746Z {"level":"info","message":"Socket.IO initialized","timestamp":"2026-03-15 20:41:39"}
+2026-03-15T20:41:39.496893822Z [CRON] Initializing background jobs...
+2026-03-15T20:41:39.606254495Z [CRON] Jobs scheduled successfully.
+2026-03-15T20:41:39.796178116Z {"level":"info","message":"Server listening on http://localhost:%d","timestamp":"2026-03-15 20:41:39"}
+2026-03-15T20:41:39.796429141Z {"level":"info","message":"CORS origin: %s","timestamp":"2026-03-15 20:41:39"}
+2026-03-15T20:41:40.2906417Z {"level":"info","message":"\u001b[0mHEAD / \u001b[33m404\u001b[0m 2.678 ms - 38\u001b[0m","timestamp":"2026-03-15 20:41:40"}
+2026-03-15T20:41:40.29355674Z {"duration":"5.77ms","id":"eh3xyp5gmms7zrgd","ip":"::1","level":"error","message":"HTTP request failed: HEAD /","method":"HEAD","status":404,"timestamp":"2026-03-15 20:41:40","url":"/","userAgent":"Go-http-client/1.1"}
+2026-03-15T20:41:45.49472675Z {"level":"info","message":"\u001b[0mGET /health \u001b[32m200\u001b[0m 1.101 ms - 227\u001b[0m","timestamp":"2026-03-15 20:41:45"}
+2026-03-15T20:41:45.496420729Z {"duration":"4.02ms","id":"p8gxq4temms7zvh0","ip":"::ffff:10.233.24.163","level":"info","message":"HTTP request completed: GET /health","method":"GET","status":200,"timestamp":"2026-03-15 20:41:45","url":"/health","userAgent":"Render/1.0"}
+2026-03-15T20:41:45.501889729Z {"level":"info","message":"\u001b[0mGET /health \u001b[32m200\u001b[0m 0.503 ms - 227\u001b[0m","timestamp":"2026-03-15 20:41:45"}
+2026-03-15T20:41:45.504239046Z {"duration":"3.05ms","id":"sdqxqnrhmms7zvh8","ip":"::ffff:10.233.24.163","level":"info","message":"HTTP request completed: GET /health","method":"GET","status":200,"timestamp":"2026-03-15 20:41:45","url":"/health","userAgent":"Render/1.0"}
+2026-03-15T20:41:46.255898011Z ==> Your service is live 🎉
+2026-03-15T20:41:46.364817897Z ==> 
+2026-03-15T20:41:46.366777826Z ==> ///////////////////////////////////////////////////////////
+2026-03-15T20:41:46.368788108Z ==> 
+2026-03-15T20:41:46.371433396Z ==> Available at your primary URL https://urbanpro-api.onrender.com
+2026-03-15T20:41:46.374029761Z ==> 
+2026-03-15T20:41:46.376052683Z ==> ///////////////////////////////////////////////////////////
+2026-03-15T20:41:46.377631519Z {"level":"info","message":"\u001b[0mGET / \u001b[33m404\u001b[0m 0.594 ms - 38\u001b[0m","timestamp":"2026-03-15 20:41:46"}
+2026-03-15T20:41:46.37797964Z {"duration":"1.33ms","id":"r6rp8plymms7zw5k","ip":"::1","level":"error","message":"HTTP request failed: GET /","method":"GET","status":404,"timestamp":"2026-03-15 20:41:46","url":"/","userAgent":"Go-http-client/2.0"}
+2026-03-15T20:41:50.491876532Z {"level":"info","message":"\u001b[0mGET /health \u001b[32m200\u001b[0m 0.464 ms - 227\u001b[0m","timestamp":"2026-03-15 20:41:50"}
+2026-03-15T20:41:50.492068833Z {"duration":"1.06ms","id":"gpjf6p52mms7zzbu","ip":"::ffff:10.233.24.163","level":"info","message":"HTTP request completed: GET /health","method":"GET","status":200,"timestamp":"2026-03-15 20:41:50","url":"/health","userAgent":"Render/1.0"}
+2026-03-15T20:41:55.492449663Z {"level":"info","message":"\u001b[0mGET /health \u001b[32m200\u001b[0m 0.542 ms - 227\u001b[0m","timestamp":"2026-03-15 20:41:55"}
+2026-03-15T20:41:55.492971253Z {"duration":"1.48ms","id":"dutowuyxmms8036r","ip":"::ffff:10.233.24.163","level":"info","message":"HTTP request completed: GET /health","method":"GET","status":200,"timestamp":"2026-03-15 20:41:55","url":"/health","userAgent":"Render/1.0"}
+2026-03-15T20:42:00.49282134Z {"level":"info","message":"\u001b[0mGET /health \u001b[32m200\u001b[0m 0.561 ms - 227\u001b[0m","timestamp":"2026-03-15 20:42:00"}
+2026-03-15T20:42:00.493138438Z {"duration":"1.27ms","id":"ii2s54uzmms8071n","ip":"::ffff:10.233.24.163","level":"info","message":"HTTP request completed: GET /health","method":"GET","status":200,"timestamp":"2026-03-15 20:42:00","url":"/health","userAgent":"Render/1.0"}
+2026-03-15T20:42:05.491665766Z {"level":"info","message":"\u001b[0mGET /health \u001b[32m200\u001b[0m 0.393 ms - 227\u001b[0m","timestamp":"2026-03-15 20:42:05"}
+2026-03-15T20:42:05.49191142Z {"duration":"0.90ms","id":"8qtnrerwmms80awi","ip":"::ffff:10.233.24.163","level":"info","message":"HTTP request completed: GET /health","method":"GET","status":200,"timestamp":"2026-03-15 20:42:05","url":"/health","userAgent":"Render/1.0"}
+2026-03-15T20:42:05.494329602Z {"level":"info","message":"\u001b[0mGET /health \u001b[32m200\u001b[0m 0.493 ms - 227\u001b[0m","timestamp":"2026-03-15 20:42:05"}
+2026-03-15T20:42:05.494550054Z {"duration":"1.19ms","id":"v33qp97emms80awl","ip":"::ffff:10.233.24.163","level":"info","message":"HTTP request completed: GET /health","method":"GET","status":200,"timestamp":"2026-03-15 20:42:05","url":"/health","userAgent":"Render/1.0"}
+2026-03-15T20:42:07.998858647Z {"level":"info","message":"\u001b[0mGET /api/workers/leaderboard/top?limit=4 \u001b[0m-\u001b[0m - ms - -\u001b[0m","timestamp":"2026-03-15 20:42:07"}
+2026-03-15T20:42:10.491902191Z {"level":"info","message":"\u001b[0mGET /health \u001b[32m200\u001b[0m 0.419 ms - 226\u001b[0m","timestamp":"2026-03-15 20:42:10"}
+2026-03-15T20:42:10.492131495Z {"duration":"1.16ms","id":"9gbtq6m8mms80ere","ip":"::ffff:10.233.24.163","level":"info","message":"HTTP request completed: GET /health","method":"GET","status":200,"timestamp":"2026-03-15 20:42:10","url":"/health","userAgent":"Render/1.0"}

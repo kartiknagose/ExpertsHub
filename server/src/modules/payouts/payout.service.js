@@ -120,60 +120,61 @@ exports.processDailyCronPayouts = async () => {
 };
 
 async function processRazorpayTransfer(profile, deductBalance, payoutAmount) {
-    return prisma.$transaction(async (tx) => {
-        // 1. Deduct wallet balance before firing external API
+    // First transaction: reserve funds + create processing record.
+    const payoutRecord = await prisma.$transaction(async (tx) => {
         await tx.workerProfile.update({
             where: { id: profile.id },
             data: { walletBalance: { decrement: deductBalance } }
         });
 
-        // 2. Create local pending payout record
-        const payoutRecord = await tx.payout.create({
+        return tx.payout.create({
             data: {
                 workerProfileId: profile.id,
                 amount: payoutAmount,
                 status: 'PROCESSING'
             }
         });
+    }, {
+        maxWait: 10000,
+        timeout: 15000,
+    });
 
-        // 3. Initiate Razorpay transfer (live) or test transfer (simulated)
-        try {
-            let transferId;
+    try {
+        // External API call should stay out of interactive transaction.
+        let transferId;
 
-            const canUseLiveTransfer =
-                PAYOUT_MODE === 'LIVE' &&
-                typeof profile.razorpayAccountId === 'string' &&
-                profile.razorpayAccountId.startsWith('acc_');
+        const canUseLiveTransfer =
+            PAYOUT_MODE === 'LIVE' &&
+            typeof profile.razorpayAccountId === 'string' &&
+            profile.razorpayAccountId.startsWith('acc_');
 
-            if (canUseLiveTransfer) {
-                const razorpay = getRazorpayClient();
-                const transfer = await razorpay.transfers.create({
-                    account: profile.razorpayAccountId,
-                    amount: Math.round(Number(payoutAmount) * 100),
-                    currency: 'INR',
-                    notes: {
-                        workerProfileId: String(profile.id),
-                        payoutType: 'WORKER_WITHDRAWAL',
-                    },
-                });
-                transferId = transfer.id;
-            } else {
-                transferId = `trf_test_${Math.random().toString(36).slice(2, 11)}`;
-            }
-
-            // 4. Update status to processed
-            const completed = await tx.payout.update({
-                where: { id: payoutRecord.id },
-                data: {
-                    status: 'PROCESSED',
-                    transferReference: transferId,
-                    processedAt: new Date()
-                }
+        if (canUseLiveTransfer) {
+            const razorpay = getRazorpayClient();
+            const transfer = await razorpay.transfers.create({
+                account: profile.razorpayAccountId,
+                amount: Math.round(Number(payoutAmount) * 100),
+                currency: 'INR',
+                notes: {
+                    workerProfileId: String(profile.id),
+                    payoutType: 'WORKER_WITHDRAWAL',
+                },
             });
+            transferId = transfer.id;
+        } else {
+            transferId = `trf_test_${Math.random().toString(36).slice(2, 11)}`;
+        }
 
-            return completed;
-        } catch (apiError) {
-            // 5. On Gateway Failure - refund to wallet and mark FAILED
+        return prisma.payout.update({
+            where: { id: payoutRecord.id },
+            data: {
+                status: 'PROCESSED',
+                transferReference: transferId,
+                processedAt: new Date()
+            }
+        });
+    } catch (apiError) {
+        // Recovery transaction: refund reserved funds + mark failed.
+        await prisma.$transaction(async (tx) => {
             await tx.workerProfile.update({
                 where: { id: profile.id },
                 data: { walletBalance: { increment: deductBalance } }
@@ -182,9 +183,13 @@ async function processRazorpayTransfer(profile, deductBalance, payoutAmount) {
                 where: { id: payoutRecord.id },
                 data: { status: 'FAILED' }
             });
-            throw new AppError(500, 'Payment Gateway failed to process transfer: ' + apiError.message);
-        }
-    });
+        }, {
+            maxWait: 10000,
+            timeout: 15000,
+        });
+
+        throw new AppError(500, 'Payment Gateway failed to process transfer: ' + apiError.message);
+    }
 }
 
 exports.getWorkerPayoutHistory = async (userId, { skip, limit }) => {

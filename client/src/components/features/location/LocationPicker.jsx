@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap, Circle } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import '../../../utils/leafletSetup';
 import { MapPin, Navigation, Globe, Layers, Zap } from 'lucide-react';
 import { AddressAutocomplete } from './AddressAutocomplete';
 import { toast } from 'sonner';

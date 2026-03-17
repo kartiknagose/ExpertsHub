@@ -10,9 +10,11 @@ const { captureException } = require('../config/monitoring');
 module.exports = (err, _req, res, _next) => {
   // Determine HTTP status code
   const status = err.statusCode || err.status || 500;
+  const isDevelopment = process.env.NODE_ENV === 'development';
 
-  // Use custom message if available, otherwise generic message
-  const message = err.message || 'Internal Server Error';
+  // Do not expose internal 5xx details in production responses.
+  const rawMessage = err.message || 'Internal Server Error';
+  const message = status >= 500 && !isDevelopment ? 'Internal Server Error' : rawMessage;
 
   if (status >= 500) {
     // CRASH REPORTING (Sprint 15)
@@ -23,11 +25,9 @@ module.exports = (err, _req, res, _next) => {
     });
   }
 
-  const isDevelopment = process.env.NODE_ENV === 'development';
-
   // Log via Winston — error level for 5xx, warn for 4xx
   const logLevel = status >= 500 ? 'error' : 'warn';
-  logger[logLevel]('%s %s → %d: %s', _req.method, _req.originalUrl, status, message, {
+  logger[logLevel]('%s %s -> %d: %s', _req.method, _req.originalUrl, status, rawMessage, {
     ...(isDevelopment && { stack: err.stack }),
   });
 

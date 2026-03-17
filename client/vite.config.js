@@ -51,6 +51,29 @@ export default defineConfig({
     sourcemap: false,
     minify: 'esbuild',
     target: 'esnext',
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return;
+
+          if (id.includes('socket.io-client') || id.includes('engine.io-client')) {
+            return 'socket-vendor';
+          }
+
+          if (id.includes('framer-motion')) {
+            return 'motion-vendor';
+          }
+
+          if (id.includes('recharts') || id.includes('d3-')) {
+            return 'charts-vendor';
+          }
+
+          if (id.includes('leaflet')) {
+            return 'maps-vendor';
+          }
+        },
+      },
+    },
   },
   optimizeDeps: {
     include: ['react', 'react-dom', 'react-router-dom', 'framer-motion', 'lucide-react', 'axios'],

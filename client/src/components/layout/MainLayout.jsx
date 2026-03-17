@@ -8,7 +8,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { ProfileIncompleteAlert } from '../common/ProfileIncompleteAlert';
 
 export function MainLayout({ children }) {
-  const { user, isAuthenticated } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 

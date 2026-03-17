@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { MapContainer, TileLayer, Marker, Circle } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import '../../../utils/leafletSetup';
 import { MAP_TILES } from '../../../utils/mapTiles';
 import { Layers, Map as MapIcon, Mountain, Satellite, Moon, Zap } from 'lucide-react';
 import './map-styles.css';

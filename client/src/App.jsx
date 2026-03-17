@@ -1,15 +1,16 @@
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { BrowserRouter, useNavigate } from 'react-router-dom';
 import { AppRoutes } from './routes/AppRoutes';
 import { ThemeProvider } from './context/ThemeContext';
 import { SOSProvider } from './context/SOSContext';
 import { CityProvider } from './context/CityContext';
-import { GlobalSOSButton } from './components/features/safety/GlobalSOSButton';
-import { PWAReloadPrompt } from './components/features/pwa/PWAReloadPrompt';
-import { PWAInstallPrompt } from './components/features/pwa/PWAInstallPrompt';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
-import { GlobalSocketListener } from './components/common/GlobalSocketListener';
 import { useAuth } from './hooks/useAuth';
+
+const GlobalSOSButton = lazy(() => import('./components/features/safety/GlobalSOSButton').then(m => ({ default: m.GlobalSOSButton })));
+const GlobalSocketListener = lazy(() => import('./components/common/GlobalSocketListener').then(m => ({ default: m.GlobalSocketListener })));
+const PWAReloadPrompt = lazy(() => import('./components/features/pwa/PWAReloadPrompt').then(m => ({ default: m.PWAReloadPrompt })));
+const PWAInstallPrompt = lazy(() => import('./components/features/pwa/PWAInstallPrompt').then(m => ({ default: m.PWAInstallPrompt })));
 
 /**
  * SessionExpiredHandler
@@ -47,6 +48,8 @@ function SessionExpiredHandler() {
  * 7. AppRoutes - all route definitions
  */
 function App() {
+  const { isAuthenticated } = useAuth();
+
   return (
     <ErrorBoundary>
       <ThemeProvider>
@@ -54,11 +57,13 @@ function App() {
           <CityProvider>
             <SOSProvider>
               <SessionExpiredHandler />
-              <GlobalSocketListener />
               <AppRoutes />
-              <GlobalSOSButton />
-              <PWAReloadPrompt />
-              <PWAInstallPrompt />
+              <Suspense fallback={null}>
+                {isAuthenticated && <GlobalSocketListener />}
+                {isAuthenticated && <GlobalSOSButton />}
+                <PWAReloadPrompt />
+                <PWAInstallPrompt />
+              </Suspense>
             </SOSProvider>
           </CityProvider>
         </BrowserRouter>

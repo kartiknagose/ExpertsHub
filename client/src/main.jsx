@@ -7,8 +7,6 @@ import { NotificationProvider } from './context/NotificationContext';
 import App from './App.jsx';
 import GlobalErrorBoundary from './components/common/GlobalErrorBoundary.jsx';
 import './index.css';
-import 'leaflet/dist/leaflet.css';
-import './utils/leafletSetup';
 import './config/i18n';
 import { installToastDeduper } from './utils/toastDeduper';
 

@@ -1,5 +1,7 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline, Circle } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import '../../../utils/leafletSetup';
 import L from 'leaflet';
 import { Navigation, Compass, Target, Clock, Zap, Layers, Map as MapIcon, CheckCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
