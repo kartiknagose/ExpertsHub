@@ -59,7 +59,7 @@ export function LocationPicker({ onChange, initialLocation = null, className = '
         if (!initialLocation) {
             getUserLocation();
         }
-    }, []); // Run once on mount
+    }, [initialLocation, getUserLocation]); // Include dependencies for linting and stability
 
     // Sync state with initialLocation if it changes (e.g. after profile fetch)
     useEffect(() => {
@@ -91,7 +91,7 @@ export function LocationPicker({ onChange, initialLocation = null, className = '
         fetchReverseGeocode(latlng.lat, latlng.lng);
     };
 
-    const fetchReverseGeocode = async (lat, lng) => {
+    const fetchReverseGeocode = useCallback(async (lat, lng) => {
         try {
             const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&addressdetails=1`);
             const data = await response.json();
@@ -119,9 +119,9 @@ export function LocationPicker({ onChange, initialLocation = null, className = '
         } finally {
             setIsCalibrating(false);
         }
-    };
+    }, [handleLocationChange, t]);
 
-    const getUserLocation = () => {
+    const getUserLocation = useCallback(() => {
         if (!navigator.geolocation) {
             toast.error('Geolocation is not supported by your browser.');
             return;
@@ -152,7 +152,7 @@ export function LocationPicker({ onChange, initialLocation = null, className = '
             },
             { enableHighAccuracy: true, timeout: 20000, maximumAge: 15000 }
         );
-    };
+    }, [handleLocationChange, fetchReverseGeocode]);
 
     const [mapType, setMapType] = useState('satellite');
 

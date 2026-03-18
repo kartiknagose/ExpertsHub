@@ -1,6 +1,6 @@
 const nodemailer = require('nodemailer');
 const dotenv = require('dotenv');
-dotenv.config({ path: 'server/.env' });
+dotenv.config({ path: '.env' });
 
 async function test() {
   console.log('--- SMTP TEST START ---');
