@@ -51,7 +51,11 @@ const buildTransport = () => {
 };
 
 const getFromAddress = () => {
-  const fromEmail = process.env.FROM_EMAIL || process.env.SMTP_USER;
+  // IMPORTANT: When using Gmail SMTP, the From email MUST match the authenticated
+  // SMTP_USER account. Gmail silently drops or rewrites emails from non-matching
+  // addresses like "noreply@urbanpro.com". Always use SMTP_USER as the actual
+  // sending email address and FROM_NAME as the display name.
+  const fromEmail = process.env.SMTP_USER || process.env.FROM_EMAIL;
   const fromName = process.env.FROM_NAME || 'UrbanPro';
   return `${fromName} <${fromEmail}>`;
 };

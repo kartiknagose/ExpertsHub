@@ -63,6 +63,7 @@
   }
 
   /* ── Auto-fill overrides ────────────────────────────────────────────────── */
+  /* Light mode: keep transparent, inherit text color */
   input:-webkit-autofill,
   input:-webkit-autofill:hover,
   input:-webkit-autofill:focus,
@@ -72,10 +73,28 @@
   select:-webkit-autofill,
   select:-webkit-autofill:hover,
   select:-webkit-autofill:focus {
-    -webkit-text-fill-color: inherit !important;
-    -webkit-box-shadow: 0 0 0px 1000px transparent inset !important;
+    -webkit-text-fill-color: #111827 !important;
+    -webkit-box-shadow: 0 0 0px 1000px rgba(255, 255, 255, 0.95) inset !important;
     transition: background-color 5000s ease-in-out 0s;
     background-color: transparent !important;
+    caret-color: #111827 !important;
+  }
+
+  /* Dark mode: force white text and dark background on autofill */
+  .dark input:-webkit-autofill,
+  .dark input:-webkit-autofill:hover,
+  .dark input:-webkit-autofill:focus,
+  .dark textarea:-webkit-autofill,
+  .dark textarea:-webkit-autofill:hover,
+  .dark textarea:-webkit-autofill:focus,
+  .dark select:-webkit-autofill,
+  .dark select:-webkit-autofill:hover,
+  .dark select:-webkit-autofill:focus {
+    -webkit-text-fill-color: #f9fafb !important;
+    -webkit-box-shadow: 0 0 0px 1000px rgb(25, 28, 35) inset !important;
+    transition: background-color 5000s ease-in-out 0s;
+    background-color: transparent !important;
+    caret-color: #f9fafb !important;
   }
 
   /* ── Base typography ────────────────────────────────────────────────────── */

@@ -1,6 +1,7 @@
 const asyncHandler = require('../../common/utils/asyncHandler');
 const AppError = require('../../common/errors/AppError');
 const prisma = require('../../config/prisma');
+const { FRONTEND_URL } = require('../../config/env');
 const { registerUser, loginUser, verifyEmailToken, requestPasswordReset, resetPasswordWithToken, changePassword } = require('./auth.service');
 const { sendVerificationEmail, sendPasswordResetEmail } = require('../../common/utils/mailer');
 
@@ -16,7 +17,8 @@ const COOKIE_OPTIONS = {
 exports.register = asyncHandler(async (req, res) => {
   const { name, email, mobile, password, role } = req.body;
   const { user, verificationToken } = await registerUser({ name, email, mobile, password, role });
-  const baseUrl = req.get('origin') || process.env.CORS_ORIGIN || 'http://localhost:5173';
+  // Use FRONTEND_URL (never comma-separated CORS_ORIGIN) to build a valid, clickable link
+  const baseUrl = FRONTEND_URL;
   const verificationLink = `${baseUrl}/verify-email?token=${encodeURIComponent(verificationToken)}`;
   
   // Send email ASYNCHRONOUSLY (non-blocking) to avoid signup delays
@@ -118,7 +120,7 @@ exports.verifyEmail = asyncHandler(async (req, res) => {
 
 exports.forgotPassword = asyncHandler(async (req, res) => {
   const { email } = req.body;
-  const baseUrl = req.get('origin') || process.env.CORS_ORIGIN || 'http://localhost:5173';
+  const baseUrl = FRONTEND_URL;
 
   // NOTE: result contains { resetLink, message }
   const result = await requestPasswordReset({ email, baseUrl });

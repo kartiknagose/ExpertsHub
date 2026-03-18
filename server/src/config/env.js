@@ -27,4 +27,10 @@ if (NODE_ENV === 'production' && CORS_ORIGIN === 'http://localhost:5173') {
     console.warn('WARNING: CORS_ORIGIN is set to localhost in production. This is likely a misconfiguration.');
 }
 
-module.exports = { PORT, JWT_SECRET, CORS_ORIGIN, NODE_ENV };
+// FRONTEND_URL: Used for constructing email links (verification, password reset).
+// Falls back to the first CORS origin if not explicitly set.
+const FRONTEND_URL = process.env.FRONTEND_URL
+    || (CORS_ORIGIN.includes(',') ? CORS_ORIGIN.split(',')[0].trim() : CORS_ORIGIN)
+    || 'http://localhost:5173';
+
+module.exports = { PORT, JWT_SECRET, CORS_ORIGIN, NODE_ENV, FRONTEND_URL };
