@@ -48,5 +48,8 @@
     "postcss": "^8.4.32",
     "vite": "^7.2.4",
     "vite-plugin-pwa": "^1.2.0"
+  },
+  "optionalDependencies": {
+    "@rollup/rollup-linux-x64-gnu": "4.59.0"
   }
 }

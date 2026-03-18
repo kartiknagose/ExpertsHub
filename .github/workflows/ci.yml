@@ -44,6 +44,7 @@ jobs:
           cache-dependency-path: client/package-lock.json
 
       - run: npm ci
+      - run: npm install --no-save @rollup/rollup-linux-x64-gnu@4.59.0
       - run: npm run lint
       - run: npm run build
         env:
