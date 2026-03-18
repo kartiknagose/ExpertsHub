@@ -6,7 +6,11 @@ const toNumber = (value, fallback) => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+let transporterSingleton = null;
+
 const buildTransport = () => {
+  if (transporterSingleton) return transporterSingleton;
+
   const host = process.env.SMTP_HOST;
   const port = toNumber(process.env.SMTP_PORT, 587);
   const user = process.env.SMTP_USER;
@@ -18,130 +22,109 @@ const buildTransport = () => {
     if (!host) missingFields.push('SMTP_HOST');
     if (!user) missingFields.push('SMTP_USER');
     if (!pass) missingFields.push('SMTP_PASS');
-    throw new Error(`SMTP credentials are not configured. Missing: ${missingFields.join(', ')}`);
+    console.warn(`[Email] ⚠️ SMTP credentials not fully configured. Missing: ${missingFields.join(', ')}`);
+    return null;
   }
 
-  const transporter = nodemailer.createTransport({
+  transporterSingleton = nodemailer.createTransport({
     host,
     port,
     secure,
     auth: { user, pass },
-    connectionUrl: `smtp${secure ? 's' : ''}://${user}:***@${host}:${port}`,
+    pool: true,
+    maxConnections: 5,
+    maxMessages: 100,
   });
 
   // Test connection on creation
-  transporter.verify((error, success) => {
+  transporterSingleton.verify((error, success) => {
     if (error) {
-      console.error(`[Email] ❌ SMTP Connection Failed:\n`, {
-        host,
-        port,
-        secure,
-        user,
-        error: error.message,
-        code: error.code,
-        command: error.command,
+      console.error(`[Email] ❌ SMTP Connection Failed for user ${user}:`, {
+        host, port, secure, code: error.code, message: error.message,
+        response: error.response
       });
-      logger.error('SMTP Connection verification failed', { error: error.message, code: error.code });
     } else if (success) {
-      console.log(`[Email] ✅ SMTP Connected Successfully (${host}:${port})`);
+      console.log(`[Email] ✅ SMTP Connected Successfully to ${host}:${port} as ${user}`);
     }
   });
 
-  return transporter;
+  return transporterSingleton;
 };
 
 const getFromAddress = () => {
-  // IMPORTANT: When using Gmail SMTP, the From email MUST match the authenticated
-  // SMTP_USER account. Gmail silently drops or rewrites emails from non-matching
-  // addresses like "noreply@urbanpro.com". Always use SMTP_USER as the actual
-  // sending email address and FROM_NAME as the display name.
   const fromEmail = process.env.SMTP_USER || process.env.FROM_EMAIL;
   const fromName = process.env.FROM_NAME || 'UrbanPro';
   return `${fromName} <${fromEmail}>`;
 };
 
-async function sendVerificationEmail({ to, link }) {
+/**
+ * Generic email sender with robust logging
+ */
+async function sendEmail({ to, subject, text, html, logContext = 'Default' }) {
+  const transporter = buildTransport();
+  if (!transporter) {
+    console.warn(`[Email] ⚠️ Not sending email [${logContext}] to ${to}: Transporter not configured`);
+    return null;
+  }
+
   try {
-    const transporter = buildTransport();
-    
     const info = await transporter.sendMail({
       from: getFromAddress(),
       to,
-      subject: 'Verify your UrbanPro email',
-      text: `Welcome to UrbanPro! Verify your email: ${link}`,
-      html: `
-        <div style="font-family: Arial, sans-serif; line-height: 1.6;">
-          <h2>Verify your email</h2>
-          <p>Thanks for signing up with UrbanPro. Please verify your email to continue.</p>
-          <p>
-            <a href="${link}" style="display:inline-block;padding:10px 16px;background:#2563eb;color:#ffffff;text-decoration:none;border-radius:6px;">Verify Email</a>
-          </p>
-          <p>If the button does not work, copy and paste this link into your browser:</p>
-          <p>${link}</p>
-        </div>
-      `,
+      subject,
+      text,
+      html,
     });
-    
-    console.log(`[Email] ✅ Verification email sent: ${info.messageId} → ${to}`);
-    logger.info('Verification email sent', { to, messageId: info.messageId });
+    console.log(`[Email] ✅ Sent [${logContext}]: ${info.messageId} → ${to}`);
     return info;
   } catch (error) {
-    console.error(`[Email] ❌ Failed to send verification email to ${to}:`, {
+    console.error(`[Email] ❌ Failed to send [${logContext}] to ${to}:`, {
       message: error.message,
       code: error.code,
-      command: error.command,
       response: error.response,
-      stack: error.stack.split('\n').slice(0, 3).join('\n'),
-    });
-    logger.error('Failed to send verification email', { 
-      to, 
-      message: error.message, 
-      code: error.code,
-      response: error.response 
     });
     throw error;
   }
 }
 
-async function sendPasswordResetEmail({ to, link }) {
-  try {
-    const transporter = buildTransport();
+async function sendVerificationEmail({ to, link }) {
+  return sendEmail({
+    to,
+    logContext: 'Verification',
+    subject: 'Verify your UrbanPro email',
+    text: `Welcome to UrbanPro! Verify your email: ${link}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+        <h2>Verify your email</h2>
+        <p>Thanks for signing up with UrbanPro. Please verify your email to continue.</p>
+        <p>
+          <a href="${link}" style="display:inline-block;padding:10px 16px;background:#2563eb;color:#ffffff;text-decoration:none;border-radius:6px;">Verify Email</a>
+        </p>
+        <p>If the button does not work, copy and paste this link into your browser:</p>
+        <p>${link}</p>
+      </div>
+    `,
+  });
+}
 
-    const info = await transporter.sendMail({
-      from: getFromAddress(),
-      to,
-      subject: 'Reset your UrbanPro password',
-      text: `Reset your password here: ${link}`,
-      html: `
-        <div style="font-family: Arial, sans-serif; line-height: 1.6;">
-          <h2>Reset Password</h2>
-          <p>You requested a password reset for UrbanPro.</p>
-          <p>
-            <a href="${link}" style="display:inline-block;padding:10px 16px;background:#ef4444;color:#ffffff;text-decoration:none;border-radius:6px;">Reset Password</a>
-          </p>
-          <p>If you didn't request this, you can ignore this email.</p>
-          <p>Link: ${link}</p>
-        </div>
-      `,
-    });
-    
-    console.log(`[Email] ✅ Password reset email sent: ${info.messageId} → ${to}`);
-    logger.info('Password reset email sent', { to, messageId: info.messageId });
-    return info;
-  } catch (error) {
-    console.error(`[Email] ❌ Failed to send password reset email to ${to}:`, {
-      message: error.message,
-      code: error.code,
-      command: error.command,
-      response: error.response,
-    });
-    logger.error('Failed to send password reset email', { 
-      to, 
-      message: error.message, 
-      code: error.code 
-    });
-    throw error;
-  }
+async function sendPasswordResetEmail({ to, link }) {
+  return sendEmail({
+    to,
+    logContext: 'Password Reset',
+    subject: 'Reset your UrbanPro password',
+    text: `Reset your password here: ${link}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+        <h2>Reset Password</h2>
+        <p>You requested a password reset for UrbanPro.</p>
+        <p>
+          <a href="${link}" style="display:inline-block;padding:10px 16px;background:#ef4444;color:#ffffff;text-decoration:none;border-radius:6px;">Reset Password</a>
+        </p>
+        <p>If you didn't request this, you can ignore this email.</p>
+        <p>Link: ${link}</p>
+      </div>
+    `,
+  });
 }
 
 const BOOKING_STATUS_CONFIG = {
