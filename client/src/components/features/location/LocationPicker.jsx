@@ -70,14 +70,17 @@ export function LocationPicker({ onChange, initialLocation = null, className = '
 
     const handleLocationChange = useCallback((latlng, addr = '') => {
         setPosition(latlng);
-        // Always update address if provided
-        if (addr) setAddress(addr);
-        onChange({
-            lat: latlng.lat,
-            lng: latlng.lng,
-            address: addr || address
+        // Using functional update to avoid 'address' dependency loop
+        setAddress(prev => {
+            const finalAddr = addr || prev;
+            onChange({
+                lat: latlng.lat,
+                lng: latlng.lng,
+                address: finalAddr
+            });
+            return finalAddr;
         });
-    }, [address, onChange]);
+    }, [onChange]);
 
     const handleAutocompleteSelect = (data) => {
         const latlng = { lat: data.lat, lng: data.lng };
