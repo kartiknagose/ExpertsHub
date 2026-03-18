@@ -47,7 +47,7 @@ jobs:
       - run: npm run lint
       - run: npm run build
         env:
-          NODE_OPTIONS: "--max-old-space-size=4096"
+          VITE_API_URL: "/api"
 
   # Docker image checks are intentionally excluded from CI.
   # Production deploy path is platform-native (Vercel + Render).
