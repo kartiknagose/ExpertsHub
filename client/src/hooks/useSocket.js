@@ -31,11 +31,15 @@ export default function useSocket(user = null) {
       return;
     }
 
+    const isDev = import.meta.env.DEV;
     const socketOptions = {
       withCredentials: true,
-      // Force polling in dev to avoid websocket upgrade failures on refresh.
-      transports: ['polling'],
-      upgrade: false,
+      // Prefer websocket in production for lower latency; keep polling fallback.
+      transports: isDev ? ['polling', 'websocket'] : ['websocket', 'polling'],
+      upgrade: true,
+      timeout: 10000,
+      reconnectionAttempts: 8,
+      reconnectionDelay: 500,
     };
 
     function joinRooms() {

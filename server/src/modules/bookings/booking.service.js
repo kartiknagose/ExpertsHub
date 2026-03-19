@@ -1379,6 +1379,14 @@ async function verifyBookingCompletion(bookingId, otp, userId) {
     throw new AppError(400, 'Invalid Completion OTP.');
   }
 
+  const runNonBlocking = async (label, fn) => {
+    try {
+      await fn();
+    } catch (err) {
+      console.error(`[BOOKING_COMPLETE] ${label} failed for booking ${bookingId}:`, err.message);
+    }
+  };
+
   // OTP Valid -> Complete Job
   const updatedBooking = await prisma.$transaction(async (tx) => {
     const updated = await tx.booking.update({
@@ -1408,24 +1416,35 @@ async function verifyBookingCompletion(bookingId, otp, userId) {
 
     // BUSINESS GROWTH: Update Coupon Count (Sprint 17)
     if (booking.couponId) {
-      await tx.coupon.update({
-        where: { id: booking.couponId },
-        data: { usageCount: { increment: 1 } }
+      await runNonBlocking('Coupon usage increment', async () => {
+        await tx.coupon.update({
+          where: { id: booking.couponId },
+          data: { usageCount: { increment: 1 } }
+        });
       });
     }
 
     // BUSINESS GROWTH: Award Referral Bonus if first job (Sprint 17)
-    await GrowthService.awardReferralBonus(bookingId, tx);
+    await runNonBlocking('Referral bonus award', async () => {
+      await GrowthService.awardReferralBonus(bookingId, tx);
+    });
 
     // BUSINESS GROWTH: Award Loyalty Points (Sprint 17 - #75)
-    if (updated.totalPrice) {
-      await GrowthService.awardLoyaltyPoints(updated.customerId, Number(updated.totalPrice), tx);
+    const totalPrice = Number(updated.totalPrice || 0);
+    if (Number.isFinite(totalPrice) && totalPrice > 0) {
+      await runNonBlocking('Loyalty points award', async () => {
+        await GrowthService.awardLoyaltyPoints(updated.customerId, totalPrice, tx);
+      });
     }
 
     // BUSINESS GROWTH: Handle Recurring Bookings (Sprint 17 - #78)
-    await handleRecurringBooking(updated, tx);
+    await runNonBlocking('Recurring booking handling', async () => {
+      await handleRecurringBooking(updated, tx);
+    });
 
-    await releaseEscrowIfEligible(bookingId, tx);
+    await runNonBlocking('Escrow release', async () => {
+      await releaseEscrowIfEligible(bookingId, tx);
+    });
 
     return updated;
   });

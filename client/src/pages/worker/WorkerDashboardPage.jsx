@@ -137,9 +137,13 @@ export function WorkerDashboardPage() {
   });
 
   useSocketEvent('booking:status_updated', (payload) => {
-    const isMine = payload.workerId === profile?.id;
-    if (isMine || payload.status === 'PENDING') {
-      refetch();
+    const workerUserId = payload?.workerUserId || payload?.workerProfile?.userId || payload?.workerProfile?.user?.id || null;
+    const workerProfileId = payload?.workerProfileId || payload?.workerId || payload?.workerProfile?.id || null;
+    const isMine = String(workerUserId) === String(user?.id) || String(workerProfileId) === String(profile?.id);
+
+    if (isMine || payload?.status === 'PENDING') {
+      queryClient.invalidateQueries({ queryKey: queryKeys.bookings.worker() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.bookings.open() });
     }
   });
 

@@ -42,12 +42,19 @@ const otpLimiter = rateLimit({
   max: 5, // max 5 OTP attempts per window
   standardHeaders: true,
   legacyHeaders: false,
+  skipSuccessfulRequests: true,
   keyGenerator: (req, _res) => {
-    // Key by user ID + booking ID so each booking has its own counter.
-    // This prevents an attacker from spreading attempts across bookings.
+    // Key by user ID + booking ID + action to keep START and COMPLETE
+    // counters independent and avoid accidental lockouts across steps.
     const userId = req.user?.id || 'anon';
     const bookingId = req.params.id || 'unknown';
-    return `otp:${userId}:${bookingId}`;
+    const action = req.path.includes('/complete')
+      ? 'complete'
+      : req.path.includes('/start')
+        ? 'start'
+        : 'otp';
+
+    return `otp:${userId}:${bookingId}:${action}`;
   },
   message: {
     error: 'Too many OTP attempts. Please wait 15 minutes before trying again.',

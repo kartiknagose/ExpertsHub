@@ -248,16 +248,18 @@ export function CustomerDashboardPage() {
   }, [bookings]);
 
   useSocketEvent('booking:created', (payload) => {
-    if (payload.customerId === user?.id) {
+    const customerId = payload?.customerId || payload?.customer?.id;
+    if (String(customerId) === String(user?.id)) {
       toast.info(t('New booking confirmed!'));
-      refetch();
+      queryClient.invalidateQueries({ queryKey: queryKeys.bookings.customer() });
     }
   });
 
   useSocketEvent('booking:status_updated', (payload) => {
-    if (payload.customerId === user?.id) {
+    const customerId = payload?.customerId || payload?.customer?.id;
+    if (String(customerId) === String(user?.id)) {
       toast.success(t('Booking status: {{status}}', { status: t(payload.status) }));
-      refetch();
+      queryClient.invalidateQueries({ queryKey: queryKeys.bookings.customer() });
     }
   });
 
