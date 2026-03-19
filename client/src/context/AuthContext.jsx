@@ -91,6 +91,22 @@ function authReducer(state, action) {
   }
 }
 
+const getApiErrorMessage = (error, fallback) => {
+  if (error?.code === 'ECONNABORTED') {
+    return 'Server timeout. Please try again in a few seconds.';
+  }
+
+  if (error?.request && !error?.response) {
+    return 'Unable to reach server. Check your network and try again.';
+  }
+
+  return (
+    error?.response?.data?.error ||
+    error?.response?.data?.message ||
+    fallback
+  );
+};
+
 /**
  * AuthProvider Component
  * 
@@ -212,10 +228,7 @@ export function AuthProvider({ children }) {
 
       return { success: true };
     } catch (error) {
-      const errorMessage =
-        error.response?.data?.error ||
-        error.response?.data?.message ||
-        'Login failed';
+      const errorMessage = getApiErrorMessage(error, 'Login failed');
       localStorage.removeItem('user');
       dispatch({ type: ACTIONS.LOGOUT });
       dispatch({ type: ACTIONS.LOGIN_ERROR, payload: errorMessage });
@@ -239,10 +252,7 @@ export function AuthProvider({ children }) {
       // dispatch({ type: ACTIONS.SET_LOADING, payload: false }); // Not needed as we didn't set it to true
       return { success: true };
     } catch (error) {
-      const errorMessage =
-        error.response?.data?.error ||
-        error.response?.data?.message ||
-        'Registration failed';
+      const errorMessage = getApiErrorMessage(error, 'Registration failed');
       dispatch({ type: ACTIONS.LOGIN_ERROR, payload: errorMessage });
       return { success: false, error: errorMessage };
     }
@@ -263,10 +273,7 @@ export function AuthProvider({ children }) {
       // dispatch({ type: ACTIONS.SET_LOADING, payload: false });
       return { success: true };
     } catch (error) {
-      const errorMessage =
-        error.response?.data?.error ||
-        error.response?.data?.message ||
-        'Worker registration failed';
+      const errorMessage = getApiErrorMessage(error, 'Worker registration failed');
       dispatch({ type: ACTIONS.LOGIN_ERROR, payload: errorMessage });
       return { success: false, error: errorMessage };
     }

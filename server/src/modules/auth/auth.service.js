@@ -67,6 +67,8 @@ async function registerUser({ name, email, mobile, password, role = 'CUSTOMER', 
 }
 
 async function loginUser({ email, password }) {
+  const requireEmailVerification = String(process.env.REQUIRE_EMAIL_VERIFICATION || '').toLowerCase() === 'true';
+
   const user = await prisma.user.findUnique({
     where: { email },
     include: {
@@ -78,7 +80,7 @@ async function loginUser({ email, password }) {
   if (!user) throw new AppError(401, 'Invalid credentials');
   const ok = await comparePassword(password, user.passwordHash);
   if (!ok) throw new AppError(401, 'Invalid credentials');
-  if (!user.emailVerified && process.env.NODE_ENV !== 'development') {
+  if (requireEmailVerification && !user.emailVerified && process.env.NODE_ENV !== 'development') {
     throw new AppError(403, 'Email not verified. Please check your inbox.');
   }
   if (!user.isActive) throw new AppError(403, 'Account suspended. Please contact support.');

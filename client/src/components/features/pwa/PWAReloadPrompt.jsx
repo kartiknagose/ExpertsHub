@@ -39,15 +39,14 @@ export function PWAReloadPrompt() {
 
   useEffect(() => {
     if (needRefresh) {
-      toast('A new version of UrbanPro is available', {
+      toast('Updating UrbanPro to the latest version...', {
         id: 'pwa-update-available',
-        duration: Infinity,
-        action: {
-          label: 'Update Now',
-          onClick: () => updateServiceWorker(true),
-        },
-        onDismiss: () => setNeedRefresh(false),
+        duration: 2500,
       });
+
+      // Auto-apply updates so users are never stuck on stale API configs.
+      updateServiceWorker(true);
+      setNeedRefresh(false);
     }
   }, [needRefresh, setNeedRefresh, updateServiceWorker]);
 

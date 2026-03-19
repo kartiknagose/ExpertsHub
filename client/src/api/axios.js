@@ -10,6 +10,7 @@ const API_URL = API_BASE_URL;
 // Create axios instance with default config
 const axiosInstance = axios.create({
   baseURL: API_URL,
+  timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -36,6 +37,10 @@ axiosInstance.interceptors.response.use(
   },
   (error) => {
     // Handle response errors globally
+    if (error.code === 'ECONNABORTED') {
+      console.error('Request timed out - backend took too long to respond');
+    }
+
     if (error.response) {
       // Server responded with error status
       const { status, data } = error.response;

@@ -7,6 +7,7 @@ const { sendVerificationEmail, sendPasswordResetEmail } = require('../../common/
 const GrowthService = require('../business_growth/business_growth.service');
 
 const isProduction = process.env.NODE_ENV === 'production';
+const requireEmailVerification = String(process.env.REQUIRE_EMAIL_VERIFICATION || '').toLowerCase() === 'true';
 
 const COOKIE_OPTIONS = {
   httpOnly: true,
@@ -24,7 +25,11 @@ exports.register = asyncHandler(async (req, res) => {
 
   if (process.env.NODE_ENV === 'production') {
     try {
-      await sendVerificationEmail({ to: user.email, link: verificationLink });
+      // Avoid hanging registration for a long SMTP timeout in production.
+      await Promise.race([
+        sendVerificationEmail({ to: user.email, link: verificationLink }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Verification email timeout')), 8000)),
+      ]);
       console.log(`✅ Verification email sent to ${user.email}`);
     } catch (error) {
       console.error('❌ Verification email failed (SMTP Error):');
@@ -33,13 +38,17 @@ exports.register = asyncHandler(async (req, res) => {
       console.error('Message:', error.message);
       console.error('Stack:', error.stack);
 
-      try {
-        await prisma.user.delete({ where: { id: user.id } });
-      } catch (cleanupError) {
-        console.error('Failed to clean up user after email failure:', cleanupError.message);
+      if (requireEmailVerification) {
+        try {
+          await prisma.user.delete({ where: { id: user.id } });
+        } catch (cleanupError) {
+          console.error('Failed to clean up user after email failure:', cleanupError.message);
+        }
+
+        throw new AppError(502, 'Unable to send verification email. Please try again later.');
       }
 
-      throw new AppError(502, 'Unable to send verification email. Please try again later.');
+      console.warn('⚠️ Continuing registration despite email failure because REQUIRE_EMAIL_VERIFICATION is false.');
     }
   } else {
     (async () => {
