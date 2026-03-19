@@ -3,11 +3,13 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
+const isWindowsNonCI = globalThis.process?.platform === 'win32' && globalThis.process?.env?.CI !== 'true'
+
 export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      disable: process.platform === 'win32' && process.env.CI !== 'true',
+      disable: isWindowsNonCI,
       registerType: 'prompt',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
       manifest: {
