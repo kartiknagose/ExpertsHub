@@ -29,10 +29,63 @@ export class ErrorBoundary extends Component {
         this.setState({ errorInfo });
         // Log to error reporting service in production
         console.error('ErrorBoundary caught an error:', error, errorInfo);
+
+        // Recover from stale chunk/module failures after deploys (common with cached assets).
+        const message = String(error?.message || error || '');
+        const isChunkLoadFailure = /ChunkLoadError|Failed to fetch dynamically imported module|Importing a module script failed/i.test(message);
+
+        if (isChunkLoadFailure && typeof window !== 'undefined') {
+            const reloadGuardKey = 'upro:chunk-recovery-attempted';
+            if (!sessionStorage.getItem(reloadGuardKey)) {
+                sessionStorage.setItem(reloadGuardKey, '1');
+
+                const forceReload = async () => {
+                    try {
+                        if ('serviceWorker' in navigator) {
+                            const registrations = await navigator.serviceWorker.getRegistrations();
+                            await Promise.allSettled(registrations.map((reg) => reg.unregister()));
+                        }
+
+                        if ('caches' in window) {
+                            const keys = await caches.keys();
+                            await Promise.allSettled(keys.map((key) => caches.delete(key)));
+                        }
+                    } catch (_err) {
+                        // Ignore cleanup failures and still force reload.
+                    }
+
+                    const url = new URL(window.location.href);
+                    url.searchParams.set('_cb', String(Date.now()));
+                    window.location.replace(url.toString());
+                };
+
+                void forceReload();
+            }
+        }
     }
 
     handleReset = () => {
         this.setState({ hasError: false, error: null, errorInfo: null });
+    };
+
+    handleHardRefresh = async () => {
+        try {
+            if ('serviceWorker' in navigator) {
+                const registrations = await navigator.serviceWorker.getRegistrations();
+                await Promise.allSettled(registrations.map((reg) => reg.unregister()));
+            }
+
+            if ('caches' in window) {
+                const keys = await caches.keys();
+                await Promise.allSettled(keys.map((key) => caches.delete(key)));
+            }
+        } catch (_err) {
+            // Ignore cleanup failures and force reload anyway.
+        }
+
+        const url = new URL(window.location.href);
+        url.searchParams.set('_cb', String(Date.now()));
+        window.location.replace(url.toString());
     };
 
     render() {
@@ -88,6 +141,12 @@ export class ErrorBoundary extends Component {
                                 className="px-6 py-2.5 bg-gradient-to-r from-brand-500 to-accent-500 text-white rounded-lg font-medium hover:from-brand-600 hover:to-accent-600 transition-all shadow-lg shadow-brand-500/25"
                             >
                                 Try Again
+                            </button>
+                            <button
+                                onClick={this.handleHardRefresh}
+                                className="px-6 py-2.5 rounded-lg font-medium border border-brand-300 dark:border-brand-700 text-brand-700 dark:text-brand-300 hover:bg-brand-50 dark:hover:bg-brand-900/20 transition-colors"
+                            >
+                                Hard Refresh App
                             </button>
                             <button
                                 onClick={() => window.location.reload()}

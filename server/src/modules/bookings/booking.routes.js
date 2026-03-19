@@ -124,7 +124,6 @@ router.post(
   '/:id/start',
   authenticate,
   requireWorker,
-  otpLimiter,
   bookingController.verifyBookingStart
 );
 
@@ -135,7 +134,6 @@ router.post(
   '/:id/complete',
   authenticate,
   requireWorker,
-  otpLimiter,
   bookingController.verifyBookingCompletion
 );
 
