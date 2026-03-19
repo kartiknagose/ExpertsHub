@@ -18,9 +18,17 @@ services:
       - key: REDIS_URL
         sync: false
       - key: CORS_ORIGIN
-        value: "https://urban-pro-v1.vercel.app,http://localhost:5173"
+        value: "https://your-frontend-domain.vercel.app,http://localhost:5173"
       - key: FRONTEND_URL
-        value: "https://urban-pro-v1.vercel.app"
+        value: "https://your-frontend-domain.vercel.app"
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: CACHE_RELAY_SECRET
+        sync: false
+      - key: CACHE_RELAY_URL
+        sync: false
       - key: SMTP_HOST
         sync: false
       - key: SMTP_PORT
