@@ -8,6 +8,7 @@ const GrowthService = require('../business_growth/business_growth.service');
 
 const isProduction = process.env.NODE_ENV === 'production';
 const requireEmailVerification = String(process.env.REQUIRE_EMAIL_VERIFICATION || '').toLowerCase() === 'true';
+const smtpSendTimeoutMs = Number(process.env.SMTP_SEND_TIMEOUT_MS || 20000);
 
 const COOKIE_OPTIONS = {
   httpOnly: true,
@@ -23,14 +24,42 @@ exports.register = asyncHandler(async (req, res) => {
   const baseUrl = FRONTEND_URL;
   const verificationLink = `${baseUrl}/verify-email?token=${encodeURIComponent(verificationToken)}`;
 
-  if (process.env.NODE_ENV === 'production') {
+  const sendVerificationWithTimeout = async () => {
+    await Promise.race([
+      sendVerificationEmail({ to: user.email, link: verificationLink }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Verification email timeout')), smtpSendTimeoutMs)),
+    ]);
+  };
+
+  const isRetryableMailError = (error) => {
+    if (!error) return false;
+    const code = String(error.code || '').toUpperCase();
+    const message = String(error.message || '').toLowerCase();
+    return code === 'ETIMEDOUT'
+      || code === 'ECONNECTION'
+      || code === 'ECONNRESET'
+      || message.includes('timeout');
+  };
+
+  const trySendVerification = async () => {
     try {
-      // Avoid hanging registration for a long SMTP timeout in production.
-      await Promise.race([
-        sendVerificationEmail({ to: user.email, link: verificationLink }),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Verification email timeout')), 8000)),
-      ]);
+      await sendVerificationWithTimeout();
       console.log(`✅ Verification email sent to ${user.email}`);
+      return;
+    } catch (firstError) {
+      if (!isRetryableMailError(firstError)) {
+        throw firstError;
+      }
+
+      console.warn(`⚠️ Verification email first attempt failed for ${user.email}. Retrying once...`);
+      await sendVerificationWithTimeout();
+      console.log(`✅ Verification email sent to ${user.email} (retry success)`);
+    }
+  };
+
+  if (isProduction) {
+    try {
+      await trySendVerification();
     } catch (error) {
       console.error('❌ Verification email failed (SMTP Error):');
       if (error.response) console.error('Response:', error.response);
@@ -56,8 +85,7 @@ exports.register = asyncHandler(async (req, res) => {
   } else {
     (async () => {
       try {
-        await sendVerificationEmail({ to: user.email, link: verificationLink });
-        console.log(`✅ Verification email sent to ${user.email}`);
+        await trySendVerification();
       } catch (error) {
         console.error('❌ Verification email failed (SMTP Error):');
         if (error.response) console.error('Response:', error.response);

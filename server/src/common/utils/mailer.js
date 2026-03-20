@@ -10,22 +10,60 @@ const isProduction = process.env.NODE_ENV === 'production';
 
 let transporterSingleton = null;
 
+const normalizeSecret = (value) => {
+  if (value == null) return '';
+  // Remove wrapping quotes and trim accidental whitespace/newlines.
+  return String(value).trim().replace(/^"|"$/g, '').replace(/^'|'$/g, '');
+};
+
+const normalizeGmailAppPassword = (value) => {
+  // Gmail App Password is 16 chars; users often paste it with spaces.
+  return normalizeSecret(value).replace(/\s+/g, '');
+};
+
+const readSmtpConfig = () => {
+  const host = normalizeSecret(process.env.SMTP_HOST || process.env.MAIL_HOST);
+  const port = toNumber(process.env.SMTP_PORT || process.env.MAIL_PORT, 587);
+  const user = normalizeSecret(process.env.SMTP_USER || process.env.MAIL_USER || process.env.EMAIL_USER);
+  const secure = String(process.env.SMTP_SECURE || process.env.MAIL_SECURE || 'false').toLowerCase() === 'true';
+
+  // Support multiple common key names to reduce misconfiguration issues.
+  const rawPass =
+    process.env.SMTP_PASS ||
+    process.env.SMTP_PASSWORD ||
+    process.env.MAIL_PASS ||
+    process.env.MAIL_PASSWORD ||
+    process.env.EMAIL_PASS ||
+    process.env.GMAIL_APP_PASSWORD ||
+    '';
+
+  const pass = host.toLowerCase().includes('gmail')
+    ? normalizeGmailAppPassword(rawPass)
+    : normalizeSecret(rawPass);
+
+  return { host, port, user, pass, secure };
+};
+
 const buildTransport = () => {
   if (transporterSingleton) return transporterSingleton;
 
-  const host = process.env.SMTP_HOST;
-  const port = toNumber(process.env.SMTP_PORT, 587);
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
-  const secure = String(process.env.SMTP_SECURE || 'false').toLowerCase() === 'true';
+  const { host, port, user, pass, secure } = readSmtpConfig();
 
   if (!host || !user || !pass) {
     const missingFields = [];
-    if (!host) missingFields.push('SMTP_HOST');
-    if (!user) missingFields.push('SMTP_USER');
-    if (!pass) missingFields.push('SMTP_PASS');
+    if (!host) missingFields.push('SMTP_HOST/MAIL_HOST');
+    if (!user) missingFields.push('SMTP_USER/MAIL_USER/EMAIL_USER');
+    if (!pass) missingFields.push('SMTP_PASS/SMTP_PASSWORD/MAIL_PASS/MAIL_PASSWORD/EMAIL_PASS/GMAIL_APP_PASSWORD');
     console.warn(`[Email] ⚠️ SMTP credentials not fully configured. Missing: ${missingFields.join(', ')}`);
     return null;
+  }
+
+  const isGmailHost = host.toLowerCase().includes('gmail');
+  if (isGmailHost && pass.length !== 16) {
+    console.warn(
+      `[Email] ⚠️ Gmail SMTP likely misconfigured: expected a 16-character App Password after removing spaces, got ${pass.length}.`
+    );
+    console.warn('[Email] ⚠️ Use Google App Password (not normal Gmail password) and ensure 2-Step Verification is enabled.');
   }
 
   transporterSingleton = nodemailer.createTransport({
@@ -33,6 +71,7 @@ const buildTransport = () => {
     port,
     secure,
     auth: { user, pass },
+    requireTLS: !secure,
     pool: true,
     maxConnections: 5,
     maxMessages: 100,
