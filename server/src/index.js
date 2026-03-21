@@ -144,11 +144,13 @@ app.get('/health', (req, res) => {
 // SMTP health probe (safe diagnostics for production)
 // Requires x-email-health-token header in production when EMAIL_HEALTH_TOKEN is set.
 app.get('/health/email', async (req, res) => {
-  const configuredToken = process.env.EMAIL_HEALTH_TOKEN;
-  const providedToken = req.get('x-email-health-token') || '';
+  const normalizeToken = (value) => String(value || '').trim().replace(/^"|"$/g, '').replace(/^'|'$/g, '');
+  const configuredToken = normalizeToken(process.env.EMAIL_HEALTH_TOKEN);
+  const providedToken = normalizeToken(req.get('x-email-health-token') || req.query.token || '');
+  const publicProbeEnabled = String(process.env.EMAIL_HEALTH_PROBE_PUBLIC || '').toLowerCase() === 'true';
   const isProduction = process.env.NODE_ENV === 'production';
 
-  if (isProduction && configuredToken && providedToken !== configuredToken) {
+  if (isProduction && !publicProbeEnabled && configuredToken && providedToken !== configuredToken) {
     return res.status(403).json({ ok: false, message: 'Forbidden' });
   }
 
