@@ -13,6 +13,7 @@ const SMTP_GREETING_TIMEOUT_MS = toNumber(process.env.SMTP_GREETING_TIMEOUT_MS, 
 const SMTP_SOCKET_TIMEOUT_MS = toNumber(process.env.SMTP_SOCKET_TIMEOUT_MS, 20000);
 const SMTP_VERIFY_TIMEOUT_MS = toNumber(process.env.SMTP_VERIFY_TIMEOUT_MS, 12000);
 const RESEND_HTTP_TIMEOUT_MS = toNumber(process.env.RESEND_HTTP_TIMEOUT_MS, 10000);
+const SENDGRID_HTTP_TIMEOUT_MS = toNumber(process.env.SENDGRID_HTTP_TIMEOUT_MS, 10000);
 const SMTP_DISABLED = String(process.env.SMTP_DISABLED || '').toLowerCase() === 'true';
 
 let transporterSingleton = null;
@@ -150,6 +151,10 @@ const isResendConfigured = () => {
   return Boolean(normalizeSecret(process.env.RESEND_API_KEY));
 };
 
+const isSendGridConfigured = () => {
+  return Boolean(normalizeSecret(process.env.SENDGRID_API_KEY));
+};
+
 async function sendViaResend({ to, subject, text, html, logContext = 'Default' }) {
   const resendApiKey = normalizeSecret(process.env.RESEND_API_KEY);
   const resendFrom = normalizeSecret(process.env.RESEND_FROM || process.env.FROM_EMAIL || process.env.SMTP_USER || 'onboarding@resend.dev');
@@ -191,14 +196,68 @@ async function sendViaResend({ to, subject, text, html, logContext = 'Default' }
   return { messageId, provider: 'resend' };
 }
 
+async function sendViaSendGrid({ to, subject, text, html, logContext = 'Default' }) {
+  const sendGridApiKey = normalizeSecret(process.env.SENDGRID_API_KEY);
+  const sendGridFrom = normalizeSecret(process.env.SENDGRID_FROM || process.env.FROM_EMAIL || process.env.SMTP_USER || 'noreply@example.com');
+
+  if (!sendGridApiKey) {
+    throw new Error('SendGrid fallback unavailable: SENDGRID_API_KEY is not configured');
+  }
+
+  const recipients = Array.isArray(to) ? to : [to];
+  const payload = {
+    personalizations: [{ to: recipients.map((email) => ({ email })) }],
+    from: { email: sendGridFrom },
+    subject,
+    content: [
+      { type: 'text/plain', value: text || '' },
+      { type: 'text/html', value: html || '' },
+    ],
+  };
+
+  try {
+    const response = await axios.post('https://api.sendgrid.com/v3/mail/send', payload, {
+      timeout: SENDGRID_HTTP_TIMEOUT_MS,
+      headers: {
+        Authorization: `Bearer ${sendGridApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      validateStatus: () => true,
+    });
+
+    if (response.status < 200 || response.status >= 300) {
+      console.error(`[Email] ❌ SendGrid failed for [${logContext}] to ${to}:`, {
+        status: response.status,
+        data: response.data,
+      });
+      throw new Error(`SendGrid request failed with status ${response.status}`);
+    }
+
+    const messageId = response.headers?.['x-message-id'] || 'accepted';
+    console.log(`[Email] ✅ Sent [${logContext}] via SendGrid: ${messageId} → ${to}`);
+    return { messageId, provider: 'sendgrid' };
+  } catch (error) {
+    console.error(`[Email] ❌ SendGrid failed for [${logContext}] to ${to}:`, {
+      message: error.message,
+      code: error.code,
+      status: error?.response?.status,
+      data: error?.response?.data,
+    });
+    throw error;
+  }
+}
+
 /**
  * Generic email sender with robust logging
  */
 async function sendEmail({ to, subject, text, html, logContext = 'Default' }) {
   const transporter = buildTransport();
   if (!transporter) {
-    if (isProduction && process.env.RESEND_API_KEY) {
+    if (isProduction && isResendConfigured()) {
       return sendViaResend({ to, subject, text, html, logContext });
+    }
+    if (isProduction && isSendGridConfigured()) {
+      return sendViaSendGrid({ to, subject, text, html, logContext });
     }
 
     const message = `SMTP transport not configured for ${logContext}`;
@@ -226,9 +285,15 @@ async function sendEmail({ to, subject, text, html, logContext = 'Default' }) {
       response: error.response,
     });
 
-    if (isProduction && process.env.RESEND_API_KEY && shouldFallbackToResend(error)) {
-      console.warn(`[Email] ⚠️ Falling back to Resend for [${logContext}] due to SMTP connectivity issue (${error.code || error.message}).`);
-      return sendViaResend({ to, subject, text, html, logContext });
+    if (isProduction && shouldFallbackToResend(error)) {
+      if (isResendConfigured()) {
+        console.warn(`[Email] ⚠️ Falling back to Resend for [${logContext}] due to SMTP connectivity issue (${error.code || error.message}).`);
+        return sendViaResend({ to, subject, text, html, logContext });
+      }
+      if (isSendGridConfigured()) {
+        console.warn(`[Email] ⚠️ Falling back to SendGrid for [${logContext}] due to SMTP connectivity issue (${error.code || error.message}).`);
+        return sendViaSendGrid({ to, subject, text, html, logContext });
+      }
     }
 
     throw error;
@@ -404,4 +469,5 @@ module.exports = {
   sendBookingStatusEmail,
   verifySmtpConnection,
   isResendConfigured,
+  isSendGridConfigured,
 };
