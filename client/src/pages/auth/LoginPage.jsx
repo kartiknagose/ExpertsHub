@@ -1,4 +1,5 @@
-// Login page — uses AuthLayout, premium form design
+// Login page — uses Clerk <SignIn> when Clerk is configured, falls back to
+// the custom email/password form for the legacy path.
 
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
@@ -7,19 +8,19 @@ import { z } from 'zod';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Mail, Lock, LogIn, ArrowRight, CheckCircle } from 'lucide-react';
 import { motion as Motion } from 'framer-motion';
+import { SignIn } from '@clerk/clerk-react';
 import { AuthLayout } from '../../components/layout/AuthLayout';
 import { Input, Button } from '../../components/common';
 import { useAuth } from '../../hooks/useAuth';
-import { IMAGES } from '../../constants/images';
 import { usePageTitle } from '../../hooks/usePageTitle';
+import { isClerkEnabled } from '../../config/env';
 
 const loginSchema = z.object({
   email:    z.string().email('Please enter a valid email'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
 });
 
-export function LoginPage() {
-  usePageTitle('Log In');
+function LegacyLoginForm() {
   const { login, error: authError, clearError } = useAuth();
   const navigate  = useNavigate();
   const location  = useLocation();
@@ -45,10 +46,7 @@ export function LoginPage() {
   };
 
   return (
-    <AuthLayout
-      title="Welcome back to UrbanPro"
-      subtitle="Manage your bookings, connect with professionals, or grow your service business — all in one place."
-    >
+    <>
       {/* Form header */}
       <Motion.div
         initial={{ opacity: 0, y: -12 }}
@@ -152,6 +150,47 @@ export function LoginPage() {
           </p>
         </div>
       </form>
+    </>
+  );
+}
+
+export function LoginPage() {
+  usePageTitle('Log In');
+
+  if (isClerkEnabled) {
+    return (
+      <AuthLayout
+        title="Welcome back to UrbanPro"
+        subtitle="Manage your bookings, connect with professionals, or grow your service business — all in one place."
+      >
+        <SignIn
+          routing="path"
+          path="/login"
+          signUpUrl="/register"
+          fallbackRedirectUrl="/customer/dashboard"
+          appearance={{
+            elements: {
+              rootBox: 'w-full',
+              card: 'shadow-none border-0 p-0 bg-transparent',
+              headerTitle: 'text-2xl font-bold text-neutral-900 dark:text-white',
+              headerSubtitle: 'text-neutral-500 dark:text-neutral-400',
+              formButtonPrimary: 'bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl h-12',
+              formFieldInput: 'rounded-xl border-neutral-300 dark:border-dark-600 dark:bg-dark-800 dark:text-white',
+              footerActionLink: 'text-brand-600 hover:text-brand-500 font-bold',
+            },
+          }}
+        />
+      </AuthLayout>
+    );
+  }
+
+  return (
+    <AuthLayout
+      title="Welcome back to UrbanPro"
+      subtitle="Manage your bookings, connect with professionals, or grow your service business — all in one place."
+    >
+      <LegacyLoginForm />
     </AuthLayout>
   );
 }
+

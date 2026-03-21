@@ -15,19 +15,36 @@ const axiosInstance = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  withCredentials: true, // Important: Send cookies with requests for auth
+  withCredentials: true, // Send cookies with requests (legacy JWT + CORS)
 });
 
-// Request interceptor - Runs before every request
+/**
+ * Retrieve the current Clerk session token, if Clerk is loaded and a user is
+ * signed in. Returns null when Clerk is not configured or the user is signed out.
+ */
+const getClerkToken = async () => {
+  try {
+    // window.Clerk is injected by ClerkProvider when the publishable key is set.
+    if (typeof window !== 'undefined' && window.Clerk?.session) {
+      return await window.Clerk.session.getToken();
+    }
+  } catch {
+    // Ignore — Clerk not loaded or session expired.
+  }
+  return null;
+};
+
+// Request interceptor — attach Clerk Bearer token when available
 axiosInstance.interceptors.request.use(
-  (config) => {
-    // Auth uses httpOnly cookies; no manual token headers required
+  async (config) => {
+    const token = await getClerkToken();
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    // Legacy fallback: cookie-based auth is handled automatically by withCredentials
     return config;
   },
-  (error) => {
-    // Handle request error
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error),
 );
 
 // Response interceptor - Runs after every response

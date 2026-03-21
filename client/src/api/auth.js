@@ -5,6 +5,7 @@ import axiosInstance from './axios';
 
 // Auth API endpoints
 const AUTH_ENDPOINTS = {
+  SYNC_USER: '/auth/sync',
   REGISTER_CUSTOMER: '/auth/register',
   REGISTER_WORKER: '/auth/register-worker',
   LOGIN: '/auth/login',
@@ -48,6 +49,22 @@ const withRetryOnNetworkTimeout = async (requestFn, retries = 1) => {
   }
 
   throw lastError;
+};
+
+/**
+ * Sync a Clerk-authenticated user to the local database.
+ * Called after Clerk sign-up to persist additional fields (mobile, role).
+ *
+ * @param {Object} data - Profile data
+ * @param {string} data.name     - User's full name
+ * @param {string} data.email    - User's email (must match Clerk account)
+ * @param {string} data.mobile   - User's mobile number
+ * @param {string} [data.role]   - 'CUSTOMER' | 'WORKER' (default: 'CUSTOMER')
+ * @returns {Promise} Response with user data
+ */
+export const syncUser = async (data) => {
+  const response = await axiosInstance.post(AUTH_ENDPOINTS.SYNC_USER, data);
+  return response.data;
 };
 
 /**
@@ -158,3 +175,4 @@ export const changePassword = async (data) => {
   const response = await axiosInstance.post(AUTH_ENDPOINTS.CHANGE_PASSWORD, data);
   return response.data;
 };
+

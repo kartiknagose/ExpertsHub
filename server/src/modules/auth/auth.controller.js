@@ -17,6 +17,94 @@ const COOKIE_OPTIONS = {
   maxAge: 24 * 60 * 60 * 1000,
 };
 
+/**
+ * POST /api/auth/sync
+ *
+ * Creates or updates the local DB user profile for an authenticated Clerk user.
+ * Called after Clerk sign-up to persist additional fields (mobile, role) that
+ * Clerk does not collect. Also called on first sign-in if the DB record is
+ * missing (e.g., for users that signed up via the Clerk dashboard directly).
+ *
+ * Requires: Clerk session (clerkMiddleware must run before this handler).
+ */
+exports.syncUser = asyncHandler(async (req, res) => {
+  const { userId: clerkId } = req.auth || {};
+  if (!clerkId) throw new AppError(401, 'Authentication required');
+
+  const { name, email, mobile, role = 'CUSTOMER', referralCode = null } = req.body;
+
+  if (!name || !email || !mobile) {
+    throw new AppError(400, 'name, email and mobile are required');
+  }
+
+  const validRoles = ['CUSTOMER', 'WORKER'];
+  if (!validRoles.includes(role)) {
+    throw new AppError(400, 'Invalid role. Must be CUSTOMER or WORKER.');
+  }
+
+  // Idempotent upsert: create if missing, update clerkId on existing record
+  let user = await prisma.user.findUnique({ where: { clerkId } });
+
+  if (!user) {
+    // Check if a legacy account with the same email already exists
+    const existingByEmail = await prisma.user.findUnique({ where: { email } });
+    if (existingByEmail) {
+      // Link the Clerk ID to the existing account
+      user = await prisma.user.update({
+        where: { id: existingByEmail.id },
+        data: { clerkId, emailVerified: true, emailVerifiedAt: new Date() },
+      });
+    } else {
+      // Brand-new user — create the DB record
+      let referrerId = null;
+      if (referralCode) {
+        const referrer = await prisma.user.findUnique({ where: { referralCode: referralCode.toUpperCase() } });
+        if (referrer) referrerId = referrer.id;
+      }
+
+      user = await prisma.$transaction(async (tx) => {
+        // Check mobile uniqueness
+        const existingMobile = await tx.user.findUnique({ where: { mobile } });
+        if (existingMobile) throw new AppError(409, 'Mobile number already registered');
+
+        return tx.user.create({
+          data: {
+            clerkId,
+            name,
+            email,
+            mobile,
+            role,
+            emailVerified: true,       // Clerk has already verified the email
+            emailVerifiedAt: new Date(),
+            referredById: referrerId,
+          },
+        });
+      }, { maxWait: 10000, timeout: 15000 });
+
+      // Post-registration growth setup (wallet + referral code)
+      try {
+        await prisma.$transaction(async (tx) => {
+          await GrowthService.initializeWallet(user.id, tx);
+          await GrowthService.generateReferralCode(user.id, tx);
+        }, { maxWait: 10000, timeout: 15000 });
+      } catch (setupError) {
+        console.error('[AUTH] Post-registration growth setup failed:', setupError.message);
+      }
+    }
+  }
+
+  res.status(200).json({
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      profilePhotoUrl: user.profilePhotoUrl || null,
+      isProfileComplete: user.isProfileComplete,
+    },
+  });
+});
+
 exports.register = asyncHandler(async (req, res) => {
   const { name, email, mobile, password, role } = req.body;
   const { user, verificationToken } = await registerUser({ name, email, mobile, password, role });

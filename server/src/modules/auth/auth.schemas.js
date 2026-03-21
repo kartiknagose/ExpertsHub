@@ -41,6 +41,17 @@ const changePasswordSchema = [
   body('newPassword').isLength({ min: 8 }).withMessage('New password must be at least 8 characters'),
 ];
 
+/**
+ * syncUserSchema — validates the body for POST /api/auth/sync (Clerk flow).
+ * Collects the additional profile fields that Clerk doesn't handle.
+ */
+const syncUserSchema = [
+  body('name').trim().isLength({ min: 2 }).withMessage('Name required'),
+  body('email').isEmail().withMessage('Valid email required'),
+  body('mobile').isMobilePhone('en-IN').withMessage('Valid 10-digit Indian mobile number required'),
+  body('role').optional().isIn(['CUSTOMER', 'WORKER']).withMessage('Role must be CUSTOMER or WORKER'),
+];
+
 module.exports = {
   registerSchema,
   registerWorkerSchema,
@@ -49,4 +60,5 @@ module.exports = {
   forgotPasswordSchema,
   resetPasswordSchema,
   changePasswordSchema,
+  syncUserSchema,
 };

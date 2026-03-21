@@ -17,6 +17,7 @@ const RegisterPage = lazy(() => import('../pages/auth/RegisterPage.jsx').then(m 
 const VerifyEmailPage = lazy(() => import('../pages/auth/VerifyEmailPage.jsx').then(m => ({ default: m.VerifyEmailPage })));
 const ForgotPasswordPage = lazy(() => import('../pages/auth/ForgotPasswordPage.jsx').then(m => ({ default: m.ForgotPasswordPage })));
 const ResetPasswordPage = lazy(() => import('../pages/auth/ResetPasswordPage.jsx').then(m => ({ default: m.ResetPasswordPage })));
+const OnboardingPage = lazy(() => import('../pages/auth/OnboardingPage.jsx').then(m => ({ default: m.OnboardingPage })));
 
 // Public / Legal
 const ServicesPage = lazy(() => import('../pages/services/ServicesPage.jsx').then(m => ({ default: m.ServicesPage })));
@@ -155,6 +156,9 @@ export function AppRoutes() {
         <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
         <Route path="/forgot-password" element={<PublicRoute><ForgotPasswordPage /></PublicRoute>} />
         <Route path="/reset-password" element={<PublicRoute><ResetPasswordPage /></PublicRoute>} />
+
+        {/* Clerk post-sign-up onboarding: collect mobile + role */}
+        <Route path="/onboarding" element={<OnboardingPage />} />
 
         <Route path="/register-worker" element={<Navigate to="/register?role=worker" replace />} />
         <Route path="/verify-email" element={<VerifyEmailPage />} />

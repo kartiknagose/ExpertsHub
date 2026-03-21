@@ -1,12 +1,19 @@
 const { Router } = require('express');
-const { register, login, logout, me, verifyEmail, forgotPassword, resetPassword, changePassword } = require('./auth.controller');
-const { registerSchema, registerWorkerSchema, loginSchema, verifyEmailSchema, forgotPasswordSchema, resetPasswordSchema, changePasswordSchema } = require('./auth.schemas');
+const { register, login, logout, me, verifyEmail, forgotPassword, resetPassword, changePassword, syncUser } = require('./auth.controller');
+const { registerSchema, registerWorkerSchema, loginSchema, verifyEmailSchema, forgotPasswordSchema, resetPasswordSchema, changePasswordSchema, syncUserSchema } = require('./auth.schemas');
 const validate = require('../../middleware/validation');
 const auth = require('../../middleware/auth');
+const { requireClerkSession } = require('../../middleware/auth');
 const { authLimiter } = require('../../config/rateLimit');
 
 const router = Router();
 
+// ── Clerk-native routes ──────────────────────────────────────────────────────
+// POST /api/auth/sync — create or link a DB user profile after Clerk sign-up.
+// Uses requireClerkSession (verifies Clerk JWT only, no DB user required yet).
+router.post('/sync', authLimiter, ...requireClerkSession, syncUserSchema, validate, syncUser);
+
+// ── Legacy routes (kept for backward compatibility) ──────────────────────────
 router.post('/register', authLimiter, registerSchema, validate, register);
 router.post('/register-customer', authLimiter, registerSchema, validate, register);
 router.post('/register-worker', authLimiter, registerWorkerSchema, validate, register);

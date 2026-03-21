@@ -36,4 +36,8 @@ export const clientEnv = Object.freeze({
   supabaseAnonKey: readEnv('VITE_SUPABASE_ANON_KEY', ''),
   supabaseFunctionsUrl: readEnv('VITE_SUPABASE_FUNCTIONS_URL', ''),
   appEnv: readEnv('VITE_APP_ENV', import.meta.env.MODE || 'development'),
+  clerkPublishableKey: readEnv('VITE_CLERK_PUBLISHABLE_KEY', ''),
 });
+
+/** True when Clerk authentication is configured for this deployment. */
+export const isClerkEnabled = Boolean(clientEnv.clerkPublishableKey);

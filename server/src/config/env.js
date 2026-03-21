@@ -20,6 +20,12 @@ if (!JWT_SECRET) {
     process.exit(1);
 }
 
+// Clerk secret key — required when CLERK_SECRET_KEY is provided (i.e., Clerk mode is active).
+const CLERK_SECRET_KEY = process.env.CLERK_SECRET_KEY || '';
+if (NODE_ENV === 'production' && !CLERK_SECRET_KEY) {
+    console.warn('WARNING: CLERK_SECRET_KEY is not set. Clerk authentication will not work in production.');
+}
+
 // CORS_ORIGIN: Validate in production
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173';
 
@@ -44,6 +50,7 @@ const SENTRY_TRACES_SAMPLE_RATE = process.env.SENTRY_TRACES_SAMPLE_RATE || '0.1'
 module.exports = {
     PORT,
     JWT_SECRET,
+    CLERK_SECRET_KEY,
     CORS_ORIGIN,
     NODE_ENV,
     FRONTEND_URL,

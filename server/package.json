@@ -20,6 +20,8 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@clerk/backend": "^3.2.2",
+    "@clerk/express": "^2.0.6",
     "@prisma/adapter-pg": "^7.3.0",
     "@prisma/client": "^5.22.0",
     "@sentry/node": "^10.44.0",

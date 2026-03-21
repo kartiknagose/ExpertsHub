@@ -2,8 +2,10 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClientProvider, QueryClient } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
+import { ClerkProvider } from '@clerk/clerk-react';
 import { AuthProvider } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext';
+import { ClerkBridge } from './components/auth/ClerkBridge';
 import App from './App.jsx';
 import GlobalErrorBoundary from './components/common/GlobalErrorBoundary.jsx';
 import { initClientMonitoring } from './config/sentry';
@@ -14,21 +16,16 @@ import { installToastDeduper } from './utils/toastDeduper';
 initClientMonitoring();
 installToastDeduper();
 
+const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+
 /**
  * React Query Client Setup
- *
- * Manages server state (API responses, caching, refetching)
- * Configuration:
- * - staleTime: 5 min - cache is fresh for 5 minutes
- * - gcTime: 10 min - cache is garbage collected after 10 minutes
- * - retry: 1 - retry failed requests once
- * - refetchOnWindowFocus: false - don't refetch when window gains focus
  */
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000, // 5 minutes
-      gcTime: 10 * 60 * 1000, // 10 minutes
+      staleTime: 5 * 60 * 1000,
+      gcTime: 10 * 60 * 1000,
       retry: 1,
       refetchOnWindowFocus: false,
     },
@@ -38,32 +35,35 @@ const queryClient = new QueryClient({
   },
 });
 
-createRoot(document.getElementById('root')).render(
+const AppTree = (
   <StrictMode>
-    {/* QueryClientProvider - gives React Query to entire app */}
     <QueryClientProvider client={queryClient}>
-      {/* NotificationProvider - gives global notifications to entire app */}
       <NotificationProvider>
-        {/* AuthProvider - gives authentication context to entire app */}
         <AuthProvider>
+          {/* ClerkBridge syncs Clerk session → AuthContext (only rendered when Clerk is active) */}
+          {CLERK_PUBLISHABLE_KEY && <ClerkBridge />}
           <GlobalErrorBoundary>
             <App />
           </GlobalErrorBoundary>
-          {/* Sonner Toaster - renders toast notifications */}
           <Toaster
             position="top-right"
             richColors
             closeButton
             duration={4000}
-            toastOptions={{
-              style: {
-                fontFamily: 'inherit',
-              },
-            }}
+            toastOptions={{ style: { fontFamily: 'inherit' } }}
           />
         </AuthProvider>
       </NotificationProvider>
     </QueryClientProvider>
   </StrictMode>
 );
+
+// Wrap with ClerkProvider only when a publishable key is configured.
+// This allows the app to run without Clerk during local dev if the key is absent.
+createRoot(document.getElementById('root')).render(
+  CLERK_PUBLISHABLE_KEY
+    ? <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY}>{AppTree}</ClerkProvider>
+    : AppTree
+);
+
 
