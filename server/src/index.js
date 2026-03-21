@@ -48,7 +48,7 @@ const growthRoutes = require('./modules/business_growth/growth.routes'); // Refe
 const payoutRoutes = require('./modules/payouts/payout.routes');
 const invoiceRoutes = require('./modules/invoices/invoice.routes');
 const analyticsRoutes = require('./modules/analytics/analytics.routes');
-const { verifySmtpConnection } = require('./common/utils/mailer');
+const { verifySmtpConnection, isResendConfigured } = require('./common/utils/mailer');
 
 // Create Express application instance
 const app = express();
@@ -155,9 +155,17 @@ app.get('/health/email', async (req, res) => {
   }
 
   const result = await verifySmtpConnection();
-  const status = result.ok ? 200 : 503;
+  const fallbackConfigured = isResendConfigured();
+  const deliveryReady = result.ok || fallbackConfigured;
+  const status = deliveryReady ? 200 : 503;
   return res.status(status).json({
-    ok: result.ok,
+    ok: deliveryReady,
+    smtp: {
+      ok: result.ok,
+    },
+    resend: {
+      configured: fallbackConfigured,
+    },
     details: result.ok ? undefined : {
       code: result.code,
       message: result.message,

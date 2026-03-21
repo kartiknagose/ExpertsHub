@@ -140,6 +140,10 @@ const shouldFallbackToResend = (error) => {
   return code === 'ETIMEDOUT' || code === 'ECONNECTION' || code === 'ECONNRESET' || message.includes('timeout');
 };
 
+const isResendConfigured = () => {
+  return Boolean(normalizeSecret(process.env.RESEND_API_KEY));
+};
+
 async function sendViaResend({ to, subject, text, html, logContext = 'Default' }) {
   const resendApiKey = normalizeSecret(process.env.RESEND_API_KEY);
   const resendFrom = normalizeSecret(process.env.RESEND_FROM || process.env.FROM_EMAIL || process.env.SMTP_USER || 'onboarding@resend.dev');
@@ -381,4 +385,5 @@ module.exports = {
   sendPasswordResetEmail,
   sendBookingStatusEmail,
   verifySmtpConnection,
+  isResendConfigured,
 };
