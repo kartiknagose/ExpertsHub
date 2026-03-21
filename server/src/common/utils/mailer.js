@@ -1,4 +1,5 @@
 const nodemailer = require('nodemailer');
+const axios = require('axios');
 const logger = require('../../config/logger');
 
 const toNumber = (value, fallback) => {
@@ -11,6 +12,7 @@ const SMTP_CONNECTION_TIMEOUT_MS = toNumber(process.env.SMTP_CONNECTION_TIMEOUT_
 const SMTP_GREETING_TIMEOUT_MS = toNumber(process.env.SMTP_GREETING_TIMEOUT_MS, 10000);
 const SMTP_SOCKET_TIMEOUT_MS = toNumber(process.env.SMTP_SOCKET_TIMEOUT_MS, 20000);
 const SMTP_VERIFY_TIMEOUT_MS = toNumber(process.env.SMTP_VERIFY_TIMEOUT_MS, 12000);
+const RESEND_HTTP_TIMEOUT_MS = toNumber(process.env.RESEND_HTTP_TIMEOUT_MS, 10000);
 
 let transporterSingleton = null;
 
@@ -132,12 +134,51 @@ const getFromAddress = () => {
   return `${fromName} <${fromEmail}>`;
 };
 
+const shouldFallbackToResend = (error) => {
+  const code = String(error?.code || '').toUpperCase();
+  const message = String(error?.message || '').toLowerCase();
+  return code === 'ETIMEDOUT' || code === 'ECONNECTION' || code === 'ECONNRESET' || message.includes('timeout');
+};
+
+async function sendViaResend({ to, subject, text, html, logContext = 'Default' }) {
+  const resendApiKey = normalizeSecret(process.env.RESEND_API_KEY);
+  const resendFrom = normalizeSecret(process.env.RESEND_FROM || process.env.FROM_EMAIL || process.env.SMTP_USER || 'onboarding@resend.dev');
+
+  if (!resendApiKey) {
+    throw new Error('Resend fallback unavailable: RESEND_API_KEY is not configured');
+  }
+
+  const payload = {
+    from: resendFrom,
+    to: Array.isArray(to) ? to : [to],
+    subject,
+    html,
+    text,
+  };
+
+  const response = await axios.post('https://api.resend.com/emails', payload, {
+    timeout: RESEND_HTTP_TIMEOUT_MS,
+    headers: {
+      Authorization: `Bearer ${resendApiKey}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  const messageId = response?.data?.id || 'unknown';
+  console.log(`[Email] ✅ Sent [${logContext}] via Resend: ${messageId} → ${to}`);
+  return { messageId, provider: 'resend' };
+}
+
 /**
  * Generic email sender with robust logging
  */
 async function sendEmail({ to, subject, text, html, logContext = 'Default' }) {
   const transporter = buildTransport();
   if (!transporter) {
+    if (isProduction && process.env.RESEND_API_KEY) {
+      return sendViaResend({ to, subject, text, html, logContext });
+    }
+
     const message = `SMTP transport not configured for ${logContext}`;
     console.warn(`[Email] ⚠️ Not sending email [${logContext}] to ${to}: ${message}`);
     if (isProduction) {
@@ -162,6 +203,12 @@ async function sendEmail({ to, subject, text, html, logContext = 'Default' }) {
       code: error.code,
       response: error.response,
     });
+
+    if (isProduction && process.env.RESEND_API_KEY && shouldFallbackToResend(error)) {
+      console.warn(`[Email] ⚠️ Falling back to Resend for [${logContext}] due to SMTP connectivity issue (${error.code || error.message}).`);
+      return sendViaResend({ to, subject, text, html, logContext });
+    }
+
     throw error;
   }
 }
