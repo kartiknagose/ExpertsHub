@@ -7,6 +7,10 @@ const toNumber = (value, fallback) => {
 };
 
 const isProduction = process.env.NODE_ENV === 'production';
+const SMTP_CONNECTION_TIMEOUT_MS = toNumber(process.env.SMTP_CONNECTION_TIMEOUT_MS, 10000);
+const SMTP_GREETING_TIMEOUT_MS = toNumber(process.env.SMTP_GREETING_TIMEOUT_MS, 10000);
+const SMTP_SOCKET_TIMEOUT_MS = toNumber(process.env.SMTP_SOCKET_TIMEOUT_MS, 20000);
+const SMTP_VERIFY_TIMEOUT_MS = toNumber(process.env.SMTP_VERIFY_TIMEOUT_MS, 12000);
 
 let transporterSingleton = null;
 
@@ -72,6 +76,9 @@ const buildTransport = () => {
     secure,
     auth: { user, pass },
     requireTLS: !secure,
+    connectionTimeout: SMTP_CONNECTION_TIMEOUT_MS,
+    greetingTimeout: SMTP_GREETING_TIMEOUT_MS,
+    socketTimeout: SMTP_SOCKET_TIMEOUT_MS,
     pool: true,
     maxConnections: 5,
     maxMessages: 100,
@@ -102,7 +109,12 @@ async function verifySmtpConnection() {
   }
 
   try {
-    await transporter.verify();
+    await Promise.race([
+      transporter.verify(),
+      new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('SMTP verify timeout')), SMTP_VERIFY_TIMEOUT_MS);
+      }),
+    ]);
     return { ok: true };
   } catch (error) {
     return {
