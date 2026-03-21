@@ -1,4 +1,0 @@
-
-login input text is black in dark mode.It should be white in dark mode.
-When opened in mobile phone in customers booking detail page there occurs modify button along with cancel button which is not displayed when opened in desktop. What is it's need?
-Make the chat with worker button exactly same like call worker button in design. And I think we should replace the Email button with chat with worker button

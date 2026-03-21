@@ -3,15 +3,17 @@
         "module": "CommonJS",
         "target": "ES2020",
         "checkJs": false,
-        "baseUrl": ".",
+        "baseUrl": "./src",
         "paths": {
             "*": [
-                "src/*"
+                "./*"
             ]
         }
     },
+    "include": [
+        "src/**/*"
+    ],
     "exclude": [
-        "node_modules",
-        "dist"
+        "node_modules"
     ]
 }
