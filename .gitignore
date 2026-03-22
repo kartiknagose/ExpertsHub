@@ -9,6 +9,9 @@ build/
 .env
 .env.*
 !.env.example
+RENDER_ENV_*.txt
+VERCEL_ENV_*.txt
+DEPLOYMENT_*
 
 # logs
 npm-debug.log*
