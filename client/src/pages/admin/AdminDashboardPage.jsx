@@ -13,6 +13,7 @@ import {
   Skeleton, SimpleBarChart, SimpleDonutChart,
   AsyncState, StatGridSkeleton, BookingStatusBadge
 } from '../../components/common';
+import { EmptyDataState } from '../../components/common/sections';
 import { useSocketEvent } from '../../hooks/useSocket';
 import { getAdminUsers, getAdminDashboard } from '../../api/admin';
 import { getAllBookings } from '../../api/bookings';
@@ -189,7 +190,12 @@ export function AdminDashboardPage() {
                   <div className="p-5 pt-4">
                     {bookingsQuery.isLoading && <div className="flex justify-center py-8"><Spinner size="lg" /></div>}
                     {!bookingsQuery.isLoading && bookings.length === 0 && (
-                      <p className="text-sm text-neutral-500 dark:text-neutral-400 py-4 text-center">No bookings yet.</p>
+                      <EmptyDataState
+                        title="No bookings yet"
+                        description="New bookings will appear here as customers place requests."
+                        actionLabel="Go to Bookings"
+                        onAction={() => navigate('/admin/bookings')}
+                      />
                     )}
                     {!bookingsQuery.isLoading && bookings.length > 0 && (
                       <div className="space-y-3">
@@ -225,7 +231,12 @@ export function AdminDashboardPage() {
                   <div className="p-5 pt-4">
                     {usersQuery.isLoading && <div className="flex justify-center py-8"><Spinner size="lg" /></div>}
                     {!usersQuery.isLoading && users.length === 0 && (
-                      <p className="text-sm text-neutral-500 dark:text-neutral-400 py-4 text-center">No users yet.</p>
+                      <EmptyDataState
+                        title="No users yet"
+                        description="User signups will appear here once registrations begin."
+                        actionLabel="Manage Users"
+                        onAction={() => navigate('/admin/users')}
+                      />
                     )}
                     {!usersQuery.isLoading && users.length > 0 && (
                       <div className="space-y-3">
@@ -261,7 +272,12 @@ export function AdminDashboardPage() {
                   <div className="p-5 pt-4">
                     {verificationQuery.isLoading && <div className="flex justify-center py-8"><Spinner size="lg" /></div>}
                     {!verificationQuery.isLoading && pendingApplications.length === 0 && (
-                      <p className="text-sm text-neutral-500 dark:text-neutral-400 py-4 text-center">No pending applications.</p>
+                      <EmptyDataState
+                        title="No pending applications"
+                        description="Worker verification requests waiting for review will appear here."
+                        actionLabel="Open Verification"
+                        onAction={() => navigate('/admin/verification')}
+                      />
                     )}
                     {!verificationQuery.isLoading && pendingApplications.length > 0 && (
                       <div className="space-y-3">
