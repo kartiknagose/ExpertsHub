@@ -38,6 +38,7 @@ export function NotificationPreferencesPage() {
   const [preferences, setPreferences] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState('');
 
   const EVENT_SETTINGS = [
     { key: 'bookingUpdates', label: t('Booking Updates'), description: t('New bookings, status changes, cancellations'), icon: MessageSquare },
@@ -49,11 +50,43 @@ export function NotificationPreferencesPage() {
   ];
 
   useEffect(() => {
-    getNotificationPreferences()
-      .then(setPreferences)
-      .catch(() => showError(t('Failed to load notification preferences')))
-      .finally(() => setLoading(false));
+    let mounted = true;
+
+    const loadPreferences = async () => {
+      setLoading(true);
+      setLoadError('');
+      try {
+        const data = await getNotificationPreferences();
+        if (!mounted) return;
+        setPreferences(data);
+      } catch {
+        if (!mounted) return;
+        setLoadError(t('Failed to load notification preferences'));
+        showError(t('Failed to load notification preferences'));
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+
+    loadPreferences();
+    return () => {
+      mounted = false;
+    };
   }, [showError, t]);
+
+  const retryLoadPreferences = async () => {
+    setLoading(true);
+    setLoadError('');
+    try {
+      const data = await getNotificationPreferences();
+      setPreferences(data);
+    } catch {
+      setLoadError(t('Failed to load notification preferences'));
+      showError(t('Failed to load notification preferences'));
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleToggle = async (key, value) => {
     const prev = { ...preferences };
@@ -89,6 +122,30 @@ export function NotificationPreferencesPage() {
       <MainLayout>
         <div className="flex items-center justify-center min-h-[60vh]">
           <Loader2 className="animate-spin text-brand-500" size={32} />
+        </div>
+      </MainLayout>
+    );
+  }
+
+  if (loadError || !preferences) {
+    return (
+      <MainLayout>
+        <div className="max-w-3xl mx-auto px-4 py-12">
+          <Card className="p-8 rounded-3xl border border-error-200 bg-error-50 dark:border-error-500/30 dark:bg-error-500/10">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-bold text-error-700 dark:text-error-300">
+                  {t('Unable to load preferences')}
+                </h2>
+                <p className="text-sm mt-1 text-error-600 dark:text-error-400">
+                  {loadError || t('Please try again.')}
+                </p>
+              </div>
+              <Button variant="outline" onClick={retryLoadPreferences}>
+                {t('Retry')}
+              </Button>
+            </div>
+          </Card>
         </div>
       </MainLayout>
     );
