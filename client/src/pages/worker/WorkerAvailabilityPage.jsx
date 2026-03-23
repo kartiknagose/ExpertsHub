@@ -84,7 +84,7 @@ export function WorkerAvailabilityPage() {
 
   return (
     <MainLayout>
-      <div className={getPageLayout('default')}>
+      <div className={`${getPageLayout('default')} module-canvas module-canvas--profile`}>
         
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
           <Motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>

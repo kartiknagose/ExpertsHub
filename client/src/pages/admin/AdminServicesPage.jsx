@@ -106,7 +106,7 @@ export function AdminServicesPage() {
 
   return (
     <MainLayout>
-      <div className={getPageLayout('default')}>
+      <div className={`${getPageLayout('default')} module-canvas module-canvas--utility`}>
         <PageHeader
           title="Services Catalog"
           subtitle="Manage the services available for customers."

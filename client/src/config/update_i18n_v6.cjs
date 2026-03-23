@@ -1,5 +1,5 @@
 const fs = require('fs');
-const targetFile = 'd:/mini_project/UrbanPro V2/client/src/config/i18n.js';
+const targetFile = 'd:/mini_project/ExpertsHub V2/client/src/config/i18n.js';
 let content = fs.readFileSync(targetFile, 'utf8');
 
 const enKeys = `      // Loyalty/Rewards Keys

@@ -13,19 +13,28 @@ import { useTranslation } from 'react-i18next';
 import { MainLayout } from '../../components/layout/MainLayout';
 import {
   PageHeader, Card, Button, Badge,
-  StatCard, AsyncState, SimpleBarChart, Input, Select
+  StatCard, AsyncState, Input, Select, Modal, ModalFooter
 } from '../../components/common';
 import { getMyPayments } from '../../api/payments';
 import { getBankDetails, requestInstantPayout, updateBankDetails, downloadWorkerReport } from '../../api/payouts';
 import { getPageLayout } from '../../constants/layout';
 import { queryKeys } from '../../utils/queryKeys';
 import { usePageTitle } from '../../hooks/usePageTitle';
+import { toastErrorFromResponse } from '../../utils/notifications';
 
 export function WorkerEarningsPage() {
   const { t, i18n } = useTranslation();
   usePageTitle(t('Earnings'));
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [isPayoutModalOpen, setIsPayoutModalOpen] = useState(false);
+  const [payoutForm, setPayoutForm] = useState({
+    payoutMethod: 'BANK',
+    bankAccountNumber: '',
+    bankIfsc: '',
+    upiId: '',
+    razorpayAccountId: '',
+  });
 
   const formatPaymentDate = (value) => {
     if (!value) return 'N/A';
@@ -53,7 +62,7 @@ export function WorkerEarningsPage() {
       queryClient.invalidateQueries({ queryKey: queryKeys.worker.payments() });
     },
     onError: (err) => {
-      toast.error(err.response?.data?.message || t('Failed to request instant payout'));
+      toastErrorFromResponse(err, t('Failed to request instant payout'));
     }
   });
 
@@ -62,9 +71,10 @@ export function WorkerEarningsPage() {
     onSuccess: () => {
       toast.success(t('Payout destination updated successfully!'));
       refetchBank();
+      setIsPayoutModalOpen(false);
     },
     onError: (err) => {
-      toast.error(err.response?.data?.message || t('Failed to update payout destination'));
+      toastErrorFromResponse(err, t('Failed to update payout destination'));
     }
   });
 
@@ -98,80 +108,96 @@ export function WorkerEarningsPage() {
     });
   }, [payments, searchTerm, statusFilter]);
 
-  const chartData = useMemo(() => {
-    const last7Days = Array.from({ length: 7 }, (_, i) => {
-      const d = new Date();
-      d.setDate(d.getDate() - (6 - i));
-      return d;
+  const earningsInsights = useMemo(() => {
+    const now = new Date();
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+    const paidLast7Days = payments.filter((p) => {
+      if (p.status !== 'PAID' || !p.createdAt) return false;
+      const createdAt = new Date(p.createdAt);
+      return Number.isFinite(createdAt.getTime()) && createdAt >= sevenDaysAgo;
     });
 
-    return last7Days.map(date => {
-      const dateStr = date.toISOString().split('T')[0];
-      const dailyTotal = payments
-        .filter(p => p.createdAt?.startsWith(dateStr) && p.status === 'PAID')
-        .reduce((sum, p) => sum + Number(p.amount || 0), 0);
+    const paidAmountLast7Days = paidLast7Days.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+    const avgPaidTicket = paidLast7Days.length ? paidAmountLast7Days / paidLast7Days.length : 0;
 
-      return {
-        label: date.toLocaleDateString(i18n.language, { weekday: 'short' }),
-        value: dailyTotal,
-        tooltip: `₹${dailyTotal.toLocaleString()}`
-      };
+    return {
+      paidLast7DaysCount: paidLast7Days.length,
+      paidAmountLast7Days,
+      avgPaidTicket,
+    };
+  }, [payments]);
+
+  const payoutReadiness = useMemo(() => {
+    const blockers = [];
+
+    if (!bankData?.payoutMethod) {
+      blockers.push(t('Set a payout method before withdrawing.'));
+    }
+
+    if (Number(stats.walletBalance || 0) < 100) {
+      blockers.push(t('Minimum instant withdrawal is ₹100.'));
+    }
+
+    if (bankData?.payoutMode === 'LIVE' && !bankData?.isLinked) {
+      blockers.push(t('Live mode requires linked Razorpay account (acc_...).'));
+    }
+
+    return {
+      isReady: blockers.length === 0,
+      blockers,
+    };
+  }, [bankData?.payoutMethod, bankData?.payoutMode, bankData?.isLinked, stats.walletBalance, t]);
+
+  const openPayoutModal = () => {
+    setPayoutForm({
+      payoutMethod: bankData?.payoutMethod || 'BANK',
+      bankAccountNumber: '',
+      bankIfsc: '',
+      upiId: '',
+      razorpayAccountId: bankData?.razorpayAccountId || '',
     });
-  }, [payments, i18n.language]);
+    setIsPayoutModalOpen(true);
+  };
 
-  const handleConfigurePayoutDestination = () => {
-    const methodInput = window.prompt(
-      `${t('Choose payout method:')}\n1. BANK\n2. UPI\n3. LINKED_ACCOUNT`,
-      bankData?.payoutMethod || 'BANK'
-    );
+  const submitPayoutDestination = () => {
+    const method = String(payoutForm.payoutMethod || 'BANK').toUpperCase();
 
-    if (!methodInput) return;
-
-    const normalized = String(methodInput).trim().toUpperCase();
-    const methodMap = { '1': 'BANK', '2': 'UPI', '3': 'LINKED_ACCOUNT' };
-    const payoutMethod = methodMap[normalized] || normalized;
-
-    if (!['BANK', 'UPI', 'LINKED_ACCOUNT'].includes(payoutMethod)) {
-      toast.error(t('Invalid payout method.'));
+    if (method === 'BANK' && (!payoutForm.bankAccountNumber || !payoutForm.bankIfsc)) {
+      toast.error(t('Bank account number and IFSC are required for BANK payout method.'));
       return;
     }
 
-    if (payoutMethod === 'BANK') {
-      const acc = window.prompt(t('Enter Bank Account Number:'), '');
-      const ifsc = window.prompt(t('Enter Bank IFSC:'), '');
-      const linkedAccountId = window.prompt(t('Enter Razorpay Linked Account ID (optional in test mode):'), '');
-      if (!acc || !ifsc) return;
-
-      updateBankMutation.mutate({
-        payoutMethod,
-        bankAccountNumber: acc,
-        bankIfsc: ifsc,
-        razorpayAccountId: linkedAccountId || undefined,
-      });
+    if (method === 'UPI' && !payoutForm.upiId) {
+      toast.error(t('UPI ID is required for UPI payout method.'));
       return;
     }
 
-    if (payoutMethod === 'UPI') {
-      const upiId = window.prompt(t('Enter UPI ID (example: name@okhdfcbank):'), '');
-      const linkedAccountId = window.prompt(t('Enter Razorpay Linked Account ID (optional in test mode):'), '');
-      if (!upiId) return;
-
-      updateBankMutation.mutate({
-        payoutMethod,
-        upiId,
-        razorpayAccountId: linkedAccountId || undefined,
-      });
+    if (method === 'LINKED_ACCOUNT' && !payoutForm.razorpayAccountId) {
+      toast.error(t('Razorpay account ID is required for linked-account payouts.'));
       return;
     }
 
-    const linkedAccountId = window.prompt(t('Enter Razorpay Linked Account ID (acc_...):'), '');
-    if (!linkedAccountId) return;
-    updateBankMutation.mutate({ payoutMethod, razorpayAccountId: linkedAccountId });
+    const payload = {
+      payoutMethod: method,
+      razorpayAccountId: payoutForm.razorpayAccountId || undefined,
+    };
+
+    if (method === 'BANK') {
+      payload.bankAccountNumber = payoutForm.bankAccountNumber;
+      payload.bankIfsc = payoutForm.bankIfsc;
+    }
+
+    if (method === 'UPI') {
+      payload.upiId = payoutForm.upiId;
+    }
+
+    updateBankMutation.mutate(payload);
   };
 
   return (
     <MainLayout>
-      <div className={getPageLayout('wide')}>
+      <div className={`${getPageLayout('wide')} module-canvas module-canvas--profile`}>
         
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
@@ -234,7 +260,7 @@ export function WorkerEarningsPage() {
                 <div className="flex flex-col sm:flex-row gap-3">
                   <Button
                     onClick={() => instantPayoutMutation.mutate()}
-                    isLoading={instantPayoutMutation.isPending}
+                    loading={instantPayoutMutation.isPending}
                     disabled={!bankData?.isLinked && bankData?.payoutMode === 'LIVE'}
                     className="h-12 rounded-2xl font-bold uppercase tracking-widest text-xs"
                   >
@@ -242,8 +268,8 @@ export function WorkerEarningsPage() {
                   </Button>
                   <Button
                     variant="outline"
-                    onClick={handleConfigurePayoutDestination}
-                    isLoading={updateBankMutation.isPending}
+                    onClick={openPayoutModal}
+                    loading={updateBankMutation.isPending}
                     className="h-12 rounded-2xl font-bold uppercase tracking-widest text-xs"
                   >
                     {t('Change Payout Method')}
@@ -252,32 +278,70 @@ export function WorkerEarningsPage() {
               </div>
             </Card>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 mb-10">
-              {/* Chart */}
-              <div className="lg:col-span-2">
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 mb-10">
+              {/* Insights */}
+              <div className="xl:col-span-2">
                 <Motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-                  <SimpleBarChart title={t("Revenue Overview (Last 7 Days)")} data={chartData} height="h-96" className="rounded-[2.5rem] shadow-2xl border-none" />
+                  <Card className="rounded-[2.5rem] shadow-2xl border-none h-full">
+                    <div className="p-8 border-b border-neutral-100 dark:border-dark-800 bg-neutral-50/40 dark:bg-dark-900/40">
+                      <h3 className="text-2xl font-bold text-neutral-900 dark:text-white uppercase tracking-tight">{t('Earnings Insights')}</h3>
+                      <p className="text-sm text-neutral-500 dark:text-neutral-400 font-medium">{t('Actionable payout and revenue summary for your worker account.')}</p>
+                    </div>
+                    <div className="p-8 grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="rounded-2xl border border-neutral-200 dark:border-dark-700 p-5 bg-white dark:bg-dark-900">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-neutral-500">{t('Paid Revenue (7d)')}</p>
+                        <p className="mt-2 text-2xl font-black text-neutral-900 dark:text-white">₹{earningsInsights.paidAmountLast7Days.toLocaleString()}</p>
+                      </div>
+                      <div className="rounded-2xl border border-neutral-200 dark:border-dark-700 p-5 bg-white dark:bg-dark-900">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-neutral-500">{t('Paid Transactions (7d)')}</p>
+                        <p className="mt-2 text-2xl font-black text-neutral-900 dark:text-white">{earningsInsights.paidLast7DaysCount}</p>
+                      </div>
+                      <div className="rounded-2xl border border-neutral-200 dark:border-dark-700 p-5 bg-white dark:bg-dark-900">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-neutral-500">{t('Avg Ticket (7d)')}</p>
+                        <p className="mt-2 text-2xl font-black text-neutral-900 dark:text-white">₹{Math.round(earningsInsights.avgPaidTicket).toLocaleString()}</p>
+                      </div>
+                    </div>
+
+                    <div className="px-8 pb-8">
+                      <div className={`rounded-2xl p-5 border ${payoutReadiness.isReady ? 'border-success-200 bg-success-50/60 dark:border-success-500/30 dark:bg-success-500/10' : 'border-warning-200 bg-warning-50/60 dark:border-warning-500/30 dark:bg-warning-500/10'}`}>
+                        <p className="text-sm font-bold text-neutral-900 dark:text-white mb-2">
+                          {payoutReadiness.isReady ? t('Payout Ready') : t('Payout Setup Needed')}
+                        </p>
+                        {payoutReadiness.isReady ? (
+                          <p className="text-sm text-neutral-600 dark:text-neutral-300">{t('Your account is ready for instant withdrawal.')}</p>
+                        ) : (
+                          <div className="space-y-1.5">
+                            {payoutReadiness.blockers.map((item) => (
+                              <p key={item} className="text-sm text-neutral-600 dark:text-neutral-300 flex items-start gap-2">
+                                <AlertCircle size={14} className="mt-0.5 shrink-0" /> {item}
+                              </p>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </Card>
                 </Motion.div>
               </div>
 
               {/* Payout Settings Card */}
               <Motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-                <Card className="h-full flex flex-col border-none shadow-2xl rounded-[2.5rem] overflow-hidden bg-white dark:bg-dark-900">
+                <Card className="h-full flex flex-col border-none shadow-2xl rounded-[2rem] lg:rounded-[2.25rem] overflow-hidden bg-white dark:bg-dark-900 min-w-0">
                   <div className="p-8 pb-4 border-b border-neutral-100 dark:border-dark-800 bg-neutral-50/50 dark:bg-dark-950/50">
                     <h3 className="text-xl font-bold text-neutral-900 dark:text-white uppercase tracking-tight">{t('Payout Method')}</h3>
                     <p className="text-sm text-neutral-500 dark:text-neutral-400 font-medium">{t('Secure disbursement settings')}</p>
                   </div>
-                  <div className="p-8 space-y-6 flex-1 flex flex-col">
+                  <div className="p-6 lg:p-8 space-y-5 flex-1 flex flex-col min-w-0">
                     
-                    <div className="p-6 rounded-[2rem] border-2 border-dashed border-brand-200 dark:border-brand-500/30 bg-brand-50/30 dark:bg-brand-500/5 relative overflow-hidden group">
+                    <div className="p-5 lg:p-6 rounded-[1.5rem] lg:rounded-[2rem] border-2 border-dashed border-brand-200 dark:border-brand-500/30 bg-brand-50/30 dark:bg-brand-500/5 relative overflow-hidden group min-w-0">
                       <div className="absolute -top-10 -right-10 w-32 h-32 bg-brand-500/10 rounded-full blur-3xl group-hover:scale-150 transition-transform duration-700" />
-                      <div className="flex items-center gap-5 mb-6 relative z-10">
-                        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-brand-600 to-accent-600 text-white flex items-center justify-center shadow-xl shadow-brand-500/30 transform group-hover:rotate-6 transition-transform">
+                      <div className="flex items-center gap-4 mb-5 relative z-10 min-w-0">
+                        <div className="w-12 h-12 lg:w-14 lg:h-14 rounded-2xl bg-gradient-to-br from-brand-600 to-accent-600 text-white flex items-center justify-center shadow-xl shadow-brand-500/30 transform group-hover:rotate-6 transition-transform shrink-0">
                           <IndianRupee size={28} />
                         </div>
-                        <div>
-                          <p className="font-bold text-lg text-neutral-900 dark:text-white">{t('Payout Destination')}</p>
-                          <p className="text-xs font-bold uppercase tracking-widest text-brand-600 dark:text-brand-400">
+                        <div className="min-w-0">
+                          <p className="font-bold text-base lg:text-lg text-neutral-900 dark:text-white truncate">{t('Payout Destination')}</p>
+                          <p className="text-[10px] lg:text-xs font-bold uppercase tracking-[0.14em] lg:tracking-widest text-brand-600 dark:text-brand-400">
                             {bankData?.isLinked ? t('Active & Verified') : t('Action Required')}
                           </p>
                         </div>
@@ -285,23 +349,27 @@ export function WorkerEarningsPage() {
                       
                       {bankData?.isLinked ? (
                         <div className="relative z-10">
-                          <div className="bg-white/50 dark:bg-dark-950/50 p-4 rounded-xl border border-neutral-100 dark:border-dark-800 mb-6 shadow-inner">
+                          <div className="bg-white/50 dark:bg-dark-950/50 p-4 rounded-xl border border-neutral-100 dark:border-dark-800 mb-6 shadow-inner min-w-0">
                             <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">{t('Method')}</p>
-                            <p className="text-sm font-bold tracking-[0.08em] text-neutral-900 dark:text-white font-mono">
+                            <p className="text-sm font-bold tracking-[0.03em] text-neutral-900 dark:text-white font-mono break-words">
                               {bankData?.payoutMethod || 'BANK'}
                             </p>
                             {bankData?.payoutMethod === 'BANK' && bankData?.bankAccountNumber && (
-                              <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mt-2">A/C: {bankData.bankAccountNumber} · IFSC: {bankData.bankIfsc}</p>
+                              <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-[0.12em] mt-2 break-all">
+                                A/C: {bankData.bankAccountNumber}
+                                <br />
+                                IFSC: {bankData.bankIfsc}
+                              </p>
                             )}
                             {bankData?.payoutMethod === 'UPI' && bankData?.upiId && (
-                              <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mt-2">UPI: {bankData.upiId}</p>
+                              <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-[0.12em] mt-2 break-all">UPI: {bankData.upiId}</p>
                             )}
                           </div>
                           <Button
                             fullWidth
                             size="lg"
                             variant="primary"
-                            isLoading={instantPayoutMutation.isPending}
+                            loading={instantPayoutMutation.isPending}
                             onClick={() => instantPayoutMutation.mutate()}
                             className="h-14 shadow-brand-md rounded-2xl font-bold uppercase tracking-widest text-xs"
                           >
@@ -323,8 +391,8 @@ export function WorkerEarningsPage() {
                             fullWidth
                             size="lg"
                             variant="primary"
-                            isLoading={updateBankMutation.isPending}
-                            onClick={handleConfigurePayoutDestination}
+                            loading={updateBankMutation.isPending}
+                            onClick={openPayoutModal}
                             className="h-14 shadow-brand-md rounded-2xl font-bold uppercase tracking-widest text-xs"
                           >
                             {t('Setup Payout Method')}
@@ -368,14 +436,13 @@ export function WorkerEarningsPage() {
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value)}
                     className="w-full md:w-48 h-12 rounded-2xl font-bold text-xs uppercase tracking-widest"
-                    options={[
-                      { value: 'ALL', label: t('All Status') },
-                      { value: 'PAID', label: t('Paid') },
-                      { value: 'PENDING', label: t('Pending') },
-                      { value: 'FAILED', label: t('Failed') },
-                      { value: 'REFUNDED', label: t('Refunded') },
-                    ]}
-                  />
+                  >
+                    <option value="ALL">{t('All Status')}</option>
+                    <option value="PAID">{t('Paid')}</option>
+                    <option value="PENDING">{t('Pending')}</option>
+                    <option value="FAILED">{t('Failed')}</option>
+                    <option value="REFUNDED">{t('Refunded')}</option>
+                  </Select>
                 </div>
               </div>
 
@@ -448,6 +515,74 @@ export function WorkerEarningsPage() {
           </>
         </AsyncState>
       </div>
+
+      <Modal
+        isOpen={isPayoutModalOpen}
+        onClose={() => setIsPayoutModalOpen(false)}
+        title={t('Configure Payout Method')}
+        size="md"
+      >
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <label className="block text-xs font-bold uppercase tracking-[0.18em] text-neutral-500 dark:text-neutral-400">
+              {t('Payout Method')}
+            </label>
+            <select
+              value={payoutForm.payoutMethod}
+              onChange={(e) => setPayoutForm((prev) => ({ ...prev, payoutMethod: e.target.value }))}
+              className="w-full h-14 rounded-2xl border border-neutral-200 dark:border-dark-700 bg-white dark:bg-dark-900 px-4 text-sm font-bold text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+            >
+              {(bankData?.availableMethods || ['BANK', 'UPI', 'LINKED_ACCOUNT']).map((method) => (
+                <option key={method} value={method}>
+                  {t(method)}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {payoutForm.payoutMethod === 'BANK' && (
+            <>
+              <Input
+                label={t('Bank Account Number')}
+                value={payoutForm.bankAccountNumber}
+                onChange={(e) => setPayoutForm((prev) => ({ ...prev, bankAccountNumber: e.target.value }))}
+                placeholder={t('Enter 9-18 digit account number')}
+              />
+              <Input
+                label={t('IFSC')}
+                value={payoutForm.bankIfsc}
+                onChange={(e) => setPayoutForm((prev) => ({ ...prev, bankIfsc: e.target.value.toUpperCase() }))}
+                placeholder={t('Enter valid IFSC (e.g. HDFC0001234)')}
+              />
+            </>
+          )}
+
+          {payoutForm.payoutMethod === 'UPI' && (
+            <Input
+              label={t('UPI ID')}
+              value={payoutForm.upiId}
+              onChange={(e) => setPayoutForm((prev) => ({ ...prev, upiId: e.target.value }))}
+              placeholder={t('name@okhdfcbank')}
+            />
+          )}
+
+          <Input
+            label={t('Razorpay Account ID (optional in test mode)')}
+            value={payoutForm.razorpayAccountId}
+            onChange={(e) => setPayoutForm((prev) => ({ ...prev, razorpayAccountId: e.target.value }))}
+            placeholder={t('acc_...')}
+          />
+        </div>
+
+        <ModalFooter>
+          <Button variant="ghost" onClick={() => setIsPayoutModalOpen(false)}>
+            {t('Cancel')}
+          </Button>
+          <Button loading={updateBankMutation.isPending} onClick={submitPayoutDestination}>
+            {t('Save Payout Method')}
+          </Button>
+        </ModalFooter>
+      </Modal>
     </MainLayout>
   );
 }

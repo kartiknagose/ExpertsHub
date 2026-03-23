@@ -2,13 +2,13 @@ const prisma = require('../../config/prisma');
 const AppError = require('../../common/errors/AppError');
 
 /**
- * URBANPRO PLUS SUBSCRIPTION SERVICE (Sprint 17 - #74)
- * Allows customers to subscribe to UrbanPro Plus for discounts / waived fees.
+ * ExpertsHub PLUS SUBSCRIPTION SERVICE (Sprint 17 - #74)
+ * Allows customers to subscribe to ExpertsHub Plus for discounts / waived fees.
  */
 
 const PLANS = {
-  plus_monthly: { price: 99, durationMonths: 1, name: 'UrbanPro Plus Monthly' },
-  plus_yearly: { price: 999, durationMonths: 12, name: 'UrbanPro Plus Yearly' },
+  plus_monthly: { price: 99, durationMonths: 1, name: 'ExpertsHub Plus Monthly' },
+  plus_yearly: { price: 999, durationMonths: 12, name: 'ExpertsHub Plus Yearly' },
 };
 
 /**

@@ -448,7 +448,7 @@ export function WorkerProfilePage() {
 
   return (
     <MainLayout>
-      <div className={getPageLayout('default')}>
+      <div className={`${getPageLayout('default')} module-canvas module-canvas--profile`}>
         <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-widest text-brand-500">{t('Worker Profile')}</p>
@@ -635,7 +635,7 @@ export function WorkerProfilePage() {
                     </div>
                     <SocialShare
                       title={t('Hire {{name}}', { name: profileData?.user?.name || t('Professional') })}
-                      text={t('Check out my services on UrbanPro V2.')}
+                      text={t('Check out my services on ExpertsHub V2.')}
                     />
                   </div>
 

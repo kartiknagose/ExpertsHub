@@ -13,9 +13,9 @@ const categories = [
     label: 'General',
     icon: HelpCircle,
     faqs: [
-      { q: 'What is UrbanPro?', a: 'UrbanPro is India\'s trusted home services marketplace connecting customers with verified, skilled professionals for all types of home services — from cleaning and plumbing to electrical and painting.' },
-      { q: 'Is UrbanPro available in my city?', a: 'UrbanPro is currently expanding across major Indian cities. Sign up to check availability in your area.' },
-      { q: 'Is UrbanPro free to use for customers?', a: 'Yes! Creating an account and browsing services is completely free. You only pay when you book a service.' },
+      { q: 'What is ExpertsHub?', a: 'ExpertsHub is India\'s trusted home services marketplace connecting customers with verified, skilled professionals for all types of home services — from cleaning and plumbing to electrical and painting.' },
+      { q: 'Is ExpertsHub available in my city?', a: 'ExpertsHub is currently expanding across major Indian cities. Sign up to check availability in your area.' },
+      { q: 'Is ExpertsHub free to use for customers?', a: 'Yes! Creating an account and browsing services is completely free. You only pay when you book a service.' },
     ],
   },
   {
@@ -44,8 +44,8 @@ const categories = [
     label: 'Professionals',
     icon: Shield,
     faqs: [
-      { q: 'Are workers background-checked?', a: 'Yes. Every professional on UrbanPro goes through identity verification and skill assessment before being approved to take bookings.' },
-      { q: 'How do I become a professional on UrbanPro?', a: 'Sign up with a Professional account, complete your profile, and submit your verification documents. Our team will review and approve your account.' },
+      { q: 'Are workers background-checked?', a: 'Yes. Every professional on ExpertsHub goes through identity verification and skill assessment before being approved to take bookings.' },
+      { q: 'How do I become a professional on ExpertsHub?', a: 'Sign up with a Professional account, complete your profile, and submit your verification documents. Our team will review and approve your account.' },
       { q: 'How do professionals get paid?', a: 'Payments are released directly after service completion and customer OTP confirmation, usually within 24 hours.' },
     ],
   },
@@ -112,7 +112,7 @@ export function FaqPage() {
             Frequently Asked <span className="gradient-text">Questions</span>
           </h1>
           <p className="text-lg text-neutral-500 dark:text-neutral-400 max-w-xl mx-auto">
-            Everything you need to know about UrbanPro — answered here.
+            Everything you need to know about ExpertsHub — answered here.
           </p>
         </div>
       </section>
@@ -175,7 +175,7 @@ export function FaqPage() {
               Our support team is available Mon–Sat 8AM–8PM to help you.
             </p>
             <a
-              href="mailto:support@urbanpro.com"
+              href="mailto:support@ExpertsHub.com"
               className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-brand-500 text-white text-sm font-bold hover:bg-brand-600 transition-colors shadow-brand-sm"
             >
               Email Support

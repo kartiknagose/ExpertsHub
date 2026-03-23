@@ -53,14 +53,16 @@ export function SystemStatusPage() {
 
   return (
     <MainLayout>
-      <div className={getPageLayout('narrow')}>
-        <PageHeader
-          title="System Status"
-          subtitle="Live connection checks between frontend, backend, and database."
-        />
+      <div className={`${getPageLayout('narrow')} module-canvas module-canvas--public`}>
+        <section className="mb-8 rounded-3xl border border-neutral-200 bg-white p-8 shadow-sm dark:border-dark-700 dark:bg-dark-800">
+          <PageHeader
+            title="System Status"
+            subtitle="Live connection checks between frontend, backend, and database."
+          />
+        </section>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card>
+          <Card className="rounded-2xl border border-neutral-200 bg-white p-6 dark:border-dark-700 dark:bg-dark-800">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Server size={20} className="text-brand-500" />
@@ -89,7 +91,7 @@ export function SystemStatusPage() {
             )}
           </Card>
 
-          <Card>
+          <Card className="rounded-2xl border border-neutral-200 bg-white p-6 dark:border-dark-700 dark:bg-dark-800">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Database size={20} className="text-success-500" />
@@ -119,7 +121,7 @@ export function SystemStatusPage() {
           </Card>
         </div>
 
-        <Card className="mt-6">
+        <Card className="mt-6 rounded-2xl border border-neutral-200 bg-white p-6 dark:border-dark-700 dark:bg-dark-800">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Activity size={20} className="text-accent-500" />

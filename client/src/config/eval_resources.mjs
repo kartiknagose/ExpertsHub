@@ -1,5 +1,5 @@
 import fs from 'fs';
-const content = fs.readFileSync('d:/mini_project/UrbanPro V2/client/src/config/i18n.js', 'utf8');
+const content = fs.readFileSync('d:/mini_project/ExpertsHub V2/client/src/config/i18n.js', 'utf8');
 
 // Extract the resources object
 const resourcesMatch = content.match(/const resources = (\{[\s\S]*?\});\s+i18n/);

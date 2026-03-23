@@ -1,4 +1,4 @@
-// Prisma schema for UrbanPro v2
+// Prisma schema for ExpertsHub v2
 
 generator client {
   provider = "prisma-client-js"
@@ -748,7 +748,7 @@ enum LoyaltyTransactionType {
   BONUS
 }
 
-// ── URBANPRO PLUS SUBSCRIPTION (Sprint 17 - #74) ─────────────────
+// ── ExpertsHub PLUS SUBSCRIPTION (Sprint 17 - #74) ─────────────────
 
 model UrbanProPlusSubscription {
   id        Int      @id @default(autoincrement())

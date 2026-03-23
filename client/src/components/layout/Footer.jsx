@@ -33,7 +33,7 @@ const socials = [
 ];
 
 const contactDetails = [
-  { icon: Mail,   text: 'support@urbanpro.com', href: 'mailto:support@urbanpro.com' },
+  { icon: Mail,   text: 'support@ExpertsHub.com', href: 'mailto:support@ExpertsHub.com' },
   { icon: Phone,  text: '+91 98765 43210',       href: 'tel:+919876543210' },
   { icon: MapPin, text: 'Pune, Maharashtra, India', href: '#' },
 ];
@@ -56,9 +56,9 @@ export function Footer() {
             {/* Logo */}
             <div className="flex items-center gap-3 mb-5">
               <div className="w-10 h-10 bg-gradient-to-br from-brand-500 to-accent-500 rounded-xl flex items-center justify-center shadow-brand-sm">
-                <span className="text-white font-black text-xl leading-none">U</span>
+                <span className="inline-block text-white font-black text-xl leading-none" style={{ transform: 'rotate(-30deg)' }}>E</span>
               </div>
-              <span className="text-2xl font-black gradient-text tracking-tight">UrbanPro</span>
+              <span className="text-2xl font-black gradient-text tracking-tight">ExpertsHub</span>
             </div>
 
             <p className="text-sm leading-relaxed mb-6 max-w-xs text-neutral-400">
@@ -143,7 +143,7 @@ export function Footer() {
       {/* Bottom bar */}
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col sm:flex-row items-center justify-between gap-3">
         <p className="text-xs text-neutral-500 font-medium">
-          © {new Date().getFullYear()} UrbanPro Technologies Pvt. Ltd. All rights reserved.
+          © {new Date().getFullYear()} ExpertsHub Technologies Pvt. Ltd. All rights reserved.
         </p>
         <p className="text-xs flex items-center gap-1.5 text-neutral-500">
           Made with{' '}

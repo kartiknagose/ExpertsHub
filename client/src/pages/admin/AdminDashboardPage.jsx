@@ -117,8 +117,8 @@ export function AdminDashboardPage() {
 
   return (
     <MainLayout>
-      <div className={getPageLayout('default')}>
-        <div className="flex items-start justify-between mb-8">
+      <div className={`${getPageLayout('default')} dashboard-canvas dashboard-canvas--admin`}>
+        <div className="dashboard-hero flex items-start justify-between mb-8">
           <PageHeader
             title="Admin Dashboard"
             subtitle="Monitor marketplace activity and manage the platform."

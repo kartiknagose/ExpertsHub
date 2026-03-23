@@ -153,7 +153,7 @@ export function NotificationPreferencesPage() {
 
   return (
     <MainLayout>
-      <div className="max-w-3xl mx-auto px-4 py-12 space-y-10">
+      <div className="max-w-3xl mx-auto px-4 py-12 space-y-10 module-canvas module-canvas--utility">
         <header className="space-y-2">
           <h1 className="text-4xl font-bold tracking-tight text-gray-900 dark:text-white">{t('Notification Controls')}</h1>
           <p className="text-base text-gray-500 dark:text-gray-400 font-medium italic">

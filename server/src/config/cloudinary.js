@@ -28,7 +28,7 @@ function uploadToCloudinary(buffer, options = {}) {
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
       {
-        folder: options.folder || 'urbanpro',
+        folder: options.folder || 'ExpertsHub',
         public_id: options.public_id,
         resource_type: options.resource_type || 'image',
         transformation: options.transformation,

@@ -4,7 +4,7 @@ import i18n from 'i18next';
 // We can't easily import the ES module i18n.js if it uses browser-only stuff like LanguageDetector
 // So let's just parse it as a string to extract the resources object or use a regex to see if it's sane.
 
-const content = fs.readFileSync('d:/mini_project/UrbanPro V2/client/src/config/i18n.js', 'utf8');
+const content = fs.readFileSync('d:/mini_project/ExpertsHub V2/client/src/config/i18n.js', 'utf8');
 
 const resourcesMatch = content.match(/const resources = (\{[\s\S]*?\});/);
 

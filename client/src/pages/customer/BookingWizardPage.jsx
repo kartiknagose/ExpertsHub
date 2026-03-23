@@ -19,10 +19,15 @@ export function BookingWizardPage() {
   const createBookingMutation = useMutation({
     mutationFn: (bookingData) => createBooking(bookingData),
     onSuccess: (data) => {
+      const createdBookingId = data?.booking?.id || data?.id;
       queryClient.invalidateQueries({ queryKey: queryKeys.bookings.customer() });
       toast.success(t('Booking created successfully! Redirecting...'));
       setTimeout(() => {
-        navigate(`/customer/bookings/${data.id}`);
+        if (createdBookingId) {
+          navigate(`/customer/bookings/${createdBookingId}`);
+        } else {
+          navigate('/customer/bookings');
+        }
       }, 1500);
     },
     onError: (error) => {

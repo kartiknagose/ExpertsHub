@@ -9,7 +9,7 @@ const router = express.Router();
 const authenticate = require('../../middleware/auth');
 const validate = require('../../middleware/validation');
 const { bookingLimiter, otpLimiter } = require('../../config/rateLimit');
-const { requireCustomer, requireWorker } = require('../../middleware/requireRole');
+const { requireCustomer, requireWorker, requireCustomerOrWorker } = require('../../middleware/requireRole');
 
 // Import validation schemas
 const {
@@ -34,7 +34,7 @@ const bookingController = require('./booking.controller');
 router.post(
   '/preview-price',
   authenticate,
-  requireCustomer,
+  requireCustomerOrWorker,
   previewPriceSchema,
   validate,
   bookingController.previewPrice
@@ -46,7 +46,7 @@ router.post(
 router.post(
   '/',
   authenticate,
-  requireCustomer,
+  requireCustomerOrWorker,
   bookingLimiter,
   createBookingSchema,
   validate,

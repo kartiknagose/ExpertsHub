@@ -222,21 +222,47 @@ export function clearToastHistory() {
 }
 
 /**
+ * Extract a friendly error message from API/network failures.
+ * Handles server payload shapes and status-code specific fallbacks.
+ */
+export function getApiErrorMessage(error, defaultMessage = 'An error occurred') {
+  if (typeof error === 'string' && error.trim()) return error;
+
+  const status = error?.response?.status;
+  const data = error?.response?.data;
+
+  const validationMessage = Array.isArray(data?.errors)
+    ? data.errors.find((item) => item?.message)?.message
+    : null;
+
+  const serverMessage =
+    data?.message ||
+    data?.error ||
+    validationMessage ||
+    null;
+
+  if (serverMessage) return serverMessage;
+
+  if (status === 400) return 'Invalid request. Please review the entered details and try again.';
+  if (status === 401) return 'Session expired. Please login again.';
+  if (status === 403) return 'You do not have permission to perform this action.';
+  if (status === 404) return 'Requested resource was not found.';
+  if (status === 409) return 'Conflict detected. Please refresh and try again.';
+  if (status === 422) return 'Submitted data is invalid. Please correct highlighted fields.';
+  if (status === 429) return 'Too many requests. Please wait and try again.';
+  if (status >= 500) return 'Server is currently unavailable. Please try again shortly.';
+
+  if (error?.code === 'ECONNABORTED') return 'Request timed out. Please try again.';
+  if (error?.request && !error?.response) return 'Network error. Please check your connection.';
+
+  return error?.message || defaultMessage;
+}
+
+/**
  * GENERIC: Show error with details
  * Extracts message from various error formats
  */
 export function toastErrorFromResponse(error, defaultMessage = 'An error occurred') {
-  let message = defaultMessage;
-
-  if (typeof error === 'string') {
-    message = error;
-  } else if (error?.response?.data?.message) {
-    message = error.response.data.message;
-  } else if (error?.response?.data?.error) {
-    message = error.response.data.error;
-  } else if (error?.message) {
-    message = error.message;
-  }
-
+  const message = getApiErrorMessage(error, defaultMessage);
   toastError(message);
  }

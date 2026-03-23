@@ -1,6 +1,6 @@
 import fs from 'fs';
 
-const filePath = 'd:/mini_project/UrbanPro V2/client/src/config/i18n.js';
+const filePath = 'd:/mini_project/ExpertsHub V2/client/src/config/i18n.js';
 let content = fs.readFileSync(filePath, 'utf8');
 
 const hiMissing = {
@@ -16,13 +16,13 @@ const hiMissing = {
   "No active missions": "कोई सक्रिय मिशन नहीं",
   "Book a professional service to track real-time updates here.": "वास्तविक समय के अपडेट ट्रैक करने के लिए यहां एक पेशेवर सेवा बुक करें।",
   "Handpicked for you": "आपके लिए चुने गए",
-  "Share UrbanPro with Friends": "दोस्तों के साथ UrbanPro साझा करें",
+  "Share ExpertsHub with Friends": "दोस्तों के साथ ExpertsHub साझा करें",
   "Know someone who needs quality home services? Spread the word!": "किसी ऐसे व्यक्ति को जानते हैं जिसे गुणवत्तापूर्ण घरेलू सेवाओं की आवश्यकता है? खबर फैलाएं!",
   "Share Now": "अभी साझा करें",
   "Safety Matrix": "सुरक्षा मैट्रिक्स",
   "Zero-Risk Promise": "जीरो-रिस्क प्रॉमिस",
   "Verified professional network": "सत्यापित पेशेवर नेटवर्क",
-  "UrbanPro Quality": "UrbanPro गुणवत्ता",
+  "ExpertsHub Quality": "ExpertsHub गुणवत्ता",
   "Top-rated standard of work": "टॉप-रेटेड कार्य मानक",
   "Secure Escrow": "सुरक्षित एस्क्रो",
   "Pay only when satisfied": "संतुष्ट होने पर ही भुगतान करें",
@@ -57,13 +57,13 @@ const mrMissing = {
   "No active missions": "कोणतीही सक्रिय मिशन नाहीत",
   "Book a professional service to track real-time updates here.": "रिअल-टाइम अपडेट्स ट्रॅक करण्यासाठी येथे प्रोफेशनल सेवा बुक करा.",
   "Handpicked for you": "तुमच्यासाठी निवडलेले",
-  "Share UrbanPro with Friends": "मित्रांसह UrbanPro शेअर करा",
+  "Share ExpertsHub with Friends": "मित्रांसह ExpertsHub शेअर करा",
   "Know someone who needs quality home services? Spread the word!": "दर्जेदार घरगुती सेवांची गरज असलेल्या कोणाला ओळखता का? प्रसार करा!",
   "Share Now": "आता शेअर करा",
   "Safety Matrix": "सुरक्षा मॅट्रिक्स",
   "Zero-Risk Promise": "झिरो-रिस्क प्रॉमिस",
   "Verified professional network": "सत्यापित प्रोफेशनल नेटवर्क",
-  "UrbanPro Quality": "UrbanPro गुणवत्ता",
+  "ExpertsHub Quality": "ExpertsHub गुणवत्ता",
   "Top-rated standard of work": "टॉप-रेटेड कामाचा दर्जा",
   "Secure Escrow": "सुरक्षित एस्क्रो",
   "Pay only when satisfied": "समाधानी असल्यावरच पैसे द्या",

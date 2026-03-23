@@ -46,7 +46,7 @@ export function CustomerFavoritesPage() {
 
   return (
     <MainLayout>
-      <div className={getPageLayout('default')}>
+      <div className={`${getPageLayout('default')} module-canvas module-canvas--profile`}>
         {/* Header */}
         <Motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
           <span className="text-xs font-bold uppercase tracking-widest text-brand-500 mb-2 block">

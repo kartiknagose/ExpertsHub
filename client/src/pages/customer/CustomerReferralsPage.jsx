@@ -45,10 +45,10 @@ export function CustomerReferralsPage() {
     };
 
     const handleShare = async () => {
-        const text = `Join UrbanPro v2 for professional home services! Use my code ${data?.referralCode} to get ₹50 credits. Download: https://urbanpro.v2.app`;
+        const text = `Join ExpertsHub v2 for professional home services! Use my code ${data?.referralCode} to get ₹50 credits. Download: https://ExpertsHub.v2.app`;
         if (navigator.share) {
             try {
-                await navigator.share({ title: 'UrbanPro Refer & Earn', text, url: 'https://urbanpro.v2.app' });
+                await navigator.share({ title: 'ExpertsHub Refer & Earn', text, url: 'https://ExpertsHub.v2.app' });
                 return;
             } catch (err) {
                 if (err?.name === 'AbortError') return;
@@ -61,7 +61,7 @@ export function CustomerReferralsPage() {
 
     return (
         <MainLayout>
-            <div className={getPageLayout('default')}>
+            <div className={`${getPageLayout('default')} module-canvas module-canvas--profile`}>
                 <PageHeader
                     title="Refer & Earn"
                     subtitle="Invite your friends and earn wallet credits together."

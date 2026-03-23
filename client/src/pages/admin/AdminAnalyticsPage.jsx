@@ -40,7 +40,7 @@ export function AdminAnalyticsPage() {
 
     return (
         <MainLayout>
-            <div className={getPageLayout('default')}>
+            <div className={`${getPageLayout('default')} module-canvas module-canvas--utility`}>
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
                     <PageHeader
                         title="Platform Analytics"

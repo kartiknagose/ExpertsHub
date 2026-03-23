@@ -1,6 +1,6 @@
 #!/bin/bash
 # Production Testing Quick Start Script
-# UrbanPro V2 - Supabase + Render
+# ExpertsHub V2 - Supabase + Render
 
 set -e
 
@@ -10,12 +10,12 @@ RED='\033[0;31m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-echo -e "${YELLOW}=== UrbanPro V2 Production Testing ===${NC}"
+echo -e "${YELLOW}=== ExpertsHub V2 Production Testing ===${NC}"
 echo ""
 
 # Configuration
 SUPABASE_URL="https://tzzlrpbuxjpsazrqjxob.supabase.co"
-RENDER_URL="https://urbanpro-api.onrender.com"
+RENDER_URL="https://ExpertsHub-api.onrender.com"
 SUPABASE_ANON_KEY="${SUPABASE_ANON_KEY:-}" # Set via env var
 CACHE_RELAY_SECRET="urbanpro_cache_relay_secret_v1_2026"
 
@@ -30,7 +30,7 @@ echo -e "${YELLOW}[TEST 1] Infrastructure Health${NC}"
 echo "Testing Supabase health..."
 if curl -s -X GET \
   -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
-  "$SUPABASE_URL/functions/v1/health" | grep -q "urbanpro-supabase"; then
+  "$SUPABASE_URL/functions/v1/health" | grep -q "ExpertsHub-supabase"; then
   echo -e "${GREEN}✅ Supabase health: OK${NC}"
 else
   echo -e "${RED}❌ Supabase health: FAILED${NC}"
@@ -102,10 +102,10 @@ echo ""
 
 # Summary
 echo -e "${GREEN}=== ALL TESTS PASSED ===${NC}"
-echo "Your UrbanPro V2 production environment is ready!"
+echo "Your ExpertsHub V2 production environment is ready!"
 echo ""
 echo "Next steps:"
-echo "1. Open app in browser: https://urbanpro.your-domain.com"
+echo "1. Open app in browser: https://ExpertsHub.your-domain.com"
 echo "2. Register as customer"
 echo "3. Register as worker"
 echo "4. Test cache relay with real service/worker updates"

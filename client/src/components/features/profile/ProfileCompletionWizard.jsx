@@ -266,7 +266,7 @@ export function ProfileCompletionWizard({ userRole, onComplete, onSkip }) {
                 <h3 className="text-lg font-bold text-neutral-900 dark:text-white mb-2 flex items-center justify-center gap-2">
                   <CheckCircle2 size={20} className="text-brand-500" /> {t('Profile Setup Complete!')}
                 </h3>
-                <p className="text-sm text-neutral-600 dark:text-neutral-400">{t('You are all set to use UrbanPro')}</p>
+                <p className="text-sm text-neutral-600 dark:text-neutral-400">{t('You are all set to use ExpertsHub')}</p>
               </div>
 
               <Card className="bg-brand-50 dark:bg-brand-500/10 border-brand-200 dark:border-brand-500/20 p-4 space-y-3">
@@ -422,7 +422,7 @@ export function ProfileCompletionWizard({ userRole, onComplete, onSkip }) {
                 <h3 className="text-lg font-bold text-neutral-900 dark:text-white mb-2 flex items-center justify-center gap-2">
                   <CheckCircle2 size={20} className="text-brand-500" /> {t('Profile Created!')}
                 </h3>
-                <p className="text-sm text-neutral-600 dark:text-neutral-400">{t('Ready to start earning on UrbanPro')}</p>
+                <p className="text-sm text-neutral-600 dark:text-neutral-400">{t('Ready to start earning on ExpertsHub')}</p>
               </div>
 
               <Card className="bg-brand-50 dark:bg-brand-500/10 border-brand-200 dark:border-brand-500/20 p-4 space-y-3">

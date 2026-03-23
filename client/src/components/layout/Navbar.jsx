@@ -6,12 +6,11 @@ import { motion as Motion, AnimatePresence } from 'framer-motion';
 import {
   Menu, X, Briefcase, Settings, Users, Tag, Mail,
   LogOut, LogIn, UserPlus, Sun, Moon, LayoutGrid,
-  ChevronDown, MessageSquare, Zap, Globe, MapPin
+  ChevronDown, Globe
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth';
 import { useTheme } from '../../context/ThemeContext';
-import { useCity } from '../../context/CityContext';
 import { resolveProfilePhotoUrl } from '../../utils/profilePhoto';
 import { Button } from '../ui/Button';
 import { NotificationDropdown } from '../features/notifications/NotificationDropdown';
@@ -25,11 +24,9 @@ export function Navbar({ onOpenSidebar = () => {}, sidebarOffset = '', showBrand
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [langMenuOpen, setLangMenuOpen] = useState(false);
-  const [cityMenuOpen, setCityMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const userMenuRef = useRef(null);
   const langMenuRef = useRef(null);
-  const cityMenuRef = useRef(null);
 
   // Detect scroll for enhanced frosted effect
   useEffect(() => {
@@ -49,21 +46,18 @@ export function Navbar({ onOpenSidebar = () => {}, sidebarOffset = '', showBrand
     const handler = (e) => { 
       if (userMenuOpen && userMenuRef.current && !userMenuRef.current.contains(e.target)) setUserMenuOpen(false); 
       if (langMenuOpen && langMenuRef.current && !langMenuRef.current.contains(e.target)) setLangMenuOpen(false); 
-      if (cityMenuOpen && cityMenuRef.current && !cityMenuRef.current.contains(e.target)) setCityMenuOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
-  }, [userMenuOpen, langMenuOpen, cityMenuOpen]);
+  }, [userMenuOpen, langMenuOpen]);
 
   const publicLinks = [
     { name: t('Services'),    href: '/services',    icon: Briefcase },
     { name: t('Simple Process'),href: '/how-it-works', icon: Settings },
     { name: t('Coupons'),     href: '/pricing',      icon: Tag },
     { name: t('Users'),       href: '/about',        icon: Users },
-    { name: t('Messages'),     href: '/contact',      icon: Mail },
+    { name: t('Contact'),     href: '/contact',      icon: Mail },
   ];
-
-  const { cities, selectedCity, changeCity } = useCity();
 
   const handleLogout = async () => { await logout(); navigate('/login'); setMobileMenuOpen(false); };
   const closeMobileMenu = () => setMobileMenuOpen(false);
@@ -86,7 +80,7 @@ export function Navbar({ onOpenSidebar = () => {}, sidebarOffset = '', showBrand
   }, [user?.role, t]);
 
   const profilePhotoUrl = resolveProfilePhotoUrl(user?.profilePhotoUrl);
-  const profileInitial  = (user?.name || 'U').slice(0, 1).toUpperCase();
+  const profileInitial  = (user?.name || 'E').slice(0, 1).toUpperCase();
   const isLinkActive    = (href) => location.pathname === href || location.pathname.startsWith(href + '/');
 
   return (
@@ -112,10 +106,10 @@ export function Navbar({ onOpenSidebar = () => {}, sidebarOffset = '', showBrand
               className="flex items-center gap-2.5 shrink-0 group"
             >
               <div className="w-8 h-8 bg-gradient-to-br from-brand-500 to-accent-500 rounded-xl flex items-center justify-center shadow-md shadow-brand-500/30 group-hover:shadow-brand-500/50 transition-shadow duration-200">
-                <span className="text-white font-black text-lg leading-none">U</span>
+                <span className="inline-block text-white font-black text-lg leading-none" style={{ transform: 'rotate(-30deg)' }}>E</span>
               </div>
               <span className="text-xl font-black gradient-text tracking-tight">
-                UrbanPro
+                ExpertsHub
               </span>
             </Link>
           ) : (
@@ -152,70 +146,20 @@ export function Navbar({ onOpenSidebar = () => {}, sidebarOffset = '', showBrand
           {/* ── Right Actions ────────────────────────────────────────────── */}
           <div className="flex items-center gap-0.5">
 
-            {/* Sidebar toggle */}
+            {/* Sidebar toggle (desktop) */}
             {isAuthenticated && (
               <button
                 type="button"
                 onClick={onOpenSidebar}
-                className="p-2 rounded-xl transition-colors text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-dark-800"
+                className="hidden md:inline-flex p-2 rounded-xl transition-colors text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-dark-800"
                 aria-label="Open sidebar"
               >
                 <LayoutGrid size={20} />
               </button>
             )}
 
-            {/* Messages */}
-            {isAuthenticated && (
-              <Link
-                to="/messages"
-                className="p-2 rounded-xl transition-colors text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-dark-800"
-                aria-label="Messages"
-              >
-                <MessageSquare size={20} />
-              </Link>
-            )}
-
             {/* Notifications */}
             {isAuthenticated && <NotificationDropdown />}
-
-            {/* City Selector */}
-            <div className="relative hidden lg:block" ref={cityMenuRef}>
-              <button
-                onClick={() => setCityMenuOpen(!cityMenuOpen)}
-                className="flex items-center gap-1.5 p-2 rounded-xl transition-colors text-neutral-500 dark:text-neutral-400 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-neutral-100 dark:hover:bg-dark-800 uppercase text-[10px] font-black tracking-widest"
-                aria-label="Toggle city"
-              >
-                <MapPin size={16} className="text-brand-500" />
-                {selectedCity?.name || 'Select City'}
-                <ChevronDown size={12} className={`transition-transform duration-200 ${cityMenuOpen ? 'rotate-180' : ''}`} />
-              </button>
-              <AnimatePresence>
-                {cityMenuOpen && (
-                  <Motion.div
-                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                    className="absolute right-0 mt-2 w-48 rounded-2xl border shadow-2xl py-2 z-50 bg-white dark:bg-dark-800 border-neutral-200 dark:border-dark-700 overflow-hidden"
-                  >
-                    <div className="px-4 py-2 border-b border-neutral-100 dark:border-dark-700">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-neutral-400">{t('Select City')}</p>
-                    </div>
-                    <div className="max-h-64 overflow-y-auto">
-                      {cities.map((city) => (
-                        <button
-                          key={city.id}
-                          onClick={() => { changeCity(city); setCityMenuOpen(false); }}
-                          className={`w-full text-left px-4 py-3 text-sm font-semibold transition-colors flex items-center justify-between ${selectedCity?.id === city.id ? 'text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-900/20' : 'text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-dark-700'}`}
-                        >
-                          {city.name}
-                          {selectedCity?.id === city.id && <Zap size={12} className="fill-current" />}
-                        </button>
-                      ))}
-                    </div>
-                  </Motion.div>
-                )}
-              </AnimatePresence>
-            </div>
 
             {/* Language toggle */}
             <div className="relative hidden md:block" ref={langMenuRef}>
@@ -376,25 +320,36 @@ export function Navbar({ onOpenSidebar = () => {}, sidebarOffset = '', showBrand
               )}
             </div>
 
-            {/* Mobile menu toggle */}
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 rounded-xl transition-colors text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-dark-800 ml-1"
-              aria-label="Toggle mobile menu"
-              aria-expanded={mobileMenuOpen}
-            >
-              <AnimatePresence mode="wait">
-                {mobileMenuOpen ? (
-                  <Motion.span key="close" initial={{ rotate: -90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: 90, opacity: 0 }} transition={{ duration: 0.15 }}>
-                    <X size={22} />
-                  </Motion.span>
-                ) : (
-                  <Motion.span key="menu" initial={{ rotate: 90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: -90, opacity: 0 }} transition={{ duration: 0.15 }}>
-                    <Menu size={22} />
-                  </Motion.span>
-                )}
-              </AnimatePresence>
-            </button>
+            {/* Mobile sidebar toggle for authenticated users */}
+            {isAuthenticated ? (
+              <button
+                type="button"
+                onClick={onOpenSidebar}
+                className="md:hidden p-2 rounded-xl transition-colors text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-dark-800 ml-1"
+                aria-label="Open sidebar"
+              >
+                <LayoutGrid size={22} />
+              </button>
+            ) : (
+              <button
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="md:hidden p-2 rounded-xl transition-colors text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-dark-800 ml-1"
+                aria-label="Toggle mobile menu"
+                aria-expanded={mobileMenuOpen}
+              >
+                <AnimatePresence mode="wait">
+                  {mobileMenuOpen ? (
+                    <Motion.span key="close" initial={{ rotate: -90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: 90, opacity: 0 }} transition={{ duration: 0.15 }}>
+                      <X size={22} />
+                    </Motion.span>
+                  ) : (
+                    <Motion.span key="menu" initial={{ rotate: 90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: -90, opacity: 0 }} transition={{ duration: 0.15 }}>
+                      <Menu size={22} />
+                    </Motion.span>
+                  )}
+                </AnimatePresence>
+              </button>
+            )}
           </div>
         </div>
       </div>

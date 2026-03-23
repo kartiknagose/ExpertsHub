@@ -76,7 +76,7 @@ export function CustomerWalletPage() {
           key: razorpayKeyId,
           amount: order.amount,
           currency: order.currency,
-          name: 'UrbanPro V2',
+          name: 'ExpertsHub V2',
           description: 'Wallet Top-up',
           order_id: order.id,
           prefill: {
@@ -192,7 +192,7 @@ export function CustomerWalletPage() {
 
   return (
     <MainLayout>
-      <div className={getPageLayout('default')}>
+      <div className={`${getPageLayout('default')} module-canvas module-canvas--profile`}>
         <PageHeader
           title="My Wallet"
           subtitle="Manage your platform credits and transaction history."

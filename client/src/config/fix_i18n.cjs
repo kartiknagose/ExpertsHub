@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const i18nPath = path.join('d:', 'mini_project', 'UrbanPro V2', 'client', 'src', 'config', 'i18n.js');
+const i18nPath = path.join('d:', 'mini_project', 'ExpertsHub V2', 'client', 'src', 'config', 'i18n.js');
 let content = fs.readFileSync(i18nPath, 'utf8');
 
 // Function to detect if a string contains Hindi characters

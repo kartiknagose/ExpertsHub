@@ -261,10 +261,6 @@ export function CustomerProfilePage() {
           hasShegaon(addr.neighbourhood) ||
           hasShegaon(data.display_name);
 
-        if (isShegaon) {
-            toastSuccess(t('Shegaon (Buldhana) detected! Syncing high-precision coordinates.'));
-        }
-
         setValue('line1', line1 || addr.display_name?.split(',')[0] || '', { shouldDirty: true });
         setValue('line2', line2 || (isShegaon ? 'Shegaon (R), Shegaon' : ''), { shouldDirty: true });
         setValue('city', isShegaon ? 'Shegaon' : (city || ''), { shouldDirty: true });
@@ -317,7 +313,7 @@ export function CustomerProfilePage() {
 
   return (
     <MainLayout>
-      <div className="max-w-7xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto px-4 py-12 sm:px-6 lg:px-8 module-canvas module-canvas--profile">
         <div className="flex flex-col lg:flex-row gap-10">
           
           {/* Sidebar Navigation */}
@@ -894,7 +890,7 @@ export function CustomerProfilePage() {
                                  <Award size={32} />
                                </div>
                                <div>
-                                 <h4 className="text-xl font-bold text-indigo-900 dark:text-indigo-300">UrbanPro Plus</h4>
+                                 <h4 className="text-xl font-bold text-indigo-900 dark:text-indigo-300">ExpertsHub Plus</h4>
                                  <p className="text-sm font-bold text-indigo-700/70 dark:text-indigo-400/60 transition-colors">
                                    {t('Enjoy zero convenience fees on all bookings.')}
                                  </p>

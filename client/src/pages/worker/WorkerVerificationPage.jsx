@@ -32,7 +32,7 @@ export function WorkerVerificationPage() {
 
   return (
     <MainLayout>
-      <div className={getPageLayout('narrow')}>
+      <div className={`${getPageLayout('narrow')} module-canvas module-canvas--profile`}>
         <PageHeader
           title={t("Verification")}
           subtitle={t("Submit your verification request to build customer trust.")}

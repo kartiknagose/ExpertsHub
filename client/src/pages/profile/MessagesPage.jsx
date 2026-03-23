@@ -69,7 +69,7 @@ export function MessagesPage() {
 
     return (
         <MainLayout>
-            <div className={getPageLayout('default')}>
+            <div className={`${getPageLayout('default')} module-canvas module-canvas--utility`}>
                 <PageHeader
                     title={t('Messages')}
                     description={t('Chat with your service providers and customers')}

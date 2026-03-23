@@ -36,7 +36,7 @@ async function sendSMSViaEmail(phone, message, carrier = 'default') {
         await sendEmail({
             to: smsEmail,
             logContext: 'SOS SMS Gateway',
-            subject: '🚨 SOS ALERT — UrbanPro Emergency',
+            subject: '🚨 SOS ALERT — ExpertsHub Emergency',
             text: message, // SMS gateways use the plain text body as the SMS
         });
         console.log(`[SOS] SMS sent to ${smsEmail}`);
@@ -134,14 +134,14 @@ async function triggerSOS(userId, bookingId, location) {
 
     // 5. Build alert message
     const smsMessage =
-        `🚨 SOS ALERT from UrbanPro!\n` +
+        `🚨 SOS ALERT from ExpertsHub!\n` +
         `${triggeringUser?.name || 'User'} (${role}) needs IMMEDIATE help.\n` +
         `Booking #${bookingId} - ${booking.service?.name || 'Service'}\n` +
         `${locationStr}\n` +
         `Call them NOW!`;
 
     const emailBody =
-        `🚨 EMERGENCY SOS ALERT — UrbanPro Safety System\n\n` +
+        `🚨 EMERGENCY SOS ALERT — ExpertsHub Safety System\n\n` +
         `${triggeringUser?.name || 'A user'} (${role}) has triggered an SOS emergency alert.\n\n` +
         `📋 Booking Details:\n` +
         `  • Booking ID: #${bookingId}\n` +
@@ -152,14 +152,14 @@ async function triggerSOS(userId, bookingId, location) {
         `  • Name: ${triggeringUser?.name || 'Unknown'}\n` +
         `  • Role: ${role}\n\n` +
         `⚠️ Please contact them IMMEDIATELY and ensure their safety.\n\n` +
-        `— UrbanPro Safety Team`;
+        `— ExpertsHub Safety Team`;
 
     // 6. Notify emergency contacts via SMS + email (async, non-blocking)
     const notifyPromises = contacts.map(async (contact) => {
         await Promise.allSettled([
             sendSMSViaEmail(contact.phone, smsMessage),
             // If contact has email field, send email too (fallback)
-            contact.email ? sendEmailAlert(contact.email, '🚨 SOS ALERT — UrbanPro Emergency', emailBody) : Promise.resolve(),
+            contact.email ? sendEmailAlert(contact.email, '🚨 SOS ALERT — ExpertsHub Emergency', emailBody) : Promise.resolve(),
         ]);
         return { name: contact.name, phone: contact.phone };
     });

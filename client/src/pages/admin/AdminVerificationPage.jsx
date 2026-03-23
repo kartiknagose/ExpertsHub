@@ -77,7 +77,7 @@ export function AdminVerificationPage() {
 
   return (
     <MainLayout>
-      <div className={getPageLayout('default')}>
+      <div className={`${getPageLayout('default')} module-canvas module-canvas--utility`}>
         <PageHeader
           title="Verification Requests"
           subtitle="Review worker verification applications and update status."

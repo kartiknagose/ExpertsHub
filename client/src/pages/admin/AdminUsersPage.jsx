@@ -99,7 +99,7 @@ export function AdminUsersPage() {
 
   return (
     <MainLayout>
-      <div className={getPageLayout('default')}>
+      <div className={`${getPageLayout('default')} module-canvas module-canvas--utility`}>
         <PageHeader
           title={t("Users")}
           subtitle={t("Manage platform users by role.")}

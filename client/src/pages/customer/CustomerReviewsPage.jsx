@@ -77,7 +77,7 @@ export function CustomerReviewsPage() {
 
   return (
     <MainLayout>
-      <div className={getPageLayout('narrow')}>
+      <div className={`${getPageLayout('narrow')} module-canvas module-canvas--profile`}>
         <PageHeader
           title="My Reviews"
           subtitle="Share your feedback to help maintain our community standards."

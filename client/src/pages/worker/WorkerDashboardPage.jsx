@@ -164,10 +164,10 @@ export function WorkerDashboardPage() {
 
   return (
     <MainLayout>
-      <div className={getPageLayout('wide')}>
+      <div className={`${getPageLayout('wide')} dashboard-canvas dashboard-canvas--worker`}>
 
         {/* Dynamic Header */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-12">
+        <div className="dashboard-hero flex flex-col md:flex-row md:items-end justify-between gap-8 mb-12">
           <div className="flex items-center gap-8">
             <div className="relative group">
               <Avatar name={user?.name} src={user?.profilePhotoUrl} size="xl" ring status={isOnline ? t('online') : t('offline')} />
@@ -484,7 +484,7 @@ export function WorkerDashboardPage() {
                 {t('Invite fellow experts and earn rewards for every successful registration.')}
               </p>
               <SocialShare
-                title={t("Join UrbanPro V2")}
+                title={t("Join ExpertsHub V2")}
                 text={`${t("Use my referral code")} ${profile?.user?.referralCode || ''} ${t("to sign up as a pro!")}`}
                 variant="row"
               />

@@ -73,16 +73,16 @@ self.addEventListener('push', (event) => {
   try {
     data = event.data.json();
   } catch {
-    data = { title: 'UrbanPro', body: event.data.text() };
+    data = { title: 'ExpertsHub', body: event.data.text() };
   }
 
-  const { title = 'UrbanPro', body, icon, badge, url, tag } = data;
+  const { title = 'ExpertsHub', body, icon, badge, url, tag } = data;
 
   const options = {
     body,
     icon: icon || '/pwa-192x192.png',
     badge: badge || '/pwa-64x64.png',
-    tag: tag || 'urbanpro-notification',
+    tag: tag || 'ExpertsHub-notification',
     renotify: true,
     data: { url: url || '/' },
     vibrate: [100, 50, 100],

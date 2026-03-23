@@ -16,7 +16,7 @@ const formatSubscriptionDate = (value) => {
 };
 
 export function CustomerProPlusPage() {
-  usePageTitle('UrbanPro Plus');
+  usePageTitle('ExpertsHub Plus');
   const queryClient = useQueryClient();
 
   const { data: sub, isLoading } = useQuery({
@@ -28,7 +28,7 @@ export function CustomerProPlusPage() {
     mutationFn: (planId) => subscribeProPlus(planId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['proplus'] });
-      toast.success('Successfully subscribed to UrbanPro Plus!');
+      toast.success('Successfully subscribed to ExpertsHub Plus!');
     },
     onError: () => toast.error('Failed to subscribe. Try again.'),
   });
@@ -56,13 +56,13 @@ export function CustomerProPlusPage() {
 
   return (
     <MainLayout>
-      <div className={getPageLayout('default')}>
+      <div className={`${getPageLayout('default')} module-canvas module-canvas--profile`}>
         <Motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
           <span className="text-xs font-black uppercase tracking-widest text-brand-500 mb-2 block">
             Premium Membership
           </span>
           <h1 className="text-4xl font-black tracking-tight text-neutral-900 dark:text-white flex items-center gap-3">
-            UrbanPro <span className="px-2 py-0.5 rounded-lg bg-gradient-to-r from-brand-500 to-accent-500 text-white text-2xl rotate-3">Plus</span>
+            ExpertsHub <span className="px-2 py-0.5 rounded-lg bg-gradient-to-r from-brand-500 to-accent-500 text-white text-2xl rotate-3">Plus</span>
           </h1>
           <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-2">
             The smartest way to maintain your home. Save on every booking.

@@ -93,7 +93,7 @@ export function PWAInstallPrompt() {
             {/* Text */}
             <div className="flex-1 min-w-0">
               <p className="font-semibold text-gray-900 dark:text-white text-sm">
-                Install UrbanPro
+                Install ExpertsHub
               </p>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                 Add to your home screen for quick access

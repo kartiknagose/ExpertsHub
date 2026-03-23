@@ -19,7 +19,7 @@ const previewPriceSchema = [
     .isInt({ min: 1 }).withMessage('Service ID must be a valid number'),
 
   body('workerProfileId')
-    .optional({ nullable: true })
+    .optional({ nullable: true, checkFalsy: true })
     .isInt({ min: 1 }).withMessage('Worker profile ID must be a valid number'),
 
   body('scheduledDate')
@@ -35,7 +35,7 @@ const previewPriceSchema = [
     .isFloat({ min: -180, max: 180 }).withMessage('Longitude must be between -180 and 180'),
 
   body('estimatedPrice')
-    .optional({ nullable: true })
+    .optional({ nullable: true, checkFalsy: true })
     .isDecimal({ decimal_digits: '0,2' }).withMessage('Estimated price must be a valid number with up to 2 decimal places'),
 ];
 
@@ -53,7 +53,7 @@ const createBookingSchema = [
   // workerProfileId is OPTIONAL now. 
   // If provided, it's a Direct Booking. If null/undefined, it's an Open Booking.
   body('workerProfileId')
-    .optional({ nullable: true })
+    .optional({ nullable: true, checkFalsy: true })
     .isInt({ min: 1 }).withMessage('Worker ID must be a valid number'),
 
   // Check if serviceId exists and is a valid number
@@ -83,7 +83,7 @@ const createBookingSchema = [
 
   // Optional: Check estimatedPrice if provided
   body('estimatedPrice')
-    .optional()
+    .optional({ nullable: true, checkFalsy: true })
     .isDecimal({ decimal_digits: '0,2' }).withMessage('Estimated price must be a valid number with up to 2 decimal places')
     .custom((value) => {
       const price = parseFloat(value);

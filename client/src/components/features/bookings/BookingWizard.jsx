@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery } from '@tanstack/react-query';
@@ -19,15 +19,18 @@ import {
   MapPinIcon,
   User,
   Loader2,
+  Search,
 } from 'lucide-react';
 import { Button, Badge, Card, Input, Textarea, Avatar, AsyncState } from '../../common';
 import { LocationPicker } from '../location/LocationPicker';
-import { AddressAutocomplete } from '../location/AddressAutocomplete';
+import { WorkerProfileWindow } from '../workers/WorkerProfileWindow';
 import { queryKeys } from '../../../utils/queryKeys';
 import { getServiceWorkers, getAllServices } from '../../../api/services';
 import { previewPrice } from '../../../api/bookings';
 import { validateCoupon } from '../../../api/growth';
 import { toast } from 'sonner';
+import { useCity } from '../../../context/CityContext';
+import { useAuth } from '../../../hooks/useAuth';
 
 const STEP_TITLES = {
   service: 'Select Service',
@@ -60,11 +63,16 @@ const WizardStep = ({ step, isActive, isCompleted, title, icon: Icon }) => (
 
 export function BookingWizard({ onSuccess, initialService = null, initialWorker = null }) {
   const { t } = useTranslation();
+  const { user } = useAuth();
+  const { selectedCity } = useCity();
   const [currentStep, setCurrentStep] = useState(0);
   const [bookingMode, setBookingMode] = useState('DIRECT'); // DIRECT or OPEN
   const [selectedService, setSelectedService] = useState(initialService);
   const [selectedWorker, setSelectedWorker] = useState(initialWorker);
+  const [profileWorkerId, setProfileWorkerId] = useState(null);
+  const [isProfileWindowOpen, setIsProfileWindowOpen] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState(null);
+  const [serviceSearch, setServiceSearch] = useState('');
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [frequency, setFrequency] = useState('ONE_TIME');
@@ -86,7 +94,7 @@ export function BookingWizard({ onSuccess, initialService = null, initialWorker 
   } = useForm({
     mode: 'onChange',
     defaultValues: {
-      workerProfileId: initialWorker?.id,
+      workerProfileId: initialWorker?.id || null,
       serviceId: initialService?.id,
       scheduledDate: '',
       addressDetails: '',
@@ -103,22 +111,128 @@ export function BookingWizard({ onSuccess, initialService = null, initialWorker 
   const watchEstimatedPrice = watch('estimatedPrice');
   const watchNotes = watch('notes');
 
-  // Fetch services if not provided
-  const { data: servicesData, isLoading: servicesLoading } = useQuery({
+  // Fetch services for browsing and searching.
+  const { data: servicesApiData, isLoading: servicesLoading } = useQuery({
     queryKey: queryKeys.services.all(),
     queryFn: getAllServices,
-    enabled: !selectedService,
+    enabled: true,
   });
+
+  // Extract services array from API response (handles both old and new response formats)
+  const servicesData = useMemo(() => servicesApiData?.services || servicesApiData || [], [servicesApiData]);
+  const filteredServices = useMemo(() => {
+    const term = serviceSearch.trim().toLowerCase();
+    if (!term) return servicesData;
+
+    return servicesData.filter((service) => {
+      const name = String(service?.name || '').toLowerCase();
+      const category = String(service?.category || '').toLowerCase();
+      const price = String(service?.basePrice || '');
+      return name.includes(term) || category.includes(term) || price.includes(term);
+    });
+  }, [servicesData, serviceSearch]);
 
   // Fetch workers for selected service
-  const { data: workersData, isLoading: workersLoading } = useQuery({
+  const { data: workersApiData, isLoading: workersLoading } = useQuery({
     queryKey: [queryKeys.services.workers(selectedService?.id)],
     queryFn: () => getServiceWorkers(selectedService?.id),
-    enabled: selectedService && bookingMode === 'DIRECT',
+    enabled: !!selectedService && bookingMode === 'DIRECT',
   });
 
+  // Extract workers array from API response
+  const workersData = Array.isArray(workersApiData) ? workersApiData : workersApiData?.workers || [];
+
+  const distanceInKm = (lat1, lng1, lat2, lng2) => {
+    const toRad = (value) => (value * Math.PI) / 180;
+    const earthRadiusKm = 6371;
+    const dLat = toRad(lat2 - lat1);
+    const dLng = toRad(lng2 - lng1);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return earthRadiusKm * c;
+  };
+
+  const normalizeWorker = (worker) => {
+    const fullName =
+      worker?.user?.name ||
+      [worker?.firstName, worker?.lastName].filter(Boolean).join(' ') ||
+      'Expert';
+    const [firstName, ...lastParts] = String(fullName).trim().split(' ');
+
+    return {
+      ...worker,
+      id: worker?.id,
+      firstName: firstName || 'Expert',
+      lastName: lastParts.join(' '),
+      profilePhoto: worker?.profilePhoto || worker?.user?.profilePhotoUrl || null,
+      avgRating: Number(worker?.avgRating ?? worker?.rating ?? 0),
+      reviewCount: Number(worker?.reviewCount ?? worker?.totalReviews ?? 0),
+      jobsDone: Number(worker?.jobsDone ?? 0),
+      hourlyRate: Number(worker?.hourlyRate ?? 0),
+      status: worker?.isVerified ? 'Verified' : 'Available',
+      skills: Array.isArray(worker?.skills) ? worker.skills : [],
+      location: worker?.location,
+      serviceRadius: Number(worker?.serviceRadius ?? 0),
+      serviceAreas: worker?.serviceAreas,
+      city: worker?.city || worker?.user?.addresses?.[0]?.city || '',
+      userId: Number(worker?.user?.id ?? worker?.userId ?? 0) || null,
+    };
+  };
+
+  const workerSupportsSelectedCity = (worker) => {
+    if (!selectedCity) return true;
+
+    const cityNeedles = [selectedCity?.name, selectedCity?.slug]
+      .filter(Boolean)
+      .map((value) => String(value).toLowerCase());
+
+    const workerCity = String(worker?.city || '').toLowerCase();
+    if (cityNeedles.some((needle) => workerCity.includes(needle))) return true;
+
+    const serviceAreas = worker?.serviceAreas;
+    if (!serviceAreas) return true;
+
+    const searchText = JSON.stringify(serviceAreas).toLowerCase();
+    if (!/[a-z]/i.test(searchText)) {
+      // Geo-only polygons often have no city labels; avoid false-negative filtering.
+      return true;
+    }
+    return cityNeedles.some((needle) => searchText.includes(needle));
+  };
+
+  const workerSupportsSelectedLocation = (worker) => {
+    const lat = Number(selectedLocation?.lat);
+    const lng = Number(selectedLocation?.lng);
+
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return true;
+
+    const workerLat = Number(worker?.location?.latitude);
+    const workerLng = Number(worker?.location?.longitude);
+    const serviceRadius = Number(worker?.serviceRadius || 0);
+
+    if (!Number.isFinite(workerLat) || !Number.isFinite(workerLng) || serviceRadius <= 0) {
+      return true;
+    }
+
+    return distanceInKm(lat, lng, workerLat, workerLng) <= serviceRadius;
+  };
+
+  const availableWorkers = workersData
+    .map(normalizeWorker)
+    .filter((worker) => workerSupportsSelectedCity(worker) && workerSupportsSelectedLocation(worker));
+
+  useEffect(() => {
+    if (user?.role !== 'WORKER' || !selectedWorker) return;
+    if (Number(selectedWorker?.userId) === Number(user?.id)) {
+      setSelectedWorker(null);
+      setValue('workerProfileId', null);
+    }
+  }, [user?.role, user?.id, selectedWorker, setValue]);
+
   // Preview pricing
-  const previewPricingMutation = useMutation({
+  const { mutate: mutatePreviewPricing } = useMutation({
     mutationFn: () =>
       previewPrice({
         serviceId: selectedService?.id,
@@ -136,28 +250,48 @@ export function BookingWizard({ onSuccess, initialService = null, initialWorker 
   });
 
   // Trigger pricing preview when relevant fields change
-  useMemo(() => {
-    if (selectedService?.id && watchScheduledDate && currentStep >= 2) {
-      previewPricingMutation.mutate();
+  useEffect(() => {
+    if (!selectedService?.id || !watchScheduledDate || currentStep < 2) {
+      return;
     }
-  }, [selectedService?.id, watchScheduledDate, currentStep, previewPricingMutation]);
+
+    mutatePreviewPricing();
+  }, [
+    selectedService?.id,
+    selectedWorker?.id,
+    watchScheduledDate,
+    watchEstimatedPrice,
+    frequency,
+    currentStep,
+    mutatePreviewPricing,
+  ]);
 
   // Handle coupon validation
   const handleApplyCoupon = async () => {
-    if (!couponCode) return;
+    const normalizedCouponCode = String(couponCode || '').trim().toUpperCase();
+    if (!normalizedCouponCode) {
+      toast.error(t('Enter a valid promo code'));
+      return;
+    }
+
+    const bookingAmount = Number(finalPrice);
+    if (!Number.isFinite(bookingAmount) || bookingAmount < 0) {
+      toast.error(t('Invalid booking amount for coupon validation'));
+      return;
+    }
+
     setIsValidatingCoupon(true);
     try {
-      const finalPrice = pricingData?.totalPrice || watchEstimatedPrice || selectedService?.basePrice;
       const result = await validateCoupon({
-        code: couponCode,
-        bookingAmount: finalPrice,
+        code: normalizedCouponCode,
+        bookingAmount,
         serviceCategory: selectedService?.category,
       });
       setAppliedCoupon(result);
       setValue('couponCode', result.code);
       toast.success(t('Coupon applied successfully!'));
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Invalid coupon code');
+      toast.error(err.response?.data?.message || err.response?.data?.error || 'Invalid coupon code');
       setAppliedCoupon(null);
       setValue('couponCode', '');
     } finally {
@@ -200,6 +334,7 @@ export function BookingWizard({ onSuccess, initialService = null, initialWorker 
           <label className="text-sm font-semibold text-neutral-700 dark:text-neutral-200">{t('Booking Type')}</label>
           <div className="grid grid-cols-2 gap-3">
             <button
+              type="button"
               onClick={() => setBookingMode('DIRECT')}
               className={`p-4 rounded-xl border-2 transition-all ${
                 bookingMode === 'DIRECT'
@@ -212,7 +347,12 @@ export function BookingWizard({ onSuccess, initialService = null, initialWorker 
               <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">{t('Select an expert')}</p>
             </button>
             <button
-              onClick={() => setBookingMode('OPEN')}
+              type="button"
+              onClick={() => {
+                setBookingMode('OPEN');
+                setSelectedWorker(null);
+                setValue('workerProfileId', null);
+              }}
               className={`p-4 rounded-xl border-2 transition-all ${
                 bookingMode === 'OPEN'
                   ? 'border-brand-500 bg-brand-50 dark:bg-brand-500/10'
@@ -229,18 +369,29 @@ export function BookingWizard({ onSuccess, initialService = null, initialWorker 
         {/* Service Grid */}
         <div className="space-y-3">
           <label className="text-sm font-semibold text-neutral-700 dark:text-neutral-200">{t('Select Service')}</label>
+          <div className="relative">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+            <input
+              type="text"
+              value={serviceSearch}
+              onChange={(e) => setServiceSearch(e.target.value)}
+              placeholder={t('Search service by name, category, or price')}
+              className="w-full h-11 rounded-xl border border-neutral-200 dark:border-dark-700 bg-white dark:bg-dark-900 pl-9 pr-3 text-sm text-neutral-900 dark:text-white placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-400"
+            />
+          </div>
           <div className="max-h-96 overflow-y-auto space-y-2">
             <AsyncState isLoading={servicesLoading} error={null}>
-              {servicesData?.map((service) => (
+              {filteredServices?.map((service) => (
                 <button
                   key={service.id}
+                  type="button"
                   onClick={() => {
                     setSelectedService(service);
                     setValue('serviceId', service.id);
                     setSelectedWorker(null);
-                    setValue('workerProfileId', '');
+                    setValue('workerProfileId', null);
                   }}
-                  className={`w-full p-4 rounded-xl border-2 text-left transition-all ${
+                  className={`w-full p-3 rounded-lg border-2 text-left transition-all ${
                     selectedService?.id === service.id
                       ? 'border-brand-500 bg-brand-50 dark:bg-brand-500/10'
                       : 'border-neutral-200 dark:border-dark-700 hover:border-brand-300'
@@ -248,16 +399,21 @@ export function BookingWizard({ onSuccess, initialService = null, initialWorker 
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1">
-                      <p className="font-bold text-neutral-900 dark:text-white">{service.name}</p>
-                      <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">{service.category}</p>
+                      <p className="font-bold text-sm text-neutral-900 dark:text-white line-clamp-1">{service.name}</p>
+                      <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-1 line-clamp-1">{service.category}</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-bold text-brand-600 dark:text-brand-400">₹{service.basePrice}</p>
-                      <p className="text-xs text-neutral-500 dark:text-neutral-400">{t('Base rate')}</p>
+                      <p className="font-bold text-sm text-brand-600 dark:text-brand-400">₹{service.basePrice}</p>
+                      <p className="text-[11px] text-neutral-500 dark:text-neutral-400">{t('Base rate')}</p>
                     </div>
                   </div>
                 </button>
               ))}
+              {!filteredServices?.length && !servicesLoading && (
+                <div className="py-8 text-center text-sm text-neutral-500 dark:text-neutral-400">
+                  {t('No services match your search.')}
+                </div>
+              )}
             </AsyncState>
           </div>
         </div>
@@ -295,15 +451,13 @@ export function BookingWizard({ onSuccess, initialService = null, initialWorker 
             <div className="py-8 text-center">
               <Loader2 size={32} className="mx-auto animate-spin text-brand-500" />
             </div>
-          ) : workersData?.length ? (
+          ) : availableWorkers.length ? (
             <div className="space-y-2 max-h-96 overflow-y-auto">
-              {workersData.map((worker) => (
-                <button
+              {availableWorkers.map((worker) => {
+                const isSelfWorker = user?.role === 'WORKER' && Number(worker?.userId) === Number(user?.id);
+                return (
+                <div
                   key={worker.id}
-                  onClick={() => {
-                    setSelectedWorker(worker);
-                    setValue('workerProfileId', worker.id);
-                  }}
                   className={`w-full p-4 rounded-xl border-2 text-left transition-all ${
                     selectedWorker?.id === worker.id
                       ? 'border-brand-500 bg-brand-50 dark:bg-brand-500/10'
@@ -323,11 +477,47 @@ export function BookingWizard({ onSuccess, initialService = null, initialWorker 
                         </span>
                         <span>₹{worker.hourlyRate}/hr</span>
                       </div>
-                      <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-2">{worker.skills?.join(', ') || 'Multi-skilled'}</p>
+                      <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+                        {t('Jobs Done')}: {worker.jobsDone}
+                      </p>
+                      <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-2">
+                        {worker.skills?.join(', ') || t('Multi-skilled')}
+                      </p>
+                      {worker.city && (
+                        <p className="text-xs text-brand-600 dark:text-brand-400 mt-1">{t('Serving')}: {worker.city}</p>
+                      )}
                     </div>
                   </div>
-                </button>
-              ))}
+
+                  <div className="mt-3 flex items-center justify-end gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setProfileWorkerId(worker.id);
+                        setIsProfileWindowOpen(true);
+                      }}
+                    >
+                      {t('View Profile')}
+                    </Button>
+                    <Button
+                      size="sm"
+                      disabled={isSelfWorker}
+                      onClick={() => {
+                        setSelectedWorker(worker);
+                        setValue('workerProfileId', worker.id);
+                      }}
+                    >
+                      {isSelfWorker
+                        ? t('You cannot select yourself')
+                        : selectedWorker?.id === worker.id
+                          ? t('Selected')
+                          : t('Select Expert')}
+                    </Button>
+                  </div>
+                </div>
+                );
+              })}
             </div>
           ) : (
             <div className="py-8 text-center text-neutral-500 dark:text-neutral-400">
@@ -399,29 +589,18 @@ export function BookingWizard({ onSuccess, initialService = null, initialWorker 
             <label className="block text-sm font-semibold text-neutral-700 dark:text-neutral-200 flex items-center gap-2">
               <MapPinIcon size={16} className="text-brand-500" /> {t('Service Location')}
             </label>
-            <AddressAutocomplete
-              value={selectedLocation?.address || ''}
+            <LocationPicker
+              className="h-[320px] sm:h-[380px] md:h-[420px]"
+              initialLocation={selectedLocation}
               onChange={(loc) => {
-                setSelectedLocation(loc);
-                setValue('addressDetails', loc.address);
-                setValue('addressLat', loc.lat);
-                setValue('addressLng', loc.lng);
+                if (loc?.address) {
+                  setSelectedLocation(loc);
+                  setValue('addressDetails', loc.address);
+                  setValue('addressLat', loc.lat);
+                  setValue('addressLng', loc.lng);
+                }
               }}
-              placeholder={t('Search for your address...')}
             />
-              <div className="rounded-xl overflow-hidden border border-neutral-200 dark:border-dark-700 h-32 sm:h-40 md:h-48">
-              <LocationPicker
-                initialLocation={selectedLocation}
-                onChange={(loc) => {
-                  if (loc?.address) {
-                    setSelectedLocation(loc);
-                    setValue('addressDetails', loc.address);
-                    setValue('addressLat', loc.lat);
-                    setValue('addressLng', loc.lng);
-                  }
-                }}
-              />
-            </div>
           </div>
 
           {/* Notes */}
@@ -533,7 +712,7 @@ export function BookingWizard({ onSuccess, initialService = null, initialWorker 
         {/* Coupon Section */}
         <div className="space-y-3">
           <label className="text-sm font-semibold text-neutral-700 dark:text-neutral-200 flex items-center gap-2">
-            <Ticket size={16} className="text-brand-500" /> {t('Apply Promo Code')}
+            <Ticket size={16} className="text-brand-500" /> {t('Apply Promo Code')} (optional)
           </label>
           {!appliedCoupon ? (
             <div className="flex gap-2">
@@ -547,6 +726,7 @@ export function BookingWizard({ onSuccess, initialService = null, initialWorker 
               <Button
                 variant="outline"
                 size="sm"
+                type="button"
                 onClick={handleApplyCoupon}
                 loading={isValidatingCoupon}
                 disabled={!couponCode || isValidatingCoupon}
@@ -608,19 +788,45 @@ export function BookingWizard({ onSuccess, initialService = null, initialWorker 
     if (isSubmitting) return;
     handleSubmit(async (data) => {
       try {
-        await onSuccess({
+        const scheduledAt = data.scheduledDate ? new Date(data.scheduledDate) : null;
+        const normalizedScheduledDate =
+          scheduledAt && Number.isFinite(scheduledAt.getTime()) ? scheduledAt.toISOString() : data.scheduledDate;
+
+        const normalizedEstimatedPrice =
+          data.estimatedPrice === '' || data.estimatedPrice === null || data.estimatedPrice === undefined
+            ? undefined
+            : Number(data.estimatedPrice);
+
+        const payload = {
           ...data,
+          scheduledDate: normalizedScheduledDate,
+          workerProfileId: bookingMode === 'DIRECT' ? selectedWorker?.id || data.workerProfileId || null : null,
+          addressDetails: String(data.addressDetails || selectedLocation?.address || '').trim(),
+          latitude: Number(selectedLocation?.lat ?? data.addressLat),
+          longitude: Number(selectedLocation?.lng ?? data.addressLng),
+          estimatedPrice: Number.isFinite(normalizedEstimatedPrice) ? normalizedEstimatedPrice : undefined,
           couponCode: appliedCoupon?.code || '',
           frequency,
-        });
+        };
+
+        if (!Number.isFinite(payload.latitude)) payload.latitude = null;
+        if (!Number.isFinite(payload.longitude)) payload.longitude = null;
+
+        await onSuccess(payload);
       } catch (err) {
-        toast.error(err.message || t('Failed to create booking'));
+        const serverMessage =
+          err?.response?.data?.error ||
+          err?.response?.data?.message ||
+          err?.message ||
+          t('Failed to create booking');
+        toast.error(serverMessage);
       }
     })();
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto">
+    <>
+      <div className="w-full max-w-4xl mx-auto">
       {/* Progress Steps */}
       <div className="mb-8">
         <div className="flex items-center justify-between gap-2 mb-6 px-4">
@@ -680,6 +886,16 @@ export function BookingWizard({ onSuccess, initialService = null, initialWorker 
           </Button>
         )}
       </div>
-    </div>
+      </div>
+
+      <WorkerProfileWindow
+        workerId={profileWorkerId}
+        isOpen={isProfileWindowOpen}
+        onClose={() => {
+          setIsProfileWindowOpen(false);
+          setProfileWorkerId(null);
+        }}
+      />
+    </>
   );
 }

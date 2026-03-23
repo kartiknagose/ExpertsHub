@@ -53,7 +53,7 @@ export function LoginPage() {
 
   return (
     <AuthLayout
-      title="Welcome back to UrbanPro"
+      title="Welcome back to ExpertsHub"
       subtitle="Manage your bookings, connect with professionals, or grow your service business — all in one place."
     >
       {/* Form header */}

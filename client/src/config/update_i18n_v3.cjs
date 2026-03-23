@@ -1,5 +1,5 @@
 const fs = require('fs');
-const targetFile = 'd:/mini_project/UrbanPro V2/client/src/config/i18n.js';
+const targetFile = 'd:/mini_project/ExpertsHub V2/client/src/config/i18n.js';
 let content = fs.readFileSync(targetFile, 'utf8');
 
 const enKeys = `      // Additional Customer Keys
@@ -15,13 +15,13 @@ const enKeys = `      // Additional Customer Keys
       "No active missions": "No active missions",
       "Book a professional service to track real-time updates here.": "Book a professional service to track real-time updates here.",
       "Handpicked for you": "Handpicked for you",
-      "Share UrbanPro with Friends": "Share UrbanPro with Friends",
+      "Share ExpertsHub with Friends": "Share ExpertsHub with Friends",
       "Know someone who needs quality home services? Spread the word!": "Know someone who needs quality home services? Spread the word!",
       "Share Now": "Share Now",
       "Safety Matrix": "Safety Matrix",
       "Zero-Risk Promise": "Zero-Risk Promise",
       "Verified professional network": "Verified professional network",
-      "UrbanPro Quality": "UrbanPro Quality",
+      "ExpertsHub Quality": "ExpertsHub Quality",
       "Top-rated standard of work": "Top-rated standard of work",
       "Secure Escrow": "Secure Escrow",
       "Pay only when satisfied": "Pay only when satisfied",
@@ -56,13 +56,13 @@ const hiKeys = `      // Additional Customer Keys
       "No active missions": "कोई सक्रिय मिशन नहीं",
       "Book a professional service to track real-time updates here.": "वास्तविक समय के अपडेट ट्रैक करने के लिए यहां एक पेशेवर सेवा बुक करें।",
       "Handpicked for you": "आपके लिए चुने गए",
-      "Share UrbanPro with Friends": "दोस्तों के साथ UrbanPro साझा करें",
+      "Share ExpertsHub with Friends": "दोस्तों के साथ ExpertsHub साझा करें",
       "Know someone who needs quality home services? Spread the word!": "किसी ऐसे व्यक्ति को जानते हैं जिसे गुणवत्तापूर्ण घरेलू सेवाओं की आवश्यकता है? खबर फैलाएं!",
       "Share Now": "अभी साझा करें",
       "Safety Matrix": "सुरक्षा मैट्रिक्स",
       "Zero-Risk Promise": "शून्य-जोखिम वादा",
       "Verified professional network": "सत्यापित पेशेवर नेटवर्क",
-      "UrbanPro Quality": "UrbanPro गुणवत्ता",
+      "ExpertsHub Quality": "ExpertsHub गुणवत्ता",
       "Top-rated standard of work": "कार्य का शीर्ष-रेटेड मानक",
       "Secure Escrow": "सुरक्षित एस्क्रो",
       "Pay only when satisfied": "संतुष्ट होने पर ही भुगतान करें",

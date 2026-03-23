@@ -18,7 +18,7 @@ export function CookiesPage() {
 
       <h2>2. Essential Cookies</h2>
       <p>
-        These cookies are strictly necessary for the platform to function. They enable authentication, session management, and security features. You cannot opt out of these cookies while using UrbanPro.
+        These cookies are strictly necessary for the platform to function. They enable authentication, session management, and security features. You cannot opt out of these cookies while using ExpertsHub.
       </p>
       <ul>
         <li><strong>auth_token</strong> — Keeps you logged in across page visits</li>
@@ -53,7 +53,7 @@ export function CookiesPage() {
 
       <h2>8. Contact</h2>
       <p>
-        Questions? Email us at <strong>privacy@urbanpro.com</strong>.
+        Questions? Email us at <strong>privacy@ExpertsHub.com</strong>.
       </p>
     </LegalLayout>
   );

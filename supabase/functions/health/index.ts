@@ -6,7 +6,7 @@ serve(() => {
   return new Response(
     JSON.stringify({
       ok: true,
-      service: 'urbanpro-supabase',
+      service: 'ExpertsHub-supabase',
       timestamp: new Date().toISOString(),
     }),
     {

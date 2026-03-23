@@ -158,8 +158,26 @@ async function getServiceWorkers(serviceId, { skip = 0, limit = 20 } = {}) {
             rating: true,
             totalReviews: true,
             isVerified: true,
+            serviceAreas: true,
+            serviceRadius: true,
+            location: {
+              select: {
+                latitude: true,
+                longitude: true,
+                isOnline: true,
+              },
+            },
             user: {
-              select: { id: true, name: true, profilePhotoUrl: true },
+              select: {
+                id: true,
+                name: true,
+                profilePhotoUrl: true,
+                addresses: {
+                  select: { city: true },
+                  orderBy: { updatedAt: 'desc' },
+                  take: 1,
+                },
+              },
             },
           },
         },
@@ -170,8 +188,37 @@ async function getServiceWorkers(serviceId, { skip = 0, limit = 20 } = {}) {
     prisma.workerService.count({ where }),
   ]);
 
+  const workerIds = workers
+    .map((entry) => entry?.worker?.id)
+    .filter((id) => Number.isInteger(id));
+
+  let jobsDoneByWorkerId = new Map();
+  if (workerIds.length) {
+    const completedCounts = await prisma.booking.groupBy({
+      by: ['workerProfileId'],
+      where: {
+        workerProfileId: { in: workerIds },
+        status: 'COMPLETED',
+      },
+      _count: { _all: true },
+    });
+
+    jobsDoneByWorkerId = new Map(
+      completedCounts.map((item) => [item.workerProfileId, item._count?._all || 0])
+    );
+  }
+
   // Flatten to worker profiles for easier consumption by frontend
-  return { data: workers.map((entry) => entry.worker), total };
+  return {
+    data: workers.map((entry) => {
+      const worker = entry.worker;
+      return {
+        ...worker,
+        jobsDone: jobsDoneByWorkerId.get(worker.id) || 0,
+      };
+    }),
+    total,
+  };
 }
 
 /**

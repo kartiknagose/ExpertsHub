@@ -1,6 +1,6 @@
 {
-  "name": "UrbanPro — AI-Powered Local Services Marketplace",
-  "short_name": "UrbanPro",
+  "name": "ExpertsHub — AI-Powered Local Services Marketplace",
+  "short_name": "ExpertsHub",
   "description": "Connect with trusted professionals for home services, repairs, and more.",
   "start_url": "/",
   "display": "standalone",
@@ -8,7 +8,7 @@
   "theme_color": "#7c3aed",
   "icons": [
     {
-      "src": "/urbanpro-favicon.svg",
+      "src": "/ExpertsHub-favicon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"

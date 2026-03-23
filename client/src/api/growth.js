@@ -100,7 +100,7 @@ export const redeemLoyaltyPoints = async (points) => {
     return res.data;
 };
 
-// ── URBANPRO PLUS (Sprint 17 - #74) ────────────────────────────
+// ── ExpertsHub PLUS (Sprint 17 - #74) ────────────────────────────
 
 export const getProPlusSubscription = async () => {
     const res = await axiosInstance.get('/growth/proplus');

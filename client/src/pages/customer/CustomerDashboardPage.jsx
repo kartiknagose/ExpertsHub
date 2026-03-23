@@ -118,7 +118,7 @@ export function CustomerDashboardPage() {
       key: razorpayKeyId,
       amount: order.amount,
       currency: order.currency,
-      name: 'UrbanPro V2',
+      name: 'ExpertsHub V2',
       description: `Booking #${booking.id}`,
       order_id: order.id,
       prefill: {
@@ -291,10 +291,10 @@ export function CustomerDashboardPage() {
 
   return (
     <MainLayout>
-      <div className={getPageLayout('wide')}>
+      <div className={`${getPageLayout('wide')} dashboard-canvas dashboard-canvas--customer`}>
 
         {/* Modern Welcome Header */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+        <div className="dashboard-hero flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
           <div className="flex items-center gap-6">
             <Avatar name={user?.name} src={user?.profilePhotoUrl} size="xl" ring />
             <div>
@@ -445,7 +445,7 @@ export function CustomerDashboardPage() {
             {/* Share Widget */}
             <Card className="border-0 bg-brand-500 text-white p-8 rounded-[2.5rem] relative overflow-hidden shadow-2xl shadow-brand-500/20">
               <div className="relative z-10">
-                <h3 className="text-2xl font-bold mb-4 leading-tight">{t('Share UrbanPro with Friends')}</h3>
+                <h3 className="text-2xl font-bold mb-4 leading-tight">{t('Share ExpertsHub with Friends')}</h3>
                 <p className="text-brand-100 text-sm font-medium mb-6 opacity-80">{t('Know someone who needs quality home services? Spread the word!')}</p>
                 <Button onClick={() => {
                   const fallbackCopy = async () => {
@@ -458,7 +458,7 @@ export function CustomerDashboardPage() {
                   };
 
                   if (navigator.share) {
-                    navigator.share({ title: 'UrbanPro', text: t('Check out UrbanPro for professional home services!'), url: window.location.origin })
+                    navigator.share({ title: 'ExpertsHub', text: t('Check out ExpertsHub for professional home services!'), url: window.location.origin })
                       .catch((err) => {
                         if (err?.name === 'AbortError') return;
                         fallbackCopy();
@@ -491,7 +491,7 @@ export function CustomerDashboardPage() {
                     <Star size={24} />
                   </div>
                   <div>
-                    <p className="font-bold text-sm tracking-tight mb-1 text-dark-900 dark:text-white">{t('UrbanPro Quality')}</p>
+                    <p className="font-bold text-sm tracking-tight mb-1 text-dark-900 dark:text-white">{t('ExpertsHub Quality')}</p>
                     <p className="text-xs text-gray-500 font-medium">{t('Top-rated standard of work')}</p>
                   </div>
                 </div>
@@ -509,7 +509,7 @@ export function CustomerDashboardPage() {
 
             {/* Support widget */}
             <div className="p-2">
-              <button onClick={() => toastInfo(t('Support center coming soon! For urgent help, email support@urbanpro.com'))} className="w-full p-6 rounded-3xl border-2 border-dashed flex items-center justify-between group transition-all border-gray-200 hover:border-brand-500/30 dark:border-dark-700 dark:hover:border-brand-500/50">
+              <button onClick={() => toastInfo(t('Support center coming soon! For urgent help, email support@ExpertsHub.com'))} className="w-full p-6 rounded-3xl border-2 border-dashed flex items-center justify-between group transition-all border-gray-200 hover:border-brand-500/30 dark:border-dark-700 dark:hover:border-brand-500/50">
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-dark-800 flex items-center justify-center">
                     <Clock size={18} className="text-gray-400" />

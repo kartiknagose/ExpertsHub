@@ -24,15 +24,18 @@ export function BlogPage() {
     usePageTitle('Blog');
   return (
     <MainLayout>
-      <div className={getPageLayout('narrow')}>
-        <PageHeader
-          title="Blog"
-          subtitle="Insights, tips, and updates from the UrbanPro team."
-        />
+      <div className={`${getPageLayout('narrow')} module-canvas module-canvas--public`}>
+        <section className="mb-8 rounded-3xl border border-neutral-200 bg-white p-8 shadow-sm dark:border-dark-700 dark:bg-dark-800">
+          <PageHeader
+            title="Blog"
+            subtitle="Insights, tips, and updates from the ExpertsHub team."
+          />
+        </section>
 
         <div className="space-y-4">
-          {posts.map((post) => (
-            <Card key={post.title}>
+          {posts.map((post, idx) => (
+            <Card key={post.title} className="rounded-2xl border border-neutral-200 bg-white p-6 dark:border-dark-700 dark:bg-dark-800">
+              <p className="mb-2 text-[10px] font-black uppercase tracking-[0.22em] text-brand-500">Article {String(idx + 1).padStart(2, '0')}</p>
               <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-gray-100">
                 {post.title}
               </h3>

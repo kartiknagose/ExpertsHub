@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 
-const BASE_TITLE = 'UrbanPro';
+const BASE_TITLE = 'ExpertsHub';
 
 export function usePageTitle(title) {
   useEffect(() => {

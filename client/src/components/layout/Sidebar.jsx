@@ -52,7 +52,7 @@ export function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse }) {
   const { user } = useAuth();
   const links = navConfig[user?.role] || [];
   const profilePhotoUrl = resolveProfilePhotoUrl(user?.profilePhotoUrl);
-  const profileInitial  = (user?.name || 'U').slice(0, 1).toUpperCase();
+  const profileInitial  = (user?.name || 'E').slice(0, 1).toUpperCase();
 
   const getRoleLabel = (role) => {
     switch (role) {
@@ -95,14 +95,14 @@ export function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse }) {
         <div className={`flex items-center h-16 border-b px-4 shrink-0 border-neutral-100 dark:border-dark-700/80 ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
           {isCollapsed ? (
             <div className="w-8 h-8 bg-gradient-to-br from-brand-500 to-accent-500 rounded-xl flex items-center justify-center shadow-brand-sm">
-              <span className="text-white font-black text-sm">U</span>
+              <span className="inline-block text-white font-black text-sm" style={{ transform: 'rotate(-30deg)' }}>E</span>
             </div>
           ) : (
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 bg-gradient-to-br from-brand-500 to-accent-500 rounded-xl flex items-center justify-center shadow-brand-sm">
-                <span className="text-white font-black text-sm">U</span>
+                <span className="inline-block text-white font-black text-sm" style={{ transform: 'rotate(-30deg)' }}>E</span>
               </div>
-              <span className="font-black text-lg gradient-text tracking-tight">UrbanPro</span>
+              <span className="font-black text-lg gradient-text tracking-tight">ExpertsHub</span>
             </div>
           )}
 
@@ -250,7 +250,7 @@ export function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse }) {
               className="px-4 py-3 border-t border-neutral-100 dark:border-dark-700/80"
             >
               <p className="text-[11px] text-center text-neutral-400 dark:text-neutral-600 font-medium">
-                UrbanPro © {new Date().getFullYear()}
+                ExpertsHub © {new Date().getFullYear()}
               </p>
             </Motion.div>
           )}

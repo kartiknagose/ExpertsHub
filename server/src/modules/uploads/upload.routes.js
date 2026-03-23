@@ -168,7 +168,7 @@ router.post(
 
     if (cloudinaryEnabled && optimizedBuffer) {
       const result = await uploadToCloudinary(optimizedBuffer, {
-        folder: 'urbanpro/profile-photos',
+        folder: 'ExpertsHub/profile-photos',
         public_id: `user-${req.user.id}-${Date.now()}`,
         transformation: [{ width: 400, height: 400, crop: 'fill', gravity: 'face' }],
       });
@@ -201,7 +201,7 @@ router.post(
     if (cloudinaryEnabled && req.file.buffer) {
       const isPdf = req.file.mimetype === 'application/pdf';
       const result = await uploadToCloudinary(req.file.buffer, {
-        folder: 'urbanpro/verification-docs',
+        folder: 'ExpertsHub/verification-docs',
         public_id: `verif-${req.user.id}-${Date.now()}`,
         resource_type: isPdf ? 'raw' : 'image',
       });
@@ -231,7 +231,7 @@ router.post(
 
     if (cloudinaryEnabled && req.file.buffer) {
       const result = await uploadToCloudinary(req.file.buffer, {
-        folder: 'urbanpro/booking-photos',
+        folder: 'ExpertsHub/booking-photos',
         public_id: `booking-${req.user.id}-${Date.now()}`,
       });
       photoUrl = result.url;
@@ -313,7 +313,7 @@ router.post(
     if (cloudinaryEnabled && req.file.buffer) {
       const isPdf = req.file.mimetype === 'application/pdf';
       const result = await uploadToCloudinary(req.file.buffer, {
-        folder: 'urbanpro/chat-attachments',
+        folder: 'ExpertsHub/chat-attachments',
         public_id: `chat-${req.user.id}-${Date.now()}`,
         resource_type: isPdf ? 'raw' : 'image',
       });

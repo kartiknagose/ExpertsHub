@@ -52,7 +52,7 @@ router.get('/favorites/check/:workerProfileId', auth, workerProfileIdParamSchema
 router.get('/loyalty', auth, GrowthController.getLoyaltySummary);
 router.post('/loyalty/redeem', auth, redeemPointsSchema, validate, GrowthController.redeemPoints);
 
-// ── UrbanPro Plus (Sprint 17 - #74) ─────────────────────────────
+// ── ExpertsHub Plus (Sprint 17 - #74) ─────────────────────────────
 router.get('/proplus', auth, GrowthController.getProPlusSubscription);
 router.post('/proplus/subscribe', auth, subscribeProPlusSchema, validate, GrowthController.subscribeProPlus);
 router.post('/proplus/cancel', auth, GrowthController.cancelProPlus);

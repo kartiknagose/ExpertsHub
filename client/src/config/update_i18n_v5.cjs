@@ -1,5 +1,5 @@
 const fs = require('fs');
-const targetFile = 'd:/mini_project/UrbanPro V2/client/src/config/i18n.js';
+const targetFile = 'd:/mini_project/ExpertsHub V2/client/src/config/i18n.js';
 let content = fs.readFileSync(targetFile, 'utf8');
 
 const enKeys = `      // Customer Profile Keys
@@ -27,7 +27,7 @@ const enKeys = `      // Customer Profile Keys
       "Save your address": "Save your address",
       "Verify email": "Verify email",
       "Quick Actions": "Quick Actions",
-      "Get the most out of UrbanPro": "Get the most out of UrbanPro",
+      "Get the most out of ExpertsHub": "Get the most out of ExpertsHub",
       "Browse Services": "Browse Services",
       "View My Bookings": "View My Bookings",
       "Complete Your Profile": "Complete Your Profile",
@@ -87,7 +87,7 @@ const hiKeys = `      // Customer Profile Keys
       "Save your address": "अपना पता सहेजें",
       "Verify email": "ईमेल सत्यापित करें",
       "Quick Actions": "त्वरित कार्रवाई",
-      "Get the most out of UrbanPro": "UrbanPro का अधिकतम लाभ उठाएं",
+      "Get the most out of ExpertsHub": "ExpertsHub का अधिकतम लाभ उठाएं",
       "Browse Services": "सेवाएं ब्राउज़ करें",
       "View My Bookings": "मेरी बुकिंग देखें",
       "Complete Your Profile": "अपनी प्रोफ़ाइल पूरी करें",

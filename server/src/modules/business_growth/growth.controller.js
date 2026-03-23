@@ -420,7 +420,7 @@ exports.redeemPoints = asyncHandler(async (req, res) => {
     res.json(result);
 });
 
-// ── URBANPRO PLUS (Sprint 17 - #74) ──────────────────────────────
+// ── ExpertsHub PLUS (Sprint 17 - #74) ──────────────────────────────
 
 /**
  * GET /api/growth/proplus
@@ -433,7 +433,7 @@ exports.getProPlusSubscription = asyncHandler(async (req, res) => {
 
 /**
  * POST /api/growth/proplus/subscribe
- * Subscribe to UrbanPro Plus demo
+ * Subscribe to ExpertsHub Plus demo
  */
 exports.subscribeProPlus = asyncHandler(async (req, res) => {
     const { planId } = req.body;

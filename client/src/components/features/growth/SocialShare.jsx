@@ -8,8 +8,8 @@ import { toast } from 'sonner';
  */
 export function SocialShare({ 
     url = window.location.href, 
-    title = 'Check out UrbanPro V2!',
-    text = 'Get reliable services at home with UrbanPro.',
+    title = 'Check out ExpertsHub V2!',
+    text = 'Get reliable services at home with ExpertsHub.',
     variant = 'minimal' // 'minimal', 'full', 'row'
 }) {
     const shareData = {

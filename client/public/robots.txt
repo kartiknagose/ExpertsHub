@@ -1,4 +1,4 @@
-# UrbanPro — Robots.txt
+# ExpertsHub — Robots.txt
 User-agent: *
 Allow: /
 Disallow: /admin/
@@ -10,4 +10,4 @@ Disallow: /login
 Disallow: /register
 
 # Sitemap
-# Sitemap: https://urbanpro.com/sitemap.xml
+# Sitemap: https://ExpertsHub.com/sitemap.xml

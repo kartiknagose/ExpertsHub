@@ -1,4 +1,4 @@
-name: UrbanPro V2 - Production Pipeline (Docker-Free)
+name: ExpertsHub V2 - Production Pipeline (Docker-Free)
 
 on:
   push:

@@ -77,7 +77,7 @@ export function WorkerReviewsPage() {
 
   return (
     <MainLayout>
-      <div className={getPageLayout('default')}>
+      <div className={`${getPageLayout('default')} module-canvas module-canvas--profile`}>
         <PageHeader title={t("Reviews Overview")} subtitle={t("Read your feedback and evaluate the customers you served.")} />
 
         <AsyncState isLoading={isLoading} isError={hasError} error={loadError} onRetry={() => { receivedQuery.refetch(); writtenQuery.refetch(); pendingQuery.refetch(); }}>

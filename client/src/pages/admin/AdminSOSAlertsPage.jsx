@@ -219,7 +219,7 @@ export function AdminSOSAlertsPage() {
 
     return (
         <MainLayout>
-            <div className={getPageLayout('default')}>
+            <div className={`${getPageLayout('default')} module-canvas module-canvas--utility`}>
                 <PageHeader
                     title={
                         <span className="flex items-center gap-3">

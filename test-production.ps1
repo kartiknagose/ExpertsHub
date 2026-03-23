@@ -1,5 +1,5 @@
 # Production Testing Quick Start Script (PowerShell)
-# UrbanPro V2 - Supabase + Render
+# ExpertsHub V2 - Supabase + Render
 
 param(
     [string]$AnonKey = ""
@@ -11,13 +11,13 @@ $Red = "`e[31m"
 $Yellow = "`e[33m"
 $Reset = "`e[0m"
 
-Write-Host "${Yellow}=== UrbanPro V2 Production Testing ===${Reset}" -NoNewline
+Write-Host "${Yellow}=== ExpertsHub V2 Production Testing ===${Reset}" -NoNewline
 Write-Host ""
 Write-Host ""
 
 # Configuration
 $SUPABASE_URL = "https://tzzlrpbuxjpsazrqjxob.supabase.co"
-$RENDER_URL = "https://urbanpro-api.onrender.com"
+$RENDER_URL = "https://ExpertsHub-api.onrender.com"
 $SUPABASE_ANON_KEY = $AnonKey
 $CACHE_RELAY_SECRET = "urbanpro_cache_relay_secret_v1_2026"
 
@@ -37,7 +37,7 @@ try {
         "apikey" = $SUPABASE_ANON_KEY
     }
     $r = Invoke-WebRequest -Uri "$SUPABASE_URL/functions/v1/health" -Method GET -Headers $h -TimeoutSec 10
-    if ($r.Content -match "urbanpro-supabase") {
+    if ($r.Content -match "ExpertsHub-supabase") {
         Write-Host "${Green}✅ Supabase health: OK${Reset}"
     } else {
         Write-Host "${Red}❌ Supabase health: FAILED${Reset}"
@@ -135,10 +135,10 @@ Write-Host ""
 
 # Summary
 Write-Host "${Green}=== ALL TESTS PASSED ===${Reset}"
-Write-Host "Your UrbanPro V2 production environment is ready!"
+Write-Host "Your ExpertsHub V2 production environment is ready!"
 Write-Host ""
 Write-Host "Next steps:"
-Write-Host "1. Open app in browser: https://urbanpro.your-domain.com"
+Write-Host "1. Open app in browser: https://ExpertsHub.your-domain.com"
 Write-Host "2. Register as customer"
 Write-Host "3. Register as worker"
 Write-Host "4. Test cache relay with real service/worker updates"

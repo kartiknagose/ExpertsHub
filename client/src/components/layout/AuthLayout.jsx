@@ -16,23 +16,23 @@ export function AuthLayout({ children, title, subtitle }) {
 
   return (
     <MainLayout>
-      <div className="min-h-[calc(100vh-64px)] flex bg-neutral-50 dark:bg-dark-950">
+      <div className="auth-redesign-shell min-h-[calc(100vh-64px)] flex bg-neutral-50 dark:bg-dark-950">
 
         {/* ── Left Panel — Brand Visual ─────────────────────────────────── */}
         <div className="hidden lg:flex flex-1 relative overflow-hidden items-center justify-center p-12">
           {/* Background gradient */}
-          <div className="absolute inset-0" style={{ background: 'linear-gradient(145deg, #1d4ed8 0%, #4f46e5 45%, #7c3aed 75%, #9d174d 100%)' }} />
+          <div className="absolute inset-0" style={{ background: 'linear-gradient(145deg, #0f766e 0%, #0ea5e9 38%, #f59e0b 76%, #ea580c 100%)' }} />
 
           {/* Animated orb accents */}
           <Motion.div
             animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }}
             transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
-            className="absolute top-[-20%] right-[-10%] w-[70%] h-[70%] rounded-full blur-[100px] bg-brand-400"
+            className="absolute top-[-20%] right-[-10%] w-[70%] h-[70%] rounded-full blur-[100px] bg-sky-300"
           />
           <Motion.div
             animate={{ scale: [1, 1.15, 1], opacity: [0.2, 0.35, 0.2] }}
             transition={{ duration: 11, repeat: Infinity, ease: 'easeInOut', delay: 2 }}
-            className="absolute bottom-[-20%] left-[-10%] w-[60%] h-[60%] rounded-full blur-[100px] bg-accent-500"
+            className="absolute bottom-[-20%] left-[-10%] w-[60%] h-[60%] rounded-full blur-[100px] bg-amber-400"
           />
 
           {/* Decorative rings */}
@@ -49,10 +49,10 @@ export function AuthLayout({ children, title, subtitle }) {
               transition={{ duration: 0.5 }}
               className="flex items-center gap-3 mb-10"
             >
-              <div className="w-11 h-11 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/30">
-                <span className="text-white font-black text-xl">U</span>
+              <div className="w-11 h-11 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/30 shadow-lg shadow-black/20">
+                <span className="inline-block text-white font-black text-xl" style={{ transform: 'rotate(-30deg)' }}>E</span>
               </div>
-              <span className="text-2xl font-black tracking-tight">UrbanPro</span>
+              <span className="text-2xl font-black tracking-tight">ExpertsHub</span>
             </Motion.div>
 
             <Motion.h1
@@ -97,17 +97,17 @@ export function AuthLayout({ children, title, subtitle }) {
         <div className="flex-1 flex items-center justify-center p-6 sm:p-10 relative bg-white dark:bg-dark-950">
           {/* Subtle background glow */}
           <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden="true">
-            <div className="absolute top-0 right-0 w-64 h-64 rounded-full blur-[80px] opacity-40 bg-brand-100 dark:bg-brand-500/10" />
-            <div className="absolute bottom-0 left-0 w-48 h-48 rounded-full blur-[60px] opacity-30 bg-accent-100 dark:bg-accent-500/8" />
+            <div className="absolute top-0 right-0 w-64 h-64 rounded-full blur-[80px] opacity-40 bg-sky-100 dark:bg-sky-500/10" />
+            <div className="absolute bottom-0 left-0 w-48 h-48 rounded-full blur-[60px] opacity-35 bg-amber-100 dark:bg-amber-500/10" />
           </div>
 
           <div className="w-full max-w-md relative z-10">
             {/* Mobile Logo */}
             <div className="flex lg:hidden items-center gap-2.5 mb-8">
               <div className="w-9 h-9 bg-gradient-to-br from-brand-500 to-accent-500 rounded-xl flex items-center justify-center shadow-brand-sm">
-                <span className="text-white font-black text-base">U</span>
+                <span className="inline-block text-white font-black text-base" style={{ transform: 'rotate(-30deg)' }}>E</span>
               </div>
-              <span className="text-xl font-black gradient-text">UrbanPro</span>
+              <span className="text-xl font-black gradient-text">ExpertsHub</span>
             </div>
 
             {children}

@@ -81,7 +81,7 @@ export function HowItWorksPage() {
           <Motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
             <span className="text-xs font-black uppercase tracking-widest text-brand-500 mb-4 block">Simple Process</span>
             <h1 className="text-5xl md:text-6xl font-black text-neutral-900 dark:text-white tracking-tight mb-5">
-              How <span className="gradient-text">UrbanPro</span> Works
+              How <span className="gradient-text">ExpertsHub</span> Works
             </h1>
             <p className="text-lg text-neutral-500 dark:text-neutral-400 max-w-xl mx-auto leading-relaxed">
               From signup to service completion — we&apos;ve made it seamless for both customers and professionals.

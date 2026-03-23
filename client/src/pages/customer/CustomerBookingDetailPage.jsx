@@ -99,7 +99,7 @@ export function CustomerBookingDetailPage() {
             key: razorpayKeyId,
             amount: order.amount,
             currency: order.currency,
-            name: 'UrbanPro V2',
+            name: 'ExpertsHub V2',
             description: `Booking #${booking.id}`,
             order_id: order.id,
             prefill: {

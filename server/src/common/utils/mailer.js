@@ -137,7 +137,7 @@ async function verifySmtpConnection() {
 
 const getFromAddress = () => {
   const fromEmail = process.env.FROM_EMAIL || process.env.SMTP_USER;
-  const fromName = process.env.FROM_NAME || 'UrbanPro';
+  const fromName = process.env.FROM_NAME || 'ExpertsHub';
   return `${fromName} <${fromEmail}>`;
 };
 
@@ -304,12 +304,12 @@ async function sendVerificationEmail({ to, link }) {
   return sendEmail({
     to,
     logContext: 'Verification',
-    subject: 'Verify your UrbanPro email',
-    text: `Welcome to UrbanPro! Verify your email: ${link}`,
+    subject: 'Verify your ExpertsHub email',
+    text: `Welcome to ExpertsHub! Verify your email: ${link}`,
     html: `
       <div style="font-family: Arial, sans-serif; line-height: 1.6;">
         <h2>Verify your email</h2>
-        <p>Thanks for signing up with UrbanPro. Please verify your email to continue.</p>
+        <p>Thanks for signing up with ExpertsHub. Please verify your email to continue.</p>
         <p>
           <a href="${link}" style="display:inline-block;padding:10px 16px;background:#2563eb;color:#ffffff;text-decoration:none;border-radius:6px;">Verify Email</a>
         </p>
@@ -324,12 +324,12 @@ async function sendPasswordResetEmail({ to, link }) {
   return sendEmail({
     to,
     logContext: 'Password Reset',
-    subject: 'Reset your UrbanPro password',
+    subject: 'Reset your ExpertsHub password',
     text: `Reset your password here: ${link}`,
     html: `
       <div style="font-family: Arial, sans-serif; line-height: 1.6;">
         <h2>Reset Password</h2>
-        <p>You requested a password reset for UrbanPro.</p>
+        <p>You requested a password reset for ExpertsHub.</p>
         <p>
           <a href="${link}" style="display:inline-block;padding:10px 16px;background:#ef4444;color:#ffffff;text-decoration:none;border-radius:6px;">Reset Password</a>
         </p>
@@ -342,42 +342,42 @@ async function sendPasswordResetEmail({ to, link }) {
 
 const BOOKING_STATUS_CONFIG = {
   PENDING: {
-    customerSubject: 'Booking Requested – UrbanPro',
+    customerSubject: 'Booking Requested – ExpertsHub',
     customerHeading: 'Booking Requested',
     customerBody: (s) => `Your booking for <strong>${s.serviceName}</strong> has been placed. The worker will respond shortly.`,
-    workerSubject: 'New Job Request – UrbanPro',
+    workerSubject: 'New Job Request – ExpertsHub',
     workerHeading: 'New Job Request',
     workerBody: (s) => `You have a new booking request for <strong>${s.serviceName}</strong> from ${s.customerName}.`,
   },
   CONFIRMED: {
-    customerSubject: 'Booking Confirmed – UrbanPro',
+    customerSubject: 'Booking Confirmed – ExpertsHub',
     customerHeading: 'Booking Confirmed',
     customerBody: (s) => `Great news! Your booking for <strong>${s.serviceName}</strong> has been confirmed by ${s.workerName}.`,
-    workerSubject: 'You Accepted a Job – UrbanPro',
+    workerSubject: 'You Accepted a Job – ExpertsHub',
     workerHeading: 'Job Accepted',
     workerBody: (s) => `You accepted the booking for <strong>${s.serviceName}</strong> (Booking #${s.bookingId}).`,
   },
   IN_PROGRESS: {
-    customerSubject: 'Job Started – UrbanPro',
+    customerSubject: 'Job Started – ExpertsHub',
     customerHeading: 'Job In Progress',
     customerBody: (s) => `${s.workerName} has started working on your <strong>${s.serviceName}</strong> booking.`,
-    workerSubject: 'Job Started – UrbanPro',
+    workerSubject: 'Job Started – ExpertsHub',
     workerHeading: 'Job Started',
     workerBody: (s) => `You've started working on <strong>${s.serviceName}</strong> (Booking #${s.bookingId}).`,
   },
   COMPLETED: {
-    customerSubject: 'Job Completed – UrbanPro',
+    customerSubject: 'Job Completed – ExpertsHub',
     customerHeading: 'Job Completed',
     customerBody: (s) => `Your <strong>${s.serviceName}</strong> job is complete. Please rate your experience!`,
-    workerSubject: 'Job Completed – UrbanPro',
+    workerSubject: 'Job Completed – ExpertsHub',
     workerHeading: 'Job Completed',
     workerBody: (s) => `Great work! You completed <strong>${s.serviceName}</strong> (Booking #${s.bookingId}).`,
   },
   CANCELLED: {
-    customerSubject: 'Booking Cancelled – UrbanPro',
+    customerSubject: 'Booking Cancelled – ExpertsHub',
     customerHeading: 'Booking Cancelled',
     customerBody: (s) => `Your booking for <strong>${s.serviceName}</strong> has been cancelled.`,
-    workerSubject: 'Booking Cancelled – UrbanPro',
+    workerSubject: 'Booking Cancelled – ExpertsHub',
     workerHeading: 'Booking Cancelled',
     workerBody: (s) => `The booking for <strong>${s.serviceName}</strong> (Booking #${s.bookingId}) has been cancelled.`,
   },
@@ -387,7 +387,7 @@ function buildEmailHtml(heading, bodyHtml, bookingId) {
   return `
     <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
       <div style="background:#2563eb;padding:16px 24px;">
-        <h1 style="color:#fff;margin:0;font-size:20px;">UrbanPro</h1>
+        <h1 style="color:#fff;margin:0;font-size:20px;">ExpertsHub</h1>
       </div>
       <div style="padding:24px;line-height:1.6;color:#1f2937;">
         <h2 style="margin:0 0 12px;font-size:18px;">${heading}</h2>
@@ -395,7 +395,7 @@ function buildEmailHtml(heading, bodyHtml, bookingId) {
         <p style="margin:0;font-size:13px;color:#6b7280;">Booking #${bookingId}</p>
       </div>
       <div style="background:#f9fafb;padding:12px 24px;font-size:12px;color:#9ca3af;text-align:center;">
-        UrbanPro &mdash; Home services, simplified.
+        ExpertsHub &mdash; Home services, simplified.
       </div>
     </div>`;
 }

@@ -275,9 +275,9 @@ export function LandingPage() {
       <section className="section-padding bg-neutral-50 dark:bg-dark-900">
         <div className={getPageLayout('wide')}>
           <Motion.div {...fadeUp()} className="text-center mb-16">
-            <span className="text-xs font-black uppercase tracking-widest text-brand-500 mb-3 block">{t('Why UrbanPro')}</span>
+            <span className="text-xs font-black uppercase tracking-widest text-brand-500 mb-3 block">{t('Why ExpertsHub')}</span>
             <h2 className="text-3xl md:text-5xl font-black mb-4 text-neutral-900 dark:text-white tracking-tight">
-              {t('Why Millions Choose UrbanPro')}
+              {t('Why Millions Choose ExpertsHub')}
             </h2>
             <p className="text-lg max-w-2xl mx-auto text-neutral-500 dark:text-neutral-400">
               {t("We've reimagined the home service experience to be seamless, safe, and superior.")}
@@ -426,7 +426,7 @@ export function LandingPage() {
               {t('Ready to transform your home?')}
             </h2>
             <p className="text-lg text-white/80 mb-10 max-w-xl mx-auto leading-relaxed">
-              Join thousands of happy homeowners and expert professionals on the UrbanPro network.
+              Join thousands of happy homeowners and expert professionals on the ExpertsHub network.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center">

@@ -117,7 +117,7 @@ export function AdminBookingsPage() {
 
   return (
     <MainLayout>
-      <div className={getPageLayout('default')}>
+      <div className={`${getPageLayout('default')} module-canvas module-canvas--utility`}>
         <PageHeader
           title="Bookings"
           subtitle="Review and manage all marketplace bookings."

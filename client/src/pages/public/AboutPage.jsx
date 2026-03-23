@@ -68,7 +68,7 @@ export function AboutPage() {
             transition={{ delay: 0.2 }}
             className="text-xl text-neutral-500 dark:text-neutral-400 max-w-2xl mx-auto leading-relaxed"
           >
-            UrbanPro connects customers with skill-verified, background-checked professionals for every home service need — built on trust, transparency, and respect for everyone&apos;s time.
+            ExpertsHub connects customers with skill-verified, background-checked professionals for every home service need — built on trust, transparency, and respect for everyone&apos;s time.
           </Motion.p>
         </div>
       </section>
@@ -104,7 +104,7 @@ export function AboutPage() {
                 We believe every household deserves reliable, affordable, and professional help — and every skilled worker deserves dignified work, fair pay, and growth opportunities.
               </p>
               <p className="text-neutral-500 dark:text-neutral-400 leading-relaxed text-lg">
-                UrbanPro is built on a foundation of verification, transparency, and accountability — so both sides of every booking feel confident and protected.
+                ExpertsHub is built on a foundation of verification, transparency, and accountability — so both sides of every booking feel confident and protected.
               </p>
             </Motion.div>
 

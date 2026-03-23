@@ -5,7 +5,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { CheckCircle, XCircle, Loader2, ArrowRight } from 'lucide-react';
 import { motion as Motion } from 'framer-motion';
 import { verifyEmail } from '../../api/auth';
-import { MainLayout } from '../../components/layout/MainLayout';
+import { AuthLayout } from '../../components/layout/AuthLayout';
 import { Button } from '../../components/common';
 import { toastSuccess, toastErrorFromResponse } from '../../utils/notifications';
 import { usePageTitle } from '../../hooks/usePageTitle';
@@ -96,8 +96,11 @@ export function VerifyEmailPage() {
   const cfg = statusConfig[status] || statusConfig.loading;
 
   return (
-    <MainLayout>
-      <div className="min-h-[80vh] flex items-center justify-center p-6">
+    <AuthLayout
+      title="Verify your email"
+      subtitle="We are confirming your account so you can access your dashboard securely."
+    >
+      <div className="min-h-[40vh] flex items-center justify-center p-1">
         <Motion.div
           initial={{ opacity: 0, scale: 0.92 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -143,6 +146,6 @@ export function VerifyEmailPage() {
           </Button>
         </Motion.div>
       </div>
-    </MainLayout>
+    </AuthLayout>
   );
 }

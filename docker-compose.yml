@@ -4,7 +4,7 @@ services:
   # Database (PostgreSQL)
   db:
     image: postgres:15-alpine
-    container_name: urbanpro-db
+    container_name: ExpertsHub-db
     restart: always
     environment:
       POSTGRES_USER: ${DB_USER:-postgres}
@@ -18,7 +18,7 @@ services:
   # Cache (Redis)
   redis:
     image: redis:7-alpine
-    container_name: urbanpro-redis
+    container_name: ExpertsHub-redis
     restart: always
     ports:
       - "6379:6379"
@@ -28,7 +28,7 @@ services:
     build:
       context: ./server
       dockerfile: Dockerfile
-    container_name: urbanpro-server
+    container_name: ExpertsHub-server
     restart: always
     ports:
       - "5000:5000"
@@ -45,7 +45,7 @@ services:
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
       FROM_EMAIL: ${FROM_EMAIL:-}
-      FROM_NAME: ${FROM_NAME:-UrbanPro}
+      FROM_NAME: ${FROM_NAME:-ExpertsHub}
       CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-}
       CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-}
       CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-}
@@ -55,7 +55,7 @@ services:
       RAZORPAY_PAYOUT_MODE: ${RAZORPAY_PAYOUT_MODE:-SIMULATED}
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
-      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@urbanpro.com}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@ExpertsHub.com}
       GOOGLE_GEOCODING_API_KEY: ${GOOGLE_GEOCODING_API_KEY:-}
     depends_on:
       - db
@@ -70,7 +70,7 @@ services:
         VITE_API_URL: ${VITE_API_URL:-/api}
         VITE_RAZORPAY_KEY_ID: ${VITE_RAZORPAY_KEY_ID:-}
         VITE_GOOGLE_PLACES_API_KEY: ${VITE_GOOGLE_PLACES_API_KEY:-}
-    container_name: urbanpro-client
+    container_name: ExpertsHub-client
     restart: always
     ports:
       - "80:80"

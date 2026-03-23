@@ -29,7 +29,7 @@ export function PWAReloadPrompt() {
 
   useEffect(() => {
     if (offlineReady) {
-      toast.success('UrbanPro is ready to work offline!', {
+      toast.success('ExpertsHub is ready to work offline!', {
         id: 'pwa-offline-ready',
         duration: 5000,
       });
@@ -39,7 +39,7 @@ export function PWAReloadPrompt() {
 
   useEffect(() => {
     if (needRefresh) {
-      toast('Updating UrbanPro to the latest version...', {
+      toast('Updating ExpertsHub to the latest version...', {
         id: 'pwa-update-available',
         duration: 2500,
       });

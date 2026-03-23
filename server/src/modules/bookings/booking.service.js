@@ -352,8 +352,12 @@ async function createBooking(customerId, bookingData) {
     const service = await prisma.service.findUnique({ where: { id: serviceId } });
     if (!service) throw new AppError(404, 'Service not found.');
 
+    const couponBookingAmount = Number.isFinite(estimatedPrice)
+      ? estimatedPrice
+      : Number(service.basePrice || 0);
+
     appliedCoupon = await GrowthService.validateCoupon(couponCode, customerId, {
-      bookingAmount: estimatedPrice,
+      bookingAmount: couponBookingAmount,
       serviceCategory: service.category
     });
   }
@@ -1085,7 +1089,7 @@ async function payBooking(bookingId, userId, userRole, reqOptions) {
     return { order };
   }
 
-  if (!isCashPayment && !isWebhook) {
+  if (!isCashPayment && !isWebhook && !payWithWallet) {
     if (!paymentReference || !paymentOrderId || !paymentSignature) {
       throw new AppError(400, 'Missing payment verification details.');
     }

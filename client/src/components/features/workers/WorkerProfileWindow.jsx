@@ -240,7 +240,7 @@ export function WorkerProfileWindow({ workerId, isOpen, onClose }) {
                                         </div>
                                         <div className="flex items-center gap-3 text-xs font-bold text-gray-500">
                                             <Award size={14} className="text-blue-500" />
-                                            <span>Background Verified by UrbanPro Safety Team</span>
+                                            <span>Background Verified by ExpertsHub Safety Team</span>
                                         </div>
                                     </div>
                                 </div>

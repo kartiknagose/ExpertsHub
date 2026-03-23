@@ -5,11 +5,11 @@ const bcrypt = require('bcryptjs');
 async function main() {
     const hashedPassword = await bcrypt.hash('password123', 10);
 
-    console.log('--- Seeding Project UrbanPro V2 ---');
+    console.log('--- Seeding Project ExpertsHub V2 ---');
 
     // 1. Create ADMIN
     const admin = await prisma.user.upsert({
-        where: { email: 'admin@urbanpro.com' },
+        where: { email: 'admin@ExpertsHub.com' },
         update: {
             passwordHash: hashedPassword,
             isProfileComplete: true,
@@ -17,7 +17,7 @@ async function main() {
         },
         create: {
             name: 'Super Admin',
-            email: 'admin@urbanpro.com',
+            email: 'admin@ExpertsHub.com',
             passwordHash: hashedPassword,
             mobile: '9999999999',
             role: 'ADMIN',
@@ -25,7 +25,7 @@ async function main() {
             isProfileComplete: true,
         },
     });
-    console.log('✅ Admin account created: admin@urbanpro.com');
+    console.log('✅ Admin account created: admin@ExpertsHub.com');
 
     // 2. Create Categories & Services
     const categories = [

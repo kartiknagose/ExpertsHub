@@ -185,7 +185,7 @@ export function WorkerBookingsPage() {
 
   return (
     <MainLayout>
-      <div className={getPageLayout('wide')}>
+      <div className={`${getPageLayout('wide')} module-canvas module-canvas--profile`}>
         <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-widest text-brand-500">{t('Bookings')}</p>

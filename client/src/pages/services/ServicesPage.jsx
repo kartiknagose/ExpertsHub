@@ -195,7 +195,7 @@ export function ServicesPage() {
 
   return (
     <MainLayout>
-      <div className={getPageLayout('wide')}>
+      <div className={`${getPageLayout('wide')} module-canvas module-canvas--services`}>
 
         {/* Modern Search Hero */}
         <div className="relative mb-12 py-12 text-center">

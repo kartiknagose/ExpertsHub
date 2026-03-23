@@ -19,7 +19,7 @@ class WhatsAppService {
 
         switch (type) {
             case 'CONFIRMATION':
-                message = `🟢 *Booking Confirmed!*\n\nHi ${data.customerName}, your UrbanPro service for *${data.serviceName}* is confirmed for *${data.time}*.\nProvider: ${data.workerName}.\nTotal Estimate: ₹${data.estimate}`;
+                message = `🟢 *Booking Confirmed!*\n\nHi ${data.customerName}, your ExpertsHub service for *${data.serviceName}* is confirmed for *${data.time}*.\nProvider: ${data.workerName}.\nTotal Estimate: ₹${data.estimate}`;
                 break;
             case 'REMINDER':
                 message = `⏳ *1-Hour Reminder*\n\nHi ${data.customerName}, your service professional *${data.workerName}* will arrive at *${data.time}* for your ${data.serviceName} booking. Please be ready!`;
@@ -31,7 +31,7 @@ class WhatsAppService {
                 message = `✅ *Job Completed*\n\nYour service *${data.serviceName}* is complete. Final amount: *₹${data.total}*. Please visit the app to review and download your invoice.`;
                 break;
             default:
-                message = `New WhatsApp Alert from UrbanPro: Please check the app.`;
+                message = `New WhatsApp Alert from ExpertsHub: Please check the app.`;
         }
 
         try {

@@ -343,7 +343,7 @@ export function CustomerProfilePage() {
 
                   <Card className="p-6">
                     <CardTitle>{t('Quick Actions')}</CardTitle>
-                    <CardDescription>{t('Get the most out of UrbanPro')}</CardDescription>
+                    <CardDescription>{t('Get the most out of ExpertsHub')}</CardDescription>
                     <div className="mt-4 space-y-3">
                       <Button fullWidth onClick={() => navigate('/services')}>
                         {t('Browse Services')}

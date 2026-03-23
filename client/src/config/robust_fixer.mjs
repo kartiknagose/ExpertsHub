@@ -1,6 +1,6 @@
 import fs from 'fs';
 
-const content = fs.readFileSync('d:/mini_project/UrbanPro V2/client/src/config/i18n.js', 'utf8');
+const content = fs.readFileSync('d:/mini_project/ExpertsHub V2/client/src/config/i18n.js', 'utf8');
 
 const langs = ['en', 'hi', 'mr', 'ta', 'te'];
 const resources = {};
@@ -106,5 +106,5 @@ i18n
 export default i18n;
 `;
 
-fs.writeFileSync('d:/mini_project/UrbanPro V2/client/src/config/i18n.fixed.js', newContent);
+fs.writeFileSync('d:/mini_project/ExpertsHub V2/client/src/config/i18n.fixed.js', newContent);
 console.log('Wrote i18n.fixed.js');

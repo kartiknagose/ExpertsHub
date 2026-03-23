@@ -90,6 +90,9 @@ const requireCustomer = requireRole('CUSTOMER');
 // Admins OR workers can access (useful for booking-related endpoints)
 const requireAdminOrWorker = requireRole('ADMIN', 'WORKER');
 
+// Customers OR workers can access (useful for marketplace booking flows)
+const requireCustomerOrWorker = requireRole('CUSTOMER', 'WORKER');
+
 /**
  * EXAMPLE USAGE IN ROUTES:
  * 
@@ -113,4 +116,5 @@ module.exports = {
   requireWorker,         // Shortcut for worker-only
   requireCustomer,       // Shortcut for customer-only
   requireAdminOrWorker,  // Shortcut for admin or worker
+  requireCustomerOrWorker,
 };

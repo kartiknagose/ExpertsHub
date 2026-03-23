@@ -34,7 +34,7 @@ class SMSService {
      * @param {string} otp - The OTP code
      */
     static async sendOTP(to, otp) {
-        const message = `Your UrbanPro verification code is: ${otp}. Do not share this code with anyone.`;
+        const message = `Your ExpertsHub verification code is: ${otp}. Do not share this code with anyone.`;
         return this.sendSMS(to, message);
     }
 
@@ -46,7 +46,7 @@ class SMSService {
      */
     static async sendBookingOTP(to, otp, type) {
         const action = type === 'START' ? 'start' : 'complete';
-        const message = `Provide this OTP: ${otp} to your worker to ${action} the job securely. - UrbanPro`;
+        const message = `Provide this OTP: ${otp} to your worker to ${action} the job securely. - ExpertsHub`;
         return this.sendSMS(to, message);
     }
 }

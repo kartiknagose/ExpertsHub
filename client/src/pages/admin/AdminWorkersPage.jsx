@@ -41,7 +41,7 @@ export function AdminWorkersPage() {
 
   return (
     <MainLayout>
-      <div className={getPageLayout('default')}>
+      <div className={`${getPageLayout('default')} module-canvas module-canvas--utility`}>
         <PageHeader
           title="Workers"
           subtitle="Review worker profiles and services."

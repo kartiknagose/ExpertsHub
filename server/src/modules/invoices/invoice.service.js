@@ -36,9 +36,9 @@ exports.generateBookingInvoicePDF = async ({ bookingId, requesterId, requesterRo
 
     // Platform Info
     doc.fontSize(10)
-        .text('UrbanPro Logistics & Services Platform', { align: 'right' })
+        .text('ExpertsHub Logistics & Services Platform', { align: 'right' })
         .text('GSTIN: 27AABCU9603R1ZM', { align: 'right' })
-        .text('Support: support@urbanpro.com', { align: 'right' });
+        .text('Support: support@ExpertsHub.com', { align: 'right' });
 
     doc.moveDown();
 

@@ -43,10 +43,20 @@ function ChangeView({ center }) {
  */
 export function LocationPicker({ onChange, initialLocation = null, className = '', radius = 0 }) {
     const { t } = useTranslation();
+    const parseLocation = useCallback((loc) => {
+        if (!loc) return null;
+        const lat = Number(loc.lat);
+        const lng = Number(loc.lng);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+        return { lat, lng };
+    }, []);
+
+    const normalizedInitialLocation = parseLocation(initialLocation);
+
     // State for local position
     const [position, setPosition] = useState(() => {
-        if (initialLocation && typeof initialLocation.lat === 'number' && typeof initialLocation.lng === 'number' && !isNaN(initialLocation.lat) && !isNaN(initialLocation.lng)) {
-            return { lat: initialLocation.lat, lng: initialLocation.lng };
+        if (normalizedInitialLocation) {
+            return normalizedInitialLocation;
         }
         return { lat: 19.0760, lng: 72.8777 }; // Default Mumbai coordinates
     });
@@ -57,10 +67,13 @@ export function LocationPicker({ onChange, initialLocation = null, className = '
 
     // Sync state with initialLocation if it changes (e.g. after profile fetch)
     useEffect(() => {
-        if (initialLocation && typeof initialLocation.lat === 'number' && typeof initialLocation.lng === 'number' && !isNaN(initialLocation.lat) && !isNaN(initialLocation.lng)) {
-            setPosition({ lat: initialLocation.lat, lng: initialLocation.lng });
+        if (normalizedInitialLocation) {
+            setPosition(normalizedInitialLocation);
         }
-    }, [initialLocation]);
+        if (initialLocation?.address) {
+            setAddress(initialLocation.address);
+        }
+    }, [normalizedInitialLocation, initialLocation?.address]);
 
     const handleLocationChange = useCallback((latlng, addr = '') => {
         const lat = Number(latlng?.lat);
@@ -111,9 +124,6 @@ export function LocationPicker({ onChange, initialLocation = null, className = '
                     : (data.display_name || '');
                 setAddress(formattedAddress);
                 handleLocationChange({ lat, lng }, formattedAddress);
-                if (isShegaon) {
-                    toast.success(t('High-precision location synced for Shegaon.'));
-                }
             } else {
                 toast.error(t('Could not parse address from map.'));
             }
@@ -161,10 +171,10 @@ export function LocationPicker({ onChange, initialLocation = null, className = '
     // Proactive Auto-Location: If no position provided, try to detect current user city.
     // This must be declared after getUserLocation to avoid use-before-initialization crashes.
     useEffect(() => {
-        if (!initialLocation) {
+        if (!normalizedInitialLocation) {
             getUserLocation();
         }
-    }, [initialLocation, getUserLocation]);
+    }, [normalizedInitialLocation, getUserLocation]);
 
     const [mapType, setMapType] = useState('satellite');
 

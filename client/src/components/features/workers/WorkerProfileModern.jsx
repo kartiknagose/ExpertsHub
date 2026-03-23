@@ -372,7 +372,7 @@ export function WorkerProfileModern({ workerId, onClose, onAction }) {
                                     </div>
                                     <div className="flex items-center gap-3 text-sm font-medium">
                                         <div className="p-1.5 rounded-lg bg-yellow-500/10 text-yellow-500"><Star size={16} /></div>
-                                        <span>Top 10% Professional on UrbanPro</span>
+                                        <span>Top 10% Professional on ExpertsHub</span>
                                     </div>
                                 </div>
 
