@@ -6,6 +6,8 @@ const GrowthController = require('./growth.controller');
 const {
 	walletTopupOrderSchema,
 	walletTopupConfirmSchema,
+	walletTopupFailSchema,
+	walletRedeemSchema,
 	walletAddCreditsSchema,
 	applyReferralSchema,
 	validateCouponSchema,
@@ -17,13 +19,20 @@ const {
 	redeemGiftCardSchema,
 	giftCardCodeParamSchema,
 } = require('./growth.schemas');
+const {
+	walletTopupCreateLimiter,
+	walletTopupVerifyLimiter,
+	walletRedeemLimiter,
+} = require('../../config/rateLimit');
 
 const router = Router();
 
 // Wallet Routes
 router.get('/wallet', auth, GrowthController.getWallet);
-router.post('/wallet/topup/order', auth, walletTopupOrderSchema, validate, GrowthController.createWalletTopupOrder);
-router.post('/wallet/topup/confirm', auth, walletTopupConfirmSchema, validate, GrowthController.confirmWalletTopup);
+router.post('/wallet/topup/order', auth, walletTopupCreateLimiter, walletTopupOrderSchema, validate, GrowthController.createWalletTopupOrder);
+router.post('/wallet/topup/confirm', auth, walletTopupVerifyLimiter, walletTopupConfirmSchema, validate, GrowthController.confirmWalletTopup);
+router.post('/wallet/topup/fail', auth, walletTopupVerifyLimiter, walletTopupFailSchema, validate, GrowthController.failWalletTopup);
+router.post('/wallet/redeem', auth, walletRedeemLimiter, walletRedeemSchema, validate, GrowthController.redeemWalletBalance);
 router.post('/wallet/add', auth, requireAdmin, walletAddCreditsSchema, validate, GrowthController.addCredits);
 
 // Referral Routes

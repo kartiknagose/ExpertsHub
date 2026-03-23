@@ -7,9 +7,8 @@ exports.getBankDetails = asyncHandler(async (req, res) => {
 });
 
 exports.updateBankDetails = asyncHandler(async (req, res) => {
-    const { bankAccountNumber, bankIfsc, razorpayAccountId } = req.body;
-    const details = await payoutService.updateWorkerBankDetails(req.user.id, bankAccountNumber, bankIfsc, razorpayAccountId);
-    res.json({ message: 'Bank details updated successfully', data: details });
+    const details = await payoutService.updateWorkerBankDetails(req.user.id, req.body || {});
+    res.json({ message: 'Payout details updated successfully', data: details });
 });
 
 exports.requestInstantPayout = asyncHandler(async (req, res) => {

@@ -97,6 +97,7 @@ model User {
   referrals      User[]              @relation("UserReferrals")
   wallet         Wallet?
   transactions   WalletTransaction[]
+  walletTopupOrders WalletTopupOrder[]
   favoriteWorkers FavoriteWorker[]
   loyaltyPoints  LoyaltyPoints?
   loyaltyTransactions LoyaltyTransaction[]
@@ -220,6 +221,8 @@ model WorkerProfile {
   // Payout Details
   bankAccountNumber String?
   bankIfsc          String?
+  upiId             String?
+  payoutMethod      WorkerPayoutMethod @default(BANK)
   razorpayAccountId String? // Linked account in Razorpay Route
   walletBalance     Decimal @default(0.0) // Pending payout balance
 }
@@ -609,6 +612,12 @@ enum PayoutStatus {
   PROCESSED
   FAILED
 }
+
+enum WorkerPayoutMethod {
+  BANK
+  UPI
+  LINKED_ACCOUNT
+}
 // ── BUSINESS GROWTH MODELS (Sprint 17) ───────────────────────────
 
 model Wallet {
@@ -629,6 +638,12 @@ enum WalletTransactionType {
   REWARD_CREDIT
 }
 
+enum WalletTopupStatus {
+  CREATED
+  PAID
+  FAILED
+}
+
 model WalletTransaction {
   id          Int                   @id @default(autoincrement())
   userId      Int
@@ -639,6 +654,27 @@ model WalletTransaction {
   referenceId String?               // e.g., booking ID or coupon code
   status      String                @default("COMPLETED") // PENDING, COMPLETED, FAILED
   createdAt   DateTime              @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model WalletTopupOrder {
+  id                Int              @id @default(autoincrement())
+  userId            Int
+  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount            Decimal          @db.Decimal(10, 2)
+  currency          String           @default("INR")
+  status            WalletTopupStatus @default(CREATED)
+  razorpayOrderId   String           @unique
+  razorpayPaymentId String?          @unique
+  razorpaySignature String?
+  failureReason     String?
+  paidAt            DateTime?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  @@index([userId, status])
+  @@index([createdAt])
 }
 
 model Coupon {

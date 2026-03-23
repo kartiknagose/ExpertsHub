@@ -15,6 +15,7 @@ import {
   getWallet,
   createWalletTopupOrder,
   confirmWalletTopup,
+  failWalletTopup,
   redeemGiftCard,
   purchaseGiftCard,
 } from '../../api/growth';
@@ -23,12 +24,14 @@ import { usePageTitle } from '../../hooks/usePageTitle';
 import { useAuth } from '../../hooks/useAuth';
 import { useRazorpay } from '../../hooks/useRazorpay';
 import { ensureRazorpayLoaded, getRazorpayKeyId } from '../../utils/razorpay';
+import { useState } from 'react';
 
 export function CustomerWalletPage() {
   usePageTitle('My Wallet');
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const razorpayKeyId = getRazorpayKeyId();
+  const [isPaymentProcessing, setIsPaymentProcessing] = useState(false);
 
   useRazorpay({
     onError: () => {
@@ -56,6 +59,19 @@ export function CustomerWalletPage() {
       }
 
       await new Promise((resolve, reject) => {
+        setIsPaymentProcessing(true);
+
+        const handleFailure = async (reason) => {
+          try {
+            await failWalletTopup({
+              razorpay_order_id: order.id,
+              reason,
+            });
+          } catch {
+            // Ignore fail callback errors: this is best-effort telemetry.
+          }
+        };
+
         const options = {
           key: razorpayKeyId,
           amount: order.amount,
@@ -71,24 +87,37 @@ export function CustomerWalletPage() {
           handler: async (response) => {
             try {
               await confirmWalletTopup({
-                paymentReference: response.razorpay_payment_id,
-                paymentOrderId: response.razorpay_order_id,
-                paymentSignature: response.razorpay_signature,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_signature: response.razorpay_signature,
               });
+              setIsPaymentProcessing(false);
               resolve();
             } catch (error) {
+              setIsPaymentProcessing(false);
               reject(error);
             }
           },
           modal: {
-            ondismiss: () => reject(new Error('Wallet top-up cancelled.')),
+            ondismiss: async () => {
+              await handleFailure('Payment cancelled by user.');
+              setIsPaymentProcessing(false);
+              reject(new Error('Wallet top-up cancelled.'));
+            },
           },
         };
 
         try {
           const rzp = new window.Razorpay(options);
+          rzp.on('payment.failed', async (event) => {
+            const reason = event?.error?.description || 'Payment failed at gateway.';
+            await handleFailure(reason);
+            setIsPaymentProcessing(false);
+            reject(new Error(reason));
+          });
           rzp.open();
         } catch (_error) {
+          setIsPaymentProcessing(false);
           reject(new Error('Unable to open payment window.'));
         }
       });
@@ -195,18 +224,19 @@ export function CustomerWalletPage() {
                   <div className="grid grid-cols-2 gap-3">
                     <Button
                       icon={Plus}
-                      loading={addMutation.isPending}
+                      loading={addMutation.isPending || isPaymentProcessing}
                       onClick={handleAddCredits}
                       className="bg-white text-brand-700 hover:bg-neutral-50 border-none font-black text-xs uppercase tracking-widest h-12 shadow-xl shadow-brand-900/20"
                     >
-                      Add Cash
+                      {isPaymentProcessing ? 'Processing...' : 'Add Cash'}
                     </Button>
                     <Button
                       variant="outline"
+                      disabled={addMutation.isPending || isPaymentProcessing}
                       className="text-white border-white/30 hover:bg-white/10 font-black text-xs uppercase tracking-widest h-12 transition-colors"
-                      onClick={() => toast.info('Detailed statements feature coming soon')}
+                      onClick={() => toast.info('Wallet balance is used automatically during booking payments.')}
                     >
-                      History
+                      Use In Booking
                     </Button>
                   </div>
                 </div>

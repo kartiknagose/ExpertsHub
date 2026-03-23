@@ -8,21 +8,48 @@ const walletTopupOrderSchema = [
 ];
 
 const walletTopupConfirmSchema = [
-  body('paymentReference')
+  body('razorpay_payment_id')
     .isString()
     .trim()
     .isLength({ min: 6, max: 128 })
-    .withMessage('paymentReference is required'),
-  body('paymentOrderId')
+    .withMessage('razorpay_payment_id is required'),
+  body('razorpay_order_id')
     .isString()
     .trim()
     .isLength({ min: 6, max: 128 })
-    .withMessage('paymentOrderId is required'),
-  body('paymentSignature')
+    .withMessage('razorpay_order_id is required'),
+  body('razorpay_signature')
     .isString()
     .trim()
     .isLength({ min: 16, max: 256 })
-    .withMessage('paymentSignature is required'),
+    .withMessage('razorpay_signature is required'),
+];
+
+const walletTopupFailSchema = [
+  body('razorpay_order_id')
+    .isString()
+    .trim()
+    .isLength({ min: 6, max: 128 })
+    .withMessage('razorpay_order_id is required'),
+  body('reason')
+    .optional({ nullable: true })
+    .isString()
+    .trim()
+    .isLength({ max: 300 })
+    .withMessage('reason must be up to 300 characters'),
+];
+
+const walletRedeemSchema = [
+  body('amount')
+    .isFloat({ min: 1, max: 100000 })
+    .withMessage('Amount must be between 1 and 100000')
+    .toFloat(),
+  body('description')
+    .optional({ nullable: true })
+    .isString()
+    .trim()
+    .isLength({ max: 200 })
+    .withMessage('Description must be up to 200 characters'),
 ];
 
 const walletAddCreditsSchema = [
@@ -141,6 +168,8 @@ const giftCardCodeParamSchema = [
 module.exports = {
   walletTopupOrderSchema,
   walletTopupConfirmSchema,
+  walletTopupFailSchema,
+  walletRedeemSchema,
   walletAddCreditsSchema,
   applyReferralSchema,
   validateCouponSchema,

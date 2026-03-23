@@ -9,6 +9,7 @@ const {
     createRazorpayWalletTopupOrder,
     verifyRazorpayPaymentSignature,
     fetchRazorpayOrder,
+    fetchRazorpayPayment,
 } = require('../payments/payment.service');
 
 /**
@@ -94,15 +95,31 @@ exports.applyReferralCode = asyncHandler(async (req, res) => {
  */
 exports.createWalletTopupOrder = asyncHandler(async (req, res) => {
     const amount = Number(req.body?.amount);
+    const normalizedAmount = Math.round(amount * 100) / 100;
 
-    if (!Number.isFinite(amount) || amount <= 0) {
+    if (!Number.isFinite(normalizedAmount) || normalizedAmount <= 0 || normalizedAmount > 100000) {
         throw new AppError(400, 'Invalid amount.');
     }
 
-    const order = await createRazorpayWalletTopupOrder(req.user.id, amount);
+    const order = await createRazorpayWalletTopupOrder(req.user.id, normalizedAmount);
+
+    await prisma.walletTopupOrder.create({
+        data: {
+            userId: req.user.id,
+            amount: normalizedAmount,
+            currency: order.currency || 'INR',
+            status: 'CREATED',
+            razorpayOrderId: order.id,
+        },
+    });
+
     res.json({
         message: 'Top-up order created successfully.',
-        order,
+        order: {
+            id: order.id,
+            amount: order.amount,
+            currency: order.currency,
+        },
     });
 });
 
@@ -110,63 +127,205 @@ exports.createWalletTopupOrder = asyncHandler(async (req, res) => {
  * Confirm Razorpay wallet top-up payment and credit wallet
  */
 exports.confirmWalletTopup = asyncHandler(async (req, res) => {
-    const paymentReference = req.body?.paymentReference;
-    const paymentOrderId = req.body?.paymentOrderId;
-    const paymentSignature = req.body?.paymentSignature;
+    const paymentId = String(req.body?.razorpay_payment_id || '').trim();
+    const orderId = String(req.body?.razorpay_order_id || '').trim();
+    const signature = String(req.body?.razorpay_signature || '').trim();
 
-    if (!paymentReference || !paymentOrderId || !paymentSignature) {
+    if (!paymentId || !orderId || !signature) {
         throw new AppError(400, 'Missing payment verification details.');
     }
 
+    const walletOrder = await prisma.walletTopupOrder.findUnique({
+        where: { razorpayOrderId: orderId },
+        select: {
+            id: true,
+            userId: true,
+            amount: true,
+            status: true,
+            razorpayPaymentId: true,
+        },
+    });
+
+    if (!walletOrder || walletOrder.userId !== req.user.id) {
+        throw new AppError(400, 'Top-up order not found for this user.');
+    }
+
+    if (walletOrder.status === 'PAID') {
+        return res.json({
+            message: 'Top-up already processed.',
+            transactionId: walletOrder.razorpayPaymentId,
+        });
+    }
+
     const isSignatureValid = verifyRazorpayPaymentSignature({
-        orderId: paymentOrderId,
-        paymentId: paymentReference,
-        signature: paymentSignature,
+        orderId,
+        paymentId,
+        signature,
     });
 
     if (!isSignatureValid) {
+        await prisma.walletTopupOrder.update({
+            where: { id: walletOrder.id },
+            data: { status: 'FAILED', failureReason: 'Signature verification failed.' },
+        });
         throw new AppError(400, 'Invalid payment signature.');
     }
 
-    const order = await fetchRazorpayOrder(paymentOrderId);
+    const [order, payment] = await Promise.all([
+        fetchRazorpayOrder(orderId),
+        fetchRazorpayPayment(paymentId),
+    ]);
+
     if (!order || order.status !== 'paid') {
+        await prisma.walletTopupOrder.update({
+            where: { id: walletOrder.id },
+            data: { status: 'FAILED', failureReason: 'Order is not captured as paid.' },
+        });
         throw new AppError(400, 'Payment has not been captured yet.');
     }
 
     const orderUserId = Number(order.notes?.userId);
     const orderPurpose = order.notes?.purpose;
     if (orderUserId !== req.user.id || orderPurpose !== 'WALLET_TOPUP') {
+        await prisma.walletTopupOrder.update({
+            where: { id: walletOrder.id },
+            data: { status: 'FAILED', failureReason: 'Order ownership validation failed.' },
+        });
         throw new AppError(400, 'Payment does not belong to this wallet top-up request.');
     }
 
-    const referenceId = `RZP_TOPUP:${paymentReference}`;
-    const alreadyCredited = await prisma.walletTransaction.findFirst({
-        where: {
-            userId: req.user.id,
-            referenceId,
-            type: 'DEPOSIT',
-            status: 'COMPLETED',
-        },
-        select: { id: true },
+    if (!payment || payment.order_id !== orderId || payment.id !== paymentId || payment.status !== 'captured') {
+        await prisma.walletTopupOrder.update({
+            where: { id: walletOrder.id },
+            data: { status: 'FAILED', failureReason: 'Payment capture validation failed.' },
+        });
+        throw new AppError(400, 'Invalid captured payment details.');
+    }
+
+    const amountFromGateway = Number(payment.amount) / 100;
+    const amountFromOrder = Number(order.amount) / 100;
+    const amountFromDb = Number(walletOrder.amount);
+    const isAmountMismatch = amountFromGateway !== amountFromOrder || amountFromOrder !== amountFromDb;
+    if (isAmountMismatch) {
+        await prisma.walletTopupOrder.update({
+            where: { id: walletOrder.id },
+            data: { status: 'FAILED', failureReason: 'Amount mismatch during verification.' },
+        });
+        throw new AppError(400, 'Payment amount mismatch.');
+    }
+
+    const existingPaidOrder = await prisma.walletTopupOrder.findFirst({
+        where: { razorpayPaymentId: paymentId, status: 'PAID' },
+        select: { id: true, razorpayPaymentId: true },
     });
 
-    if (alreadyCredited) {
+    if (existingPaidOrder) {
         return res.json({
             message: 'Top-up already processed.',
-            transactionId: alreadyCredited.id,
+            transactionId: existingPaidOrder.razorpayPaymentId,
         });
     }
 
-    const creditedAmount = Number(order.amount) / 100;
-    const transaction = await GrowthService.depositCredits(
-        req.user.id,
-        creditedAmount,
-        'Wallet Top-up via Razorpay',
-        referenceId
-    );
+    const referenceId = `RZP_TOPUP:${paymentId}`;
+
+    const credited = await prisma.$transaction(async (tx) => {
+        const claimResult = await tx.walletTopupOrder.updateMany({
+            where: {
+                id: walletOrder.id,
+                userId: req.user.id,
+                status: { in: ['CREATED', 'FAILED'] },
+            },
+            data: {
+                status: 'PAID',
+                razorpayPaymentId: paymentId,
+                razorpaySignature: signature,
+                paidAt: new Date(),
+                failureReason: null,
+            },
+        });
+
+        if (claimResult.count !== 1) {
+            return null;
+        }
+
+        return GrowthService.depositCredits(
+            req.user.id,
+            amountFromDb,
+            'Wallet Top-up via Razorpay',
+            referenceId,
+            tx
+        );
+    });
+
+    if (!credited) {
+        return res.json({
+            message: 'Top-up already processed.',
+            transactionId: paymentId,
+        });
+    }
 
     res.json({
         message: 'Wallet top-up successful.',
+        transaction: credited,
+    });
+});
+
+/**
+ * Mark a Razorpay wallet top-up as failed
+ */
+exports.failWalletTopup = asyncHandler(async (req, res) => {
+    const orderId = String(req.body?.razorpay_order_id || '').trim();
+    const reason = String(req.body?.reason || 'Payment failed or was cancelled.').trim();
+
+    const existing = await prisma.walletTopupOrder.findUnique({
+        where: { razorpayOrderId: orderId },
+        select: { id: true, userId: true, status: true },
+    });
+
+    if (!existing || existing.userId !== req.user.id) {
+        throw new AppError(404, 'Top-up order not found.');
+    }
+
+    if (existing.status === 'PAID') {
+        return res.json({ message: 'Top-up already paid. Failure update ignored.' });
+    }
+
+    await prisma.walletTopupOrder.update({
+        where: { id: existing.id },
+        data: {
+            status: 'FAILED',
+            failureReason: reason || 'Payment failed.',
+        },
+    });
+
+    res.json({ message: 'Top-up marked as failed.' });
+});
+
+/**
+ * Redeem wallet balance
+ */
+exports.redeemWalletBalance = asyncHandler(async (req, res) => {
+    const amount = Number(req.body?.amount);
+    const normalizedAmount = Math.round(amount * 100) / 100;
+    const description = typeof req.body?.description === 'string' ? req.body.description.trim() : '';
+
+    if (!Number.isFinite(normalizedAmount) || normalizedAmount <= 0 || normalizedAmount > 100000) {
+        throw new AppError(400, 'Invalid redeem amount.');
+    }
+
+    const transaction = await prisma.$transaction(async (tx) => {
+        await GrowthService.initializeWallet(req.user.id, tx);
+        return GrowthService.processWalletTransaction({
+            userId: req.user.id,
+            amount: -normalizedAmount,
+            type: 'WITHDRAWAL',
+            description: description || 'Wallet redeem',
+            referenceId: `WALLET_REDEEM:${Date.now()}`,
+        }, tx);
+    });
+
+    res.json({
+        message: 'Wallet redeemed successfully.',
         transaction,
     });
 });

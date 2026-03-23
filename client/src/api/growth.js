@@ -30,6 +30,16 @@ export const confirmWalletTopup = async (payload) => {
     return res.data;
 };
 
+export const failWalletTopup = async (payload) => {
+    const res = await axiosInstance.post('/growth/wallet/topup/fail', payload);
+    return res.data;
+};
+
+export const redeemWalletBalance = async (payload) => {
+    const res = await axiosInstance.post('/growth/wallet/redeem', payload);
+    return res.data;
+};
+
 export const validateCoupon = async (data) => {
     const res = await axiosInstance.post('/growth/coupons/validate', data);
     return res.data;

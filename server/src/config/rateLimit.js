@@ -1,4 +1,5 @@
 const rateLimit = require('express-rate-limit');
+const { ipKeyGenerator } = require('express-rate-limit');
 
 // Global rate limiter — applies to ALL routes as a safety net
 const globalLimiter = rateLimit({
@@ -49,6 +50,39 @@ const paymentWebhookLimiter = rateLimit({
   message: { error: 'Too many webhook requests. Please try again later.' },
 });
 
+const walletTopupCreateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req, _res) => {
+    return req.user?.id ? `wallet_create:user:${req.user.id}` : `wallet_create:ip:${ipKeyGenerator(req.ip)}`;
+  },
+  message: { error: 'Too many add-cash requests. Please try again later.' },
+});
+
+const walletTopupVerifyLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req, _res) => {
+    return req.user?.id ? `wallet_verify:user:${req.user.id}` : `wallet_verify:ip:${ipKeyGenerator(req.ip)}`;
+  },
+  message: { error: 'Too many payment verification attempts. Please try again later.' },
+});
+
+const walletRedeemLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req, _res) => {
+    return req.user?.id ? `wallet_redeem:user:${req.user.id}` : `wallet_redeem:ip:${ipKeyGenerator(req.ip)}`;
+  },
+  message: { error: 'Too many redeem requests. Please try again later.' },
+});
+
 // Rate limiter for booking creation (stricter)
 const bookingLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
@@ -57,7 +91,7 @@ const bookingLimiter = rateLimit({
   legacyHeaders: false,
   keyGenerator: (req, _res) => {
     // Keep anonymous users isolated per IP instead of collapsing to a shared bucket.
-    return req.user?.id ? `user:${req.user.id}` : `ip:${req.ip}`;
+    return req.user?.id ? `user:${req.user.id}` : `ip:${ipKeyGenerator(req.ip)}`;
   },
   skip: (req, _res) => {
     // Skip rate limiting for admins
@@ -78,7 +112,7 @@ const otpLimiter = rateLimit({
   keyGenerator: (req, _res) => {
     // Key by user ID + booking ID + action to keep START and COMPLETE
     // counters independent and avoid accidental lockouts across steps.
-    const actorId = req.user?.id ? `user:${req.user.id}` : `ip:${req.ip}`;
+    const actorId = req.user?.id ? `user:${req.user.id}` : `ip:${ipKeyGenerator(req.ip)}`;
     const bookingId = req.params.id || 'unknown';
     const action = req.path.includes('/complete')
       ? 'complete'
@@ -102,4 +136,7 @@ module.exports = {
   paymentWebhookLimiter,
   bookingLimiter,
   otpLimiter,
+  walletTopupCreateLimiter,
+  walletTopupVerifyLimiter,
+  walletRedeemLimiter,
 };

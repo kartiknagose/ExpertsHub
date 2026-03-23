@@ -4,16 +4,20 @@ import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
+  Bell,
   Briefcase,
   Camera,
   CheckCircle2,
   MapPin,
+  MessageSquare,
   PencilLine,
   Plus,
   Save,
   ShieldCheck,
+  ShieldAlert,
   Star,
   UserCircle,
+  Wallet,
   X,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -64,6 +68,91 @@ function normalizeList(value) {
     }
   }
   return [];
+}
+
+function SectionCard({ title, description, icon: Icon, children }) {
+  return (
+    <section className="rounded-2xl border border-neutral-200/80 bg-white p-4 shadow-sm dark:border-dark-700 dark:bg-dark-900 sm:p-5">
+      <div className="mb-4 flex items-start gap-3">
+        {Icon ? (
+          <div className="mt-0.5 rounded-xl bg-neutral-100 p-2 text-neutral-600 dark:bg-dark-800 dark:text-neutral-300">
+            <Icon size={16} />
+          </div>
+        ) : null}
+        <div>
+          <h3 className="text-sm font-extrabold tracking-tight text-neutral-900 dark:text-white">{title}</h3>
+          {description ? (
+            <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">{description}</p>
+          ) : null}
+        </div>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function ChipEditor({
+  title,
+  description,
+  inputId,
+  inputValue,
+  onInputChange,
+  onInputKeyDown,
+  placeholder,
+  chips,
+  onRemove,
+  emptyText,
+  addAriaLabel,
+  onAdd,
+  hiddenInput,
+  error,
+}) {
+  return (
+    <div className="rounded-xl border border-neutral-200 bg-white p-3 dark:border-dark-700 dark:bg-dark-900">
+      <div className="mb-3">
+        <label htmlFor={inputId} className="text-sm font-bold text-neutral-800 dark:text-neutral-200">
+          {title}
+        </label>
+        {description ? (
+          <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">{description}</p>
+        ) : null}
+      </div>
+
+      <div className="mb-2.5 flex min-h-10 flex-wrap gap-1.5 rounded-xl bg-neutral-50 p-2 dark:bg-dark-800">
+        {chips.length > 0 ? (
+          chips.map((chip) => (
+            <span
+              key={chip}
+              className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1 text-xs font-semibold text-neutral-700 shadow-sm dark:bg-dark-700 dark:text-neutral-200"
+            >
+              {chip}
+              <button type="button" onClick={() => onRemove(chip)} aria-label={`${title} ${chip}`}>
+                <X size={12} className="text-neutral-400 hover:text-error-500" />
+              </button>
+            </span>
+          ))
+        ) : (
+          <span className="text-xs text-neutral-500">{emptyText}</span>
+        )}
+      </div>
+
+      <div className="flex gap-2">
+        <Input
+          id={inputId}
+          value={inputValue}
+          onChange={onInputChange}
+          onKeyDown={onInputKeyDown}
+          placeholder={placeholder}
+        />
+        <Button type="button" variant="secondary" onClick={onAdd} className="px-3" aria-label={addAriaLabel}>
+          <Plus size={16} />
+        </Button>
+      </div>
+
+      {hiddenInput}
+      {error && <p className="mt-2 text-xs font-semibold text-error-500">{error}</p>}
+    </div>
+  );
 }
 
 export function WorkerProfilePage() {
@@ -192,13 +281,8 @@ export function WorkerProfilePage() {
         setPhotoPreview(resolvedPhoto || '');
         setInitialPhotoUrl(resolvedPhoto || '');
 
-        const isProfileIncomplete =
-          !profile?.bio ||
-          !profile?.hourlyRate ||
-          normalizedSkills.length === 0 ||
-          normalizedAreas.length === 0;
-
-        setIsEditing(!profile || isProfileIncomplete);
+        // Keep profile in view mode on load; user must explicitly click Edit.
+        setIsEditing(false);
       } catch (error) {
         if (!mounted) return;
         setServerError(error?.response?.data?.message || t('Failed to load profile'));
@@ -504,14 +588,31 @@ export function WorkerProfilePage() {
                 </div>
 
                 {!isEditing && (
-                  <div className="mt-4 border-t border-neutral-100 pt-3 dark:border-dark-700">
+                  <div className="mt-4 space-y-2 border-t border-neutral-100 pt-3 dark:border-dark-700">
+                    <Button variant="outline" fullWidth onClick={() => navigate('/worker/availability')} icon={MapPin}>
+                      {t('Set Availability')}
+                    </Button>
+                    <Button variant="outline" fullWidth onClick={() => navigate('/worker/earnings')} icon={Wallet}>
+                      {t('View Earnings')}
+                    </Button>
                     <Button
                       variant="outline"
                       fullWidth
-                      onClick={() => navigate('/worker/availability')}
-                      icon={MapPin}
+                      onClick={() => navigate('/worker/safety/contacts')}
+                      icon={ShieldAlert}
                     >
-                      {t('Set Availability')}
+                      {t('Emergency Contacts')}
+                    </Button>
+                    <Button variant="outline" fullWidth onClick={() => navigate('/messages')} icon={MessageSquare}>
+                      {t('Messages')}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      fullWidth
+                      onClick={() => navigate('/notifications/preferences')}
+                      icon={Bell}
+                    >
+                      {t('Notification Preferences')}
                     </Button>
                   </div>
                 )}
@@ -587,10 +688,57 @@ export function WorkerProfilePage() {
                         </div>
                       )}
                     </section>
+
+                    <section>
+                      <h3 className="mb-2 text-sm font-bold text-neutral-800 dark:text-neutral-200">
+                        {t('Finance & Safety')}
+                      </h3>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 dark:border-dark-700 dark:bg-dark-800">
+                          <div className="mb-2 flex items-center gap-2">
+                            <Wallet size={14} className="text-brand-500" />
+                            <p className="text-xs font-bold uppercase tracking-wide text-neutral-600 dark:text-neutral-300">
+                              {t('Finance')}
+                            </p>
+                          </div>
+                          <p className="text-sm text-neutral-700 dark:text-neutral-200">
+                            {t('Current base rate')}: <span className="font-bold">₹{profileData?.hourlyRate || '--'}</span>
+                          </p>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="mt-3"
+                            onClick={() => navigate('/worker/earnings')}
+                          >
+                            {t('Open Earnings Dashboard')}
+                          </Button>
+                        </div>
+
+                        <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 dark:border-dark-700 dark:bg-dark-800">
+                          <div className="mb-2 flex items-center gap-2">
+                            <ShieldAlert size={14} className="text-brand-500" />
+                            <p className="text-xs font-bold uppercase tracking-wide text-neutral-600 dark:text-neutral-300">
+                              {t('Safety')}
+                            </p>
+                          </div>
+                          <p className="text-sm text-neutral-700 dark:text-neutral-200">
+                            {t('Verification status')}: <span className="font-bold">{isVerified ? t('Verified') : t('Pending')}</span>
+                          </p>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="mt-3"
+                            onClick={() => navigate('/worker/safety/contacts')}
+                          >
+                            {t('Manage Emergency Contacts')}
+                          </Button>
+                        </div>
+                      </div>
+                    </section>
                   </div>
                 </Card>
               ) : (
-                <Card className="p-4 sm:p-5">
+                <Card className="p-4 sm:p-6">
                   <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <CardTitle>{t('Edit Profile')}</CardTitle>
@@ -604,6 +752,7 @@ export function WorkerProfilePage() {
                         variant="outline"
                         icon={X}
                         onClick={handleCancelEdit}
+                        disabled={isSubmitting}
                       >
                         {t('Cancel')}
                       </Button>
@@ -612,179 +761,196 @@ export function WorkerProfilePage() {
                         form="worker-profile-form"
                         icon={Save}
                         loading={isSubmitting}
-                        disabled={!canSave}
+                        disabled={isSubmitting || !canSave}
                       >
                         {t('Save Changes')}
                       </Button>
                     </div>
                   </div>
 
-                  <form id="worker-profile-form" onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">
-                    <section className="grid gap-4 lg:grid-cols-[140px_1fr]">
-                      <div>
-                        <p className="text-sm font-bold text-neutral-800 dark:text-neutral-200">{t('Profile Photo')}</p>
-                        <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
-                          {t('Use a clear and professional image.')}
-                        </p>
-                      </div>
+                  <form id="worker-profile-form" onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4 sm:space-y-5">
+                    <SectionCard
+                      title={t('Personal Info')}
+                      description={t('Keep this section clear and professional for better customer trust.')}
+                      icon={UserCircle}
+                    >
+                      <div className="space-y-4">
+                        <div className="grid gap-3 lg:grid-cols-[160px_1fr]">
+                          <div>
+                            <p className="text-sm font-semibold text-neutral-800 dark:text-neutral-200">{t('Profile Photo')}</p>
+                            <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+                              {t('Use a clear and professional image.')}
+                            </p>
+                          </div>
 
-                      <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-dashed border-neutral-300 p-3 transition hover:bg-neutral-50 dark:border-dark-700 dark:hover:bg-dark-800">
-                        <div className="h-16 w-16 overflow-hidden rounded-lg bg-neutral-100 dark:bg-dark-700">
-                          {photoPreview ? (
-                            <img src={photoPreview} alt="Preview" className="h-full w-full object-cover" />
-                          ) : (
-                            <div className="flex h-full w-full items-center justify-center text-neutral-400">
-                              <UserCircle size={32} />
+                          <label
+                            htmlFor="worker-profile-photo"
+                            className="flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-neutral-300 p-3 transition hover:bg-neutral-50 dark:border-dark-700 dark:hover:bg-dark-800"
+                          >
+                            <div className="h-16 w-16 overflow-hidden rounded-lg bg-neutral-100 dark:bg-dark-700">
+                              {photoPreview ? (
+                                <img src={photoPreview} alt="Preview" className="h-full w-full object-cover" />
+                              ) : (
+                                <div className="flex h-full w-full items-center justify-center text-neutral-400">
+                                  <UserCircle size={32} />
+                                </div>
+                              )}
                             </div>
-                          )}
+                            <div className="flex-1">
+                              <p className="text-sm font-semibold text-neutral-800 dark:text-neutral-200">
+                                {t('Upload Photo')}
+                              </p>
+                              <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+                                {t('JPG or PNG, up to 10MB.')}
+                              </p>
+                            </div>
+                            <Camera size={18} className="text-neutral-500" />
+                            <input
+                              id="worker-profile-photo"
+                              type="file"
+                              accept="image/*"
+                              onChange={handlePhotoChange}
+                              className="hidden"
+                            />
+                          </label>
                         </div>
-                        <div className="flex-1">
-                          <p className="text-sm font-semibold text-neutral-800 dark:text-neutral-200">
-                            {t('Upload Photo')}
-                          </p>
-                          <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
-                            {t('JPG or PNG, up to 10MB.')}
-                          </p>
-                        </div>
-                        <Camera size={18} className="text-neutral-500" />
-                        <input type="file" accept="image/*" onChange={handlePhotoChange} className="hidden" />
-                      </label>
-                    </section>
 
-                    <section className="grid gap-4 lg:grid-cols-2">
-                      <Textarea
-                        label={t('Professional Bio')}
-                        rows={6}
-                        placeholder={t('Describe your experience, services, and strengths.')}
-                        error={errors.bio?.message}
-                        {...register('bio')}
-                      />
-
-                      <div className="space-y-3 rounded-lg border border-neutral-200 p-3 dark:border-dark-700">
-                        <Input
-                          label={t('Hourly Rate (INR)')}
-                          type="number"
-                          error={errors.hourlyRate?.message}
-                          {...register('hourlyRate')}
+                        <Textarea
+                          label={t('Professional Bio')}
+                          rows={6}
+                          placeholder={t('Describe your experience, services, and strengths.')}
+                          error={errors.bio?.message}
+                          {...register('bio')}
                         />
+                      </div>
+                    </SectionCard>
 
-                        <div>
-                          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-500">
-                            {t('Quick Adjust')}
-                          </p>
+                    <SectionCard
+                      title={t('Work Details')}
+                      description={t('Set your pricing and service scope.')}
+                      icon={Briefcase}
+                    >
+                      <div className="grid gap-4 lg:grid-cols-2">
+                        <div className="space-y-3 rounded-xl border border-neutral-200 p-3 dark:border-dark-700">
+                          <Input
+                            id="worker-hourly-rate"
+                            label={t('Hourly Rate (INR)')}
+                            type="number"
+                            error={errors.hourlyRate?.message}
+                            {...register('hourlyRate')}
+                          />
+
+                          <div>
+                            <label
+                              htmlFor="worker-hourly-rate-range"
+                              className="mb-2 block text-xs font-semibold uppercase tracking-wider text-neutral-500"
+                            >
+                              {t('Quick Adjust')}
+                            </label>
+                            <input
+                              id="worker-hourly-rate-range"
+                              type="range"
+                              min="100"
+                              max="5000"
+                              step="50"
+                              value={watchedRate || 0}
+                              onChange={(e) =>
+                                setValue('hourlyRate', Number(e.target.value), { shouldDirty: true })
+                              }
+                              className="w-full accent-brand-500"
+                            />
+                            <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-300">
+                              {t('Current rate')}: <span className="font-bold">₹{watchedRate || 0}</span>
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl border border-neutral-200 p-3 dark:border-dark-700">
+                          <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                            <p className="text-sm font-bold text-neutral-800 dark:text-neutral-200">
+                              {t('Service Radius')}
+                            </p>
+                            <Badge>{(watchedRadius || 10)} {t('km radius')}</Badge>
+                          </div>
+
+                          <label htmlFor="worker-service-radius" className="sr-only">
+                            {t('Service Radius')}
+                          </label>
                           <input
+                            id="worker-service-radius"
                             type="range"
-                            min="100"
-                            max="5000"
-                            step="50"
-                            value={watchedRate || 0}
-                            onChange={(e) =>
-                              setValue('hourlyRate', Number(e.target.value), { shouldDirty: true })
-                            }
+                            min="1"
+                            max="100"
+                            {...register('serviceRadius', { valueAsNumber: true })}
                             className="w-full accent-brand-500"
                           />
-                          <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-300">
-                            {t('Current rate')}: <span className="font-bold">₹{watchedRate || 0}</span>
+                          <p className="mt-2 text-xs text-neutral-500 dark:text-neutral-400">
+                            {t('Choose how far you are willing to travel for jobs.')}
                           </p>
                         </div>
                       </div>
-                    </section>
+                    </SectionCard>
 
-                    <section className="grid gap-4 lg:grid-cols-2">
-                      <div className="rounded-lg border border-neutral-200 p-3 dark:border-dark-700">
-                        <p className="mb-3 text-sm font-bold text-neutral-800 dark:text-neutral-200">{t('Skills')}</p>
-                        <div className="mb-2.5 flex min-h-10 flex-wrap gap-1.5 rounded-lg bg-neutral-50 p-2 dark:bg-dark-800">
-                          {skillsList.length > 0 ? (
-                            skillsList.map((skill) => (
-                              <span
-                                key={skill}
-                                className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1 text-xs font-semibold text-neutral-700 shadow-sm dark:bg-dark-700 dark:text-neutral-200"
-                              >
-                                {skill}
-                                <button type="button" onClick={() => removeSkill(skill)}>
-                                  <X size={12} className="text-neutral-400 hover:text-error-500" />
-                                </button>
-                              </span>
-                            ))
-                          ) : (
-                            <span className="text-xs text-neutral-500">{t('No skills added')}</span>
-                          )}
-                        </div>
-                        <div className="flex gap-2">
-                          <Input
-                            value={skillInput}
-                            onChange={(e) => setSkillInput(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' || e.key === ',') {
-                                e.preventDefault();
-                                addSkill();
-                              }
-                            }}
-                            placeholder={t('Add a skill')}
-                          />
-                          <Button type="button" variant="secondary" onClick={addSkill} className="px-3" aria-label={t('Add skill')}>
-                            <Plus size={16} />
-                          </Button>
-                        </div>
-                        <input type="hidden" {...register('skills')} />
-                        {errors.skills?.message && (
-                          <p className="mt-2 text-xs font-semibold text-error-500">{errors.skills.message}</p>
-                        )}
+                    <SectionCard
+                      title={t('Skills & Service Areas')}
+                      description={t('Add the expertise and locations customers search for.')}
+                      icon={CheckCircle2}
+                    >
+                      <div className="grid gap-4 lg:grid-cols-2">
+                        <ChipEditor
+                          title={t('Skills')}
+                          description={t('Add up to 10 skills.')}
+                          inputId="worker-skill-input"
+                          inputValue={skillInput}
+                          onInputChange={(e) => setSkillInput(e.target.value)}
+                          onInputKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ',') {
+                              e.preventDefault();
+                              addSkill();
+                            }
+                          }}
+                          placeholder={t('Add a skill')}
+                          chips={skillsList}
+                          onRemove={removeSkill}
+                          emptyText={t('No skills added')}
+                          addAriaLabel={t('Add skill')}
+                          onAdd={addSkill}
+                          hiddenInput={<input type="hidden" {...register('skills')} />}
+                          error={errors.skills?.message}
+                        />
+
+                        <ChipEditor
+                          title={t('Service Areas')}
+                          description={t('Add up to 10 cities or localities.')}
+                          inputId="worker-area-input"
+                          inputValue={areaInput}
+                          onInputChange={(e) => setAreaInput(e.target.value)}
+                          onInputKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ',') {
+                              e.preventDefault();
+                              addArea();
+                            }
+                          }}
+                          placeholder={t('Add city or locality')}
+                          chips={serviceAreasList}
+                          onRemove={removeArea}
+                          emptyText={t('No service areas added')}
+                          addAriaLabel={t('Add area')}
+                          onAdd={addArea}
+                          hiddenInput={<input type="hidden" {...register('serviceAreas')} />}
+                          error={errors.serviceAreas?.message}
+                        />
                       </div>
+                    </SectionCard>
 
-                      <div className="rounded-lg border border-neutral-200 p-3 dark:border-dark-700">
-                        <p className="mb-3 text-sm font-bold text-neutral-800 dark:text-neutral-200">{t('Service Areas')}</p>
-                        <div className="mb-2.5 flex min-h-10 flex-wrap gap-1.5 rounded-lg bg-neutral-50 p-2 dark:bg-dark-800">
-                          {serviceAreasList.length > 0 ? (
-                            serviceAreasList.map((area) => (
-                              <span
-                                key={area}
-                                className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1 text-xs font-semibold text-neutral-700 shadow-sm dark:bg-dark-700 dark:text-neutral-200"
-                              >
-                                {area}
-                                <button type="button" onClick={() => removeArea(area)}>
-                                  <X size={12} className="text-neutral-400 hover:text-error-500" />
-                                </button>
-                              </span>
-                            ))
-                          ) : (
-                            <span className="text-xs text-neutral-500">{t('No service areas added')}</span>
-                          )}
-                        </div>
-                        <div className="flex gap-2">
-                          <Input
-                            value={areaInput}
-                            onChange={(e) => setAreaInput(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' || e.key === ',') {
-                                e.preventDefault();
-                                addArea();
-                              }
-                            }}
-                            placeholder={t('Add city or locality')}
-                          />
-                          <Button type="button" variant="secondary" onClick={addArea} className="px-3" aria-label={t('Add area')}>
-                            <Plus size={16} />
-                          </Button>
-                        </div>
-                        <input type="hidden" {...register('serviceAreas')} />
-                        {errors.serviceAreas?.message && (
-                          <p className="mt-2 text-xs font-semibold text-error-500">{errors.serviceAreas.message}</p>
-                        )}
-                      </div>
-                    </section>
-
-                    <section className="rounded-lg border border-neutral-200 p-3 dark:border-dark-700">
-                      <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                        <p className="text-sm font-bold text-neutral-800 dark:text-neutral-200">
-                          {t('Base Location & Radius')}
-                        </p>
-                        <Badge>{(watchedRadius || 10)} {t('km radius')}</Badge>
-                      </div>
-
-                      <div className="mb-3 rounded-lg border border-neutral-200 dark:border-dark-700">
+                    <SectionCard
+                      title={t('Service Location')}
+                      description={t('Set your base location to improve nearby job matching.')}
+                      icon={MapPin}
+                    >
+                      <div className="rounded-xl border border-neutral-200 dark:border-dark-700">
                         <LocationPicker
-                          className="!h-[250px] !rounded-lg"
+                          className="!h-[260px] !rounded-xl"
                           radius={watchedRadius}
                           onChange={(loc) => {
                             setValue('baseLatitude', loc.lat, { shouldDirty: true });
@@ -797,27 +963,14 @@ export function WorkerProfilePage() {
                           }
                         />
                       </div>
-
-                      <div>
-                        <input
-                          type="range"
-                          min="1"
-                          max="100"
-                          {...register('serviceRadius', { valueAsNumber: true })}
-                          className="w-full accent-brand-500"
-                        />
-                        <p className="mt-2 text-xs text-neutral-500 dark:text-neutral-400">
-                          {t('Choose how far you are willing to travel for jobs.')}
-                        </p>
-                      </div>
-                    </section>
+                    </SectionCard>
 
                     <div className="flex flex-col-reverse gap-2 border-t border-neutral-100 pt-3 sm:flex-row sm:justify-end dark:border-dark-700">
-                      <Button type="button" variant="outline" icon={X} onClick={handleCancelEdit}>
+                      <Button type="button" variant="outline" icon={X} onClick={handleCancelEdit} disabled={isSubmitting}>
                         {t('Cancel')}
                       </Button>
-                      <Button type="submit" icon={Save} loading={isSubmitting} disabled={!canSave}>
-                        {t('Save Changes')}
+                      <Button type="submit" icon={Save} loading={isSubmitting} disabled={isSubmitting || !canSave}>
+                        {isSubmitting ? t('Saving...') : t('Save Changes')}
                       </Button>
                     </div>
                   </form>

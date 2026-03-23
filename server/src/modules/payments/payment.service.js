@@ -81,6 +81,11 @@ async function fetchRazorpayOrder(orderId) {
   return razorpay.orders.fetch(orderId);
 }
 
+async function fetchRazorpayPayment(paymentId) {
+  const razorpay = getRazorpayClient();
+  return razorpay.payments.fetch(paymentId);
+}
+
 async function listMyPayments(userId, role, { skip = 0, limit = 20 } = {}) {
   const where =
     role === 'WORKER'
@@ -130,4 +135,5 @@ module.exports = {
   createRazorpayWalletTopupOrder,
   verifyRazorpayPaymentSignature,
   fetchRazorpayOrder,
+  fetchRazorpayPayment,
 };

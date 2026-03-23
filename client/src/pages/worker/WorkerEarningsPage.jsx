@@ -60,11 +60,11 @@ export function WorkerEarningsPage() {
   const updateBankMutation = useMutation({
     mutationFn: updateBankDetails,
     onSuccess: () => {
-      toast.success(t('Bank details linked successfully!'));
+      toast.success(t('Payout destination updated successfully!'));
       refetchBank();
     },
     onError: (err) => {
-      toast.error(err.response?.data?.message || t('Failed to link bank details'));
+      toast.error(err.response?.data?.message || t('Failed to update payout destination'));
     }
   });
 
@@ -119,6 +119,56 @@ export function WorkerEarningsPage() {
     });
   }, [payments, i18n.language]);
 
+  const handleConfigurePayoutDestination = () => {
+    const methodInput = window.prompt(
+      `${t('Choose payout method:')}\n1. BANK\n2. UPI\n3. LINKED_ACCOUNT`,
+      bankData?.payoutMethod || 'BANK'
+    );
+
+    if (!methodInput) return;
+
+    const normalized = String(methodInput).trim().toUpperCase();
+    const methodMap = { '1': 'BANK', '2': 'UPI', '3': 'LINKED_ACCOUNT' };
+    const payoutMethod = methodMap[normalized] || normalized;
+
+    if (!['BANK', 'UPI', 'LINKED_ACCOUNT'].includes(payoutMethod)) {
+      toast.error(t('Invalid payout method.'));
+      return;
+    }
+
+    if (payoutMethod === 'BANK') {
+      const acc = window.prompt(t('Enter Bank Account Number:'), '');
+      const ifsc = window.prompt(t('Enter Bank IFSC:'), '');
+      const linkedAccountId = window.prompt(t('Enter Razorpay Linked Account ID (optional in test mode):'), '');
+      if (!acc || !ifsc) return;
+
+      updateBankMutation.mutate({
+        payoutMethod,
+        bankAccountNumber: acc,
+        bankIfsc: ifsc,
+        razorpayAccountId: linkedAccountId || undefined,
+      });
+      return;
+    }
+
+    if (payoutMethod === 'UPI') {
+      const upiId = window.prompt(t('Enter UPI ID (example: name@okhdfcbank):'), '');
+      const linkedAccountId = window.prompt(t('Enter Razorpay Linked Account ID (optional in test mode):'), '');
+      if (!upiId) return;
+
+      updateBankMutation.mutate({
+        payoutMethod,
+        upiId,
+        razorpayAccountId: linkedAccountId || undefined,
+      });
+      return;
+    }
+
+    const linkedAccountId = window.prompt(t('Enter Razorpay Linked Account ID (acc_...):'), '');
+    if (!linkedAccountId) return;
+    updateBankMutation.mutate({ payoutMethod, razorpayAccountId: linkedAccountId });
+  };
+
   return (
     <MainLayout>
       <div className={getPageLayout('wide')}>
@@ -165,8 +215,42 @@ export function WorkerEarningsPage() {
               <StatCard title={t("Total Revenue")}        value={`₹${stats.total.toLocaleString()}`}             icon={Wallet}       color="brand" delay={0} className="shadow-2xl shadow-brand-500/10 rounded-[2rem] border-none" />
               <StatCard title={t("Available for Payout")} value={`₹${Number(stats.walletBalance).toLocaleString()}`} icon={TrendingUp}   color="success" delay={1} className="shadow-2xl shadow-success-500/10 rounded-[2rem] border-none" />
               <StatCard title={t("Pending Clearance")}    value={`₹${stats.pending.toLocaleString()}`}           icon={Clock}        color="warning" delay={2} className="shadow-2xl shadow-warning-500/10 rounded-[2rem] border-none" />
-              <StatCard title={t("Total Transactions")}   value={stats.count}                                    icon={ArrowUpRight} color="info" delay={3} className="shadow-2xl shadow-info-500/10 rounded-[2rem] border-none" />
+              <StatCard title={t("Total Transactions")}   value={stats.count}                                    icon={ArrowUpRight} color="brand" delay={3} className="shadow-2xl shadow-brand-500/10 rounded-[2rem] border-none" />
             </div>
+
+            <Card className="mb-10 border-none shadow-2xl rounded-[2.5rem] overflow-hidden">
+              <div className="p-8 border-b border-neutral-100 dark:border-dark-800 bg-neutral-50/30 dark:bg-dark-900/50">
+                <h3 className="text-2xl font-bold text-neutral-900 dark:text-white uppercase tracking-tight">{t('Worker Wallet')}</h3>
+                <p className="text-sm text-neutral-500 dark:text-neutral-400 font-medium">{t('Redeem your earned balance securely via Razorpay payouts.')}</p>
+              </div>
+              <div className="p-8 grid gap-6 md:grid-cols-[1fr_auto] md:items-center">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-neutral-500">{t('Redeemable Earnings')}</p>
+                  <p className="mt-2 text-4xl font-black tracking-tight text-neutral-900 dark:text-white">₹{Number(stats.walletBalance || 0).toLocaleString()}</p>
+                  <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">
+                    {t('Payout Method')}: <span className="font-bold text-neutral-700 dark:text-neutral-200">{bankData?.payoutMethod || 'BANK'}</span>
+                  </p>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <Button
+                    onClick={() => instantPayoutMutation.mutate()}
+                    isLoading={instantPayoutMutation.isPending}
+                    disabled={!bankData?.isLinked && bankData?.payoutMode === 'LIVE'}
+                    className="h-12 rounded-2xl font-bold uppercase tracking-widest text-xs"
+                  >
+                    {t('Redeem Now')}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleConfigurePayoutDestination}
+                    isLoading={updateBankMutation.isPending}
+                    className="h-12 rounded-2xl font-bold uppercase tracking-widest text-xs"
+                  >
+                    {t('Change Payout Method')}
+                  </Button>
+                </div>
+              </div>
+            </Card>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 mb-10">
               {/* Chart */}
@@ -192,7 +276,7 @@ export function WorkerEarningsPage() {
                           <IndianRupee size={28} />
                         </div>
                         <div>
-                          <p className="font-bold text-lg text-neutral-900 dark:text-white">{t('Bank Account')}</p>
+                          <p className="font-bold text-lg text-neutral-900 dark:text-white">{t('Payout Destination')}</p>
                           <p className="text-xs font-bold uppercase tracking-widest text-brand-600 dark:text-brand-400">
                             {bankData?.isLinked ? t('Active & Verified') : t('Action Required')}
                           </p>
@@ -202,10 +286,16 @@ export function WorkerEarningsPage() {
                       {bankData?.isLinked ? (
                         <div className="relative z-10">
                           <div className="bg-white/50 dark:bg-dark-950/50 p-4 rounded-xl border border-neutral-100 dark:border-dark-800 mb-6 shadow-inner">
-                            <p className="text-lg font-bold tracking-[0.2em] text-neutral-900 dark:text-white font-mono">
-                              •••• {bankData.bankAccountNumber.slice(-4)}
+                            <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">{t('Method')}</p>
+                            <p className="text-sm font-bold tracking-[0.08em] text-neutral-900 dark:text-white font-mono">
+                              {bankData?.payoutMethod || 'BANK'}
                             </p>
-                            <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mt-1">IFSC: {bankData.bankIfsc}</p>
+                            {bankData?.payoutMethod === 'BANK' && bankData?.bankAccountNumber && (
+                              <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mt-2">A/C: {bankData.bankAccountNumber} · IFSC: {bankData.bankIfsc}</p>
+                            )}
+                            {bankData?.payoutMethod === 'UPI' && bankData?.upiId && (
+                              <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mt-2">UPI: {bankData.upiId}</p>
+                            )}
                           </div>
                           <Button
                             fullWidth
@@ -227,28 +317,17 @@ export function WorkerEarningsPage() {
                       ) : (
                         <div className="relative z-10">
                           <p className="text-sm font-medium mb-6 text-neutral-500 leading-relaxed italic">
-                            {t('Connect your Indian bank account to enable automated settlements.')}
+                            {t('Configure BANK, UPI, or LINKED_ACCOUNT for Razorpay payouts.')}
                           </p>
                           <Button
                             fullWidth
                             size="lg"
                             variant="primary"
                             isLoading={updateBankMutation.isPending}
-                            onClick={() => {
-                              const acc = prompt(t('Enter Bank Account Number:'));
-                              const ifsc = prompt(t('Enter Bank IFSC:'));
-                              const linkedAccountId = prompt(t('Enter Razorpay Linked Account ID (optional in test mode):'));
-                              if (acc && ifsc) {
-                                updateBankMutation.mutate({
-                                  bankAccountNumber: acc,
-                                  bankIfsc: ifsc,
-                                  razorpayAccountId: linkedAccountId || undefined,
-                                });
-                              }
-                            }}
+                            onClick={handleConfigurePayoutDestination}
                             className="h-14 shadow-brand-md rounded-2xl font-bold uppercase tracking-widest text-xs"
                           >
-                            {t('Link Account Now')}
+                            {t('Setup Payout Method')}
                           </Button>
                         </div>
                       )}

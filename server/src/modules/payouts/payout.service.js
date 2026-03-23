@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const MIN_PAYOUT_THRESHOLD = 100.0;
 const INSTANT_PAYOUT_FEE_PERCENT = 2.0;
 const PAYOUT_MODE = (process.env.RAZORPAY_PAYOUT_MODE || 'SIMULATED').toUpperCase();
+const SUPPORTED_PAYOUT_METHODS = ['BANK', 'UPI', 'LINKED_ACCOUNT'];
 
 function roundMoney(value) {
     const amount = Number(value);
@@ -29,6 +30,8 @@ exports.getWorkerBankDetails = async (userId) => {
         select: {
             bankAccountNumber: true,
             bankIfsc: true,
+            upiId: true,
+            payoutMethod: true,
             walletBalance: true,
             razorpayAccountId: true
         }
@@ -40,32 +43,59 @@ exports.getWorkerBankDetails = async (userId) => {
     const maskedAcc = profile.bankAccountNumber ?
         'XXXX' + profile.bankAccountNumber.slice(-4) : null;
 
+    const maskedUpi = profile.upiId
+        ? `${String(profile.upiId).split('@')[0].slice(0, 2)}***@${String(profile.upiId).split('@')[1] || ''}`
+        : null;
+
     return {
         ...profile,
+        upiId: maskedUpi,
         bankAccountNumber: maskedAcc,
         isLinked: !!profile.razorpayAccountId,
+        payoutMethod: profile.payoutMethod || 'BANK',
+        availableMethods: SUPPORTED_PAYOUT_METHODS,
         payoutMode: PAYOUT_MODE,
     };
 };
 
-exports.updateWorkerBankDetails = async (userId, bankAccountNumber, bankIfsc, razorpayAccountId) => {
+exports.updateWorkerBankDetails = async (userId, payload = {}) => {
     const profile = await prisma.workerProfile.findUnique({ where: { userId }, include: { user: true } });
     if (!profile) throw new AppError(404, 'Worker profile not found');
 
-    if (!bankAccountNumber || !bankIfsc) {
-        throw new AppError(400, 'Bank Account Number and IFSC are required');
+    const payoutMethod = String(payload.payoutMethod || 'BANK').toUpperCase();
+    if (!SUPPORTED_PAYOUT_METHODS.includes(payoutMethod)) {
+        throw new AppError(400, 'Unsupported payout method.');
     }
 
-    const normalizedAcc = String(bankAccountNumber).replace(/\s+/g, '');
-    const normalizedIfsc = String(bankIfsc).trim().toUpperCase();
-    if (!/^\d{9,18}$/.test(normalizedAcc)) {
-        throw new AppError(400, 'Bank account number must be 9 to 18 digits.');
-    }
-    if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(normalizedIfsc)) {
-        throw new AppError(400, 'Invalid IFSC format.');
+    const normalizedAcc = payload.bankAccountNumber ? String(payload.bankAccountNumber).replace(/\s+/g, '') : null;
+    const normalizedIfsc = payload.bankIfsc ? String(payload.bankIfsc).trim().toUpperCase() : null;
+    const normalizedUpiId = payload.upiId ? String(payload.upiId).trim().toLowerCase() : null;
+    let accountId = payload.razorpayAccountId ? String(payload.razorpayAccountId).trim() : profile.razorpayAccountId;
+
+    if (payoutMethod === 'BANK') {
+        if (!normalizedAcc || !normalizedIfsc) {
+            throw new AppError(400, 'Bank account number and IFSC are required for BANK payouts.');
+        }
+        if (!/^\d{9,18}$/.test(normalizedAcc)) {
+            throw new AppError(400, 'Bank account number must be 9 to 18 digits.');
+        }
+        if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(normalizedIfsc)) {
+            throw new AppError(400, 'Invalid IFSC format.');
+        }
     }
 
-    let accountId = razorpayAccountId ? String(razorpayAccountId).trim() : profile.razorpayAccountId;
+    if (payoutMethod === 'UPI') {
+        if (!normalizedUpiId) {
+            throw new AppError(400, 'UPI ID is required for UPI payouts.');
+        }
+        if (!/^[a-zA-Z0-9._-]{2,256}@[a-zA-Z]{2,64}$/.test(normalizedUpiId)) {
+            throw new AppError(400, 'Invalid UPI ID format.');
+        }
+    }
+
+    if (payoutMethod === 'LINKED_ACCOUNT' && !accountId) {
+        throw new AppError(400, 'Razorpay linked account id is required for LINKED_ACCOUNT payouts.');
+    }
 
     if (accountId && !/^acc_[A-Za-z0-9]+$/.test(accountId)) {
         throw new AppError(400, 'Invalid Razorpay account id format.');
@@ -76,21 +106,27 @@ exports.updateWorkerBankDetails = async (userId, bankAccountNumber, bankIfsc, ra
         accountId = `acc_test_${crypto.randomUUID().replace(/-/g, '').slice(0, 20)}`;
     }
 
-    if (PAYOUT_MODE === 'LIVE' && !accountId) {
-        throw new AppError(400, 'Razorpay linked account ID is required for live payouts.');
+    if (PAYOUT_MODE === 'LIVE' && payoutMethod === 'LINKED_ACCOUNT' && !accountId) {
+        throw new AppError(400, 'Razorpay linked account ID is required for linked-account payouts in live mode.');
     }
+
+    const updateData = {
+        payoutMethod,
+        bankAccountNumber: payoutMethod === 'BANK' ? normalizedAcc : profile.bankAccountNumber,
+        bankIfsc: payoutMethod === 'BANK' ? normalizedIfsc : profile.bankIfsc,
+        upiId: payoutMethod === 'UPI' ? normalizedUpiId : profile.upiId,
+        razorpayAccountId: accountId,
+    };
 
     await prisma.workerProfile.update({
         where: { id: profile.id },
-        data: {
-            bankAccountNumber: normalizedAcc,
-            bankIfsc: normalizedIfsc,
-            razorpayAccountId: accountId
-        }
+        data: updateData
     });
 
     return {
         isLinked: !!accountId,
+        payoutMethod,
+        availableMethods: SUPPORTED_PAYOUT_METHODS,
         payoutMode: PAYOUT_MODE,
     };
 };
@@ -99,8 +135,21 @@ exports.processInstantPayout = async (userId) => {
     const profile = await prisma.workerProfile.findUnique({ where: { userId }, include: { user: true } });
     if (!profile) throw new AppError(404, 'Worker profile not found');
 
-    if (!profile.razorpayAccountId) {
-        throw new AppError(400, 'Bank account not linked yet for Payouts');
+    const payoutMethod = String(profile.payoutMethod || 'BANK').toUpperCase();
+    const hasBank = Boolean(profile.bankAccountNumber && profile.bankIfsc);
+    const hasUpi = Boolean(profile.upiId);
+    const hasLinked = Boolean(profile.razorpayAccountId);
+
+    if (
+        (payoutMethod === 'BANK' && !hasBank) ||
+        (payoutMethod === 'UPI' && !hasUpi) ||
+        (payoutMethod === 'LINKED_ACCOUNT' && !hasLinked)
+    ) {
+        throw new AppError(400, `Payout destination for ${payoutMethod} is not configured.`);
+    }
+
+    if (PAYOUT_MODE === 'LIVE' && payoutMethod !== 'LINKED_ACCOUNT' && !hasLinked) {
+        throw new AppError(400, 'Live payout currently requires a linked Razorpay account id.');
     }
 
     const balance = roundMoney(profile.walletBalance);
