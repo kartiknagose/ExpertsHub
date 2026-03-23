@@ -12,4 +12,6 @@ export { Modal, ModalFooter } from './Modal';
 export { ConfirmDialog } from './ConfirmDialog';
 export { Skeleton, BookingCardSkeleton, StatGridSkeleton, SkeletonContainer, ListItemSkeleton } from './Skeleton';
 export { Checkbox } from './Checkbox';
+export { Pagination } from './Pagination';
+export { Table, TableSkeleton } from './Table';
 
