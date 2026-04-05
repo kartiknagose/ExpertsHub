@@ -1,8 +1,3 @@
-// server/src/config/env.js
-// Loads environment variables and centralizes configuration values for the server.
-// IMPORTANT: Keep secrets (JWT_SECRET, DB URL, etc.) in environment variables
-// and never commit them to source control. For local development we provide
-// safe fallbacks, but those fallbacks MUST NOT be used in production.
 const dotenv = require('dotenv');
 dotenv.config();
 
@@ -16,26 +11,15 @@ const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const PORT = clamp(Math.trunc(toNumber(process.env.PORT, 3000)), 1, 65535);
 
-// SECURITY: `JWT_SECRET` must be set via an environment variable in production.
-// A dev-only fallback is provided for local development convenience. If you
-// deploy to a hosted environment (Heroku, Vercel, Azure, etc.) set the
-// secret in the platform's secret manager or environment setting.
 const JWT_SECRET = process.env.JWT_SECRET || (NODE_ENV === 'development' ? 'dev_only_secret_do_not_use_in_production' : undefined);
 
 if (!JWT_SECRET) {
-    console.error('FATAL: JWT_SECRET environment variable is not set. Server cannot start in production without it.');
+    console.error('FATAL: JWT_SECRET environment variable is not set.');
     process.exit(1);
 }
 
-// CORS_ORIGIN: Validate in production
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173';
 
-if (NODE_ENV === 'production' && CORS_ORIGIN === 'http://localhost:5173') {
-    console.warn('WARNING: CORS_ORIGIN is set to localhost in production. This is likely a misconfiguration.');
-}
-
-// FRONTEND_URL: Used for constructing email links (verification, password reset).
-// Falls back to the first CORS origin if not explicitly set.
 const FRONTEND_URL = process.env.FRONTEND_URL
     || (CORS_ORIGIN.includes(',') ? CORS_ORIGIN.split(',')[0].trim() : CORS_ORIGIN)
     || 'http://localhost:5173';

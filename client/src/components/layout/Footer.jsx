@@ -33,7 +33,7 @@ const socials = [
 ];
 
 const contactDetails = [
-  { icon: Mail,   text: 'support@ExpertsHub.com', href: 'mailto:support@ExpertsHub.com' },
+  { icon: Mail,   text: 'support@expertshub.tech', href: 'mailto:support@expertshub.tech' },
   { icon: Phone,  text: '+91 98765 43210',       href: 'tel:+919876543210' },
   { icon: MapPin, text: 'Pune, Maharashtra, India', href: '#' },
 ];

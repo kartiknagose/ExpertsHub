@@ -1,5 +1,6 @@
 const prisma = require('../../config/prisma');
 const AppError = require('../../common/errors/AppError');
+const { createNotification } = require('../notifications/notification.service');
 
 async function getMyApplication(userId) {
   return prisma.workerVerificationApplication.findFirst({
@@ -85,13 +86,14 @@ async function reviewApplication(applicationId, data) {
 
   const normalizedNotes = typeof data.notes === 'string' ? data.notes.trim() : undefined;
   const normalizedLevel = data.level || undefined;
+  const normalizedStatus = data.status === 'RESUBMIT' ? 'MORE_INFO' : data.status;
 
   // Wrap application update + profile sync in a transaction
   const updatedApp = await prisma.$transaction(async (tx) => {
     const updated = await tx.workerVerificationApplication.update({
       where: { id: applicationId },
       data: {
-        status: data.status,
+        status: normalizedStatus,
         score: data.score ?? application.score,
         notes: normalizedNotes ?? application.notes,
         reviewedAt: new Date(),
@@ -99,8 +101,8 @@ async function reviewApplication(applicationId, data) {
     });
 
     // Sync verification status with WorkerProfile
-    if (data.status === 'APPROVED' || data.status === 'REJECTED' || normalizedLevel) {
-      const level = normalizedLevel || (data.status === 'APPROVED' ? 'VERIFIED' : 'BASIC');
+    if (normalizedStatus === 'APPROVED' || normalizedStatus === 'REJECTED' || normalizedLevel) {
+      const level = normalizedLevel || (normalizedStatus === 'APPROVED' ? 'VERIFIED' : 'BASIC');
 
       const workerProfile = await tx.workerProfile.findUnique({
         where: { userId: application.userId },
@@ -114,8 +116,8 @@ async function reviewApplication(applicationId, data) {
       await tx.workerProfile.update({
         where: { id: workerProfile.id },
         data: {
-          isVerified: data.status === 'APPROVED',
-          isProbation: data.status !== 'APPROVED',
+          isVerified: normalizedStatus === 'APPROVED',
+          isProbation: normalizedStatus !== 'APPROVED',
           verificationScore: data.score ?? application.score,
           verificationLevel: level,
         },
@@ -124,6 +126,27 @@ async function reviewApplication(applicationId, data) {
 
     return updated;
   });
+
+  // Notify worker of verification status change
+  try {
+    const statusMessages = {
+      APPROVED: { title: 'Verification approved', message: 'Congratulations! Your verification has been approved. You can now access premium features.' },
+      REJECTED: { title: 'Verification rejected', message: `Your verification has been rejected. Reason: ${normalizedNotes || 'Application did not meet requirements'}. Please reapply with corrected information.` },
+      PENDING: { title: 'Verification under review', message: 'Your verification application is being reviewed. We will notify you once the review is complete.' },
+      MORE_INFO: { title: 'Resubmission required', message: `Please resubmit your verification application. Issues: ${normalizedNotes || 'See details in your application'}` }
+    };
+    const msg = statusMessages[normalizedStatus] || { title: 'Verification updated', message: 'Your verification status has been updated.' };
+    
+    await createNotification({
+      userId: application.userId,
+      type: 'VERIFICATION_STATUS',
+      title: msg.title,
+      message: msg.message,
+      data: { applicationId, status: normalizedStatus, verificationLevel: normalizedLevel }
+    });
+  } catch (notifyErr) {
+    console.warn('Failed to send verification status notification:', notifyErr.message);
+  }
 
   return updatedApp;
 }

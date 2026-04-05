@@ -94,7 +94,7 @@ CREATE TABLE "LoyaltyTransaction" (
 );
 
 -- CreateTable
-CREATE TABLE "UrbanProPlusSubscription" (
+CREATE TABLE "ExpertsHubPlusSubscription" (
     "id" SERIAL NOT NULL,
     "userId" INTEGER NOT NULL,
     "status" TEXT NOT NULL DEFAULT 'ACTIVE',
@@ -104,7 +104,7 @@ CREATE TABLE "UrbanProPlusSubscription" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
-    CONSTRAINT "UrbanProPlusSubscription_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "ExpertsHubPlusSubscription_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -174,10 +174,10 @@ CREATE UNIQUE INDEX "LoyaltyPoints_userId_key" ON "LoyaltyPoints"("userId");
 CREATE INDEX "LoyaltyTransaction_userId_idx" ON "LoyaltyTransaction"("userId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "UrbanProPlusSubscription_userId_key" ON "UrbanProPlusSubscription"("userId");
+CREATE UNIQUE INDEX "ExpertsHubPlusSubscription_userId_key" ON "ExpertsHubPlusSubscription"("userId");
 
 -- CreateIndex
-CREATE INDEX "UrbanProPlusSubscription_userId_idx" ON "UrbanProPlusSubscription"("userId");
+CREATE INDEX "ExpertsHubPlusSubscription_userId_idx" ON "ExpertsHubPlusSubscription"("userId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "GiftCard_code_key" ON "GiftCard"("code");
@@ -219,4 +219,4 @@ ALTER TABLE "LoyaltyPoints" ADD CONSTRAINT "LoyaltyPoints_userId_fkey" FOREIGN K
 ALTER TABLE "LoyaltyTransaction" ADD CONSTRAINT "LoyaltyTransaction_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "UrbanProPlusSubscription" ADD CONSTRAINT "UrbanProPlusSubscription_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "ExpertsHubPlusSubscription" ADD CONSTRAINT "ExpertsHubPlusSubscription_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;

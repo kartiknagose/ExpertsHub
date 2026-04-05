@@ -7,6 +7,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL")
 }
 
 enum Role {
@@ -102,7 +103,7 @@ model User {
   favoriteWorkers FavoriteWorker[]
   loyaltyPoints  LoyaltyPoints?
   loyaltyTransactions LoyaltyTransaction[]
-  proPlusSubscription UrbanProPlusSubscription?
+  proPlusSubscription ExpertsHubPlusSubscription?
 }
 
 model EmailVerification {
@@ -776,7 +777,7 @@ enum LoyaltyTransactionType {
 
 // ── ExpertsHub PLUS SUBSCRIPTION (Sprint 17 - #74) ─────────────────
 
-model UrbanProPlusSubscription {
+model ExpertsHubPlusSubscription {
   id        Int      @id @default(autoincrement())
   userId    Int      @unique
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)

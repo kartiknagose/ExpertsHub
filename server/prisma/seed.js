@@ -9,7 +9,7 @@ async function main() {
 
     // 1. Create ADMIN
     const admin = await prisma.user.upsert({
-        where: { email: 'admin@ExpertsHub.com' },
+        where: { email: 'admin@expertshub.tech' },
         update: {
             passwordHash: hashedPassword,
             isProfileComplete: true,
@@ -17,7 +17,7 @@ async function main() {
         },
         create: {
             name: 'Super Admin',
-            email: 'admin@ExpertsHub.com',
+            email: 'admin@expertshub.tech',
             passwordHash: hashedPassword,
             mobile: '9999999999',
             role: 'ADMIN',
@@ -25,7 +25,7 @@ async function main() {
             isProfileComplete: true,
         },
     });
-    console.log('✅ Admin account created: admin@ExpertsHub.com');
+    console.log('✅ Admin account created: admin@expertshub.tech');
 
     // 2. Create Categories & Services
     const categories = [

@@ -119,6 +119,7 @@ function RoutePrefetcher() {
       if (jobs.length > 0) {
         void Promise.allSettled(jobs);
       }
+
     };
 
     if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
@@ -136,6 +137,24 @@ function RoutePrefetcher() {
   }, [isAuthenticated, user?.role, location.pathname]);
 
   return null;
+}
+
+function BookingsRedirect() {
+  const { user, isAuthenticated } = useAuth();
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (user?.role === 'WORKER') {
+    return <Navigate to="/worker/bookings" replace />;
+  }
+
+  if (user?.role === 'ADMIN') {
+    return <Navigate to="/admin/bookings" replace />;
+  }
+
+  return <Navigate to="/customer/bookings" replace />;
 }
 
 /**
@@ -180,6 +199,7 @@ export function AppRoutes() {
         <Route path="/customer/dashboard" element={<CustomerRoute><CustomerDashboardPage /></CustomerRoute>} />
         <Route path="/customer/wallet" element={<CustomerRoute><CustomerWalletPage /></CustomerRoute>} />
         <Route path="/customer/referrals" element={<CustomerRoute><CustomerReferralsPage /></CustomerRoute>} />
+        <Route path="/bookings" element={<BookingsRedirect />} />
         <Route path="/customer/bookings" element={<CustomerRoute><CustomerBookingsPage /></CustomerRoute>} />
         <Route path="/customer/bookings/wizard" element={<CustomerRoute><BookingWizardPage /></CustomerRoute>} />
         <Route path="/customer/bookings/:id" element={<CustomerRoute><CustomerBookingDetailPage /></CustomerRoute>} />
@@ -189,6 +209,7 @@ export function AppRoutes() {
         <Route path="/customer/proplus" element={<CustomerRoute><CustomerProPlusPage /></CustomerRoute>} />
         <Route path="/customer/safety/contacts" element={<CustomerRoute><EmergencyContactsPage /></CustomerRoute>} />
         <Route path="/messages" element={<ProtectedRoute><MessagesPage /></ProtectedRoute>} />
+        <Route path="/notifications" element={<ProtectedRoute><Navigate to="/notifications/preferences" replace /></ProtectedRoute>} />
         <Route path="/notifications/preferences" element={<ProtectedRoute><NotificationPreferencesPage /></ProtectedRoute>} />
 
         {/* Worker Routes */}
@@ -217,6 +238,7 @@ export function AppRoutes() {
         <Route path="/admin/fraud" element={<AdminRoute><AdminFraudPage /></AdminRoute>} />
         <Route path="/admin/coupons" element={<AdminRoute><AdminCouponsPage /></AdminRoute>} />
         <Route path="/admin/ai-audit" element={<AdminRoute><AdminAIAuditPage /></AdminRoute>} />
+        <Route path="/admin/ai-audits" element={<AdminRoute><Navigate to="/admin/ai-audit" replace /></AdminRoute>} />
 
         {/* 404 - Wildcard */}
         <Route path="*" element={<NotFoundPage />} />

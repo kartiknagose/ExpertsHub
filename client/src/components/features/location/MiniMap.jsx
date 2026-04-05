@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { MapContainer, TileLayer, Marker, Circle } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import '../../../utils/leafletSetup';
-import { MAP_TILES } from '../../../utils/mapTiles';
+import { MAP_TILES, MAP_TILE_ATTRIBUTION } from '../../../utils/mapTiles';
 import { toFixedSafe } from '../../../utils/numberFormat';
 import { Layers, Map as MapIcon, Mountain, Satellite, Moon, Zap } from 'lucide-react';
 import './map-styles.css';
@@ -36,40 +36,42 @@ export function MiniMap({ lat, lng, height = "200px", zoom = 14, radius = 0 }) {
 
     return (
         <div
-            className="relative w-full rounded-2xl overflow-hidden border-2 transition-all duration-300 shadow-xl border-gray-50 bg-white dark:border-white/5 dark:bg-dark-900"
+            className="relative w-full rounded-2xl border-2 transition-all duration-300 shadow-xl border-gray-50 bg-white dark:border-white/5 dark:bg-dark-900"
             style={{ height }}
         >
-            <MapContainer
-                center={position}
-                zoom={zoom}
-                style={{ height: '100%', width: '100%', zIndex: 1 }}
-                zoomControl={false}
-                attributionControl={false}
-                dragging={false}
-                scrollWheelZoom={false}
-                doubleClickZoom={false}
-                touchZoom={false}
-                boxZoom={false}
-                keyboard={false}
-                className="upro-branded-minimap"
-            >
-                <TileLayer key={activeLayer} url={currentTile} />
-                <Marker position={position} />
-                
-                {radius > 0 && (
-                    <Circle
-                        center={position}
-                        radius={radius * 1000}
-                        pathOptions={{
-                            fillColor: '#3b82f6',
-                            fillOpacity: 0.1,
-                            color: '#3b82f6',
-                            weight: 1,
-                            dashArray: '4, 4'
-                        }}
-                    />
-                )}
-            </MapContainer>
+            <div className="absolute inset-0 overflow-hidden rounded-[inherit]">
+                <MapContainer
+                    center={position}
+                    zoom={zoom}
+                    style={{ height: '100%', width: '100%', zIndex: 1 }}
+                    zoomControl={false}
+                    attributionControl={false}
+                    dragging={false}
+                    scrollWheelZoom={false}
+                    doubleClickZoom={false}
+                    touchZoom={false}
+                    boxZoom={false}
+                    keyboard={false}
+                    className="upro-branded-minimap"
+                >
+                    <TileLayer key={activeLayer} url={currentTile} attribution={MAP_TILE_ATTRIBUTION} />
+                    <Marker position={position} />
+                    
+                    {radius > 0 && (
+                        <Circle
+                            center={position}
+                            radius={radius * 1000}
+                            pathOptions={{
+                                fillColor: '#3b82f6',
+                                fillOpacity: 0.1,
+                                color: '#3b82f6',
+                                weight: 1,
+                                dashArray: '4, 4'
+                            }}
+                        />
+                    )}
+                </MapContainer>
+            </div>
 
             {/* Premium Sophisticated Overlays */}
             <div className="absolute inset-0 z-[2] pointer-events-none bg-gradient-to-t from-black/5 to-transparent dark:from-dark-950/40" />

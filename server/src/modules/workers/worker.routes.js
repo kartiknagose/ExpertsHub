@@ -2,7 +2,7 @@ const { Router } = require('express');
 const auth = require('../../middleware/auth');
 const { requireWorker } = require('../../middleware/requireRole');
 const validate = require('../../middleware/validation');
-const { saveProfile, me, addService, getServices, getWorkerServices, removeService, getLeaderboard } = require('./worker.controller');
+const { saveProfile, me, list, addService, getServices, getWorkerServices, removeService, getLeaderboard } = require('./worker.controller');
 const {
 	addServiceSchema,
 	removeServiceSchema,
@@ -17,10 +17,12 @@ const withWorkerProfileInvalidation = (handler) => async (req, res, next) => {
 	try {
 		const { invalidateWorkerProfile } = require('../cache/cache.service');
 		await invalidateWorkerProfile(req.user.id);
-		return handler(req, res, next);
 	} catch (error) {
-		next(error);
+		// Cache invalidation should never block writes.
+		console.warn('Worker profile cache invalidation failed:', error?.message || error);
 	}
+
+	return handler(req, res, next);
 };
 
 // Create/update worker profile (requires login)
@@ -34,6 +36,9 @@ router.post('/services', auth, requireWorker, addServiceSchema, validate, withWo
 
 // Get all services I offer as a worker (worker only) - for managing my services
 router.get('/me/services', auth, requireWorker, getServices);
+
+// Public worker directory
+router.get('/', list);
 
 // Get all services offered by a specific worker (public) - for customers to see
 router.get('/:workerId/services', workerIdParamSchema, validate, getWorkerServices);

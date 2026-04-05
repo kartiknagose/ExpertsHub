@@ -253,10 +253,10 @@ async function sendViaSendGrid({ to, subject, text, html, logContext = 'Default'
 async function sendEmail({ to, subject, text, html, logContext = 'Default' }) {
   const transporter = buildTransport();
   if (!transporter) {
-    if (isProduction && isResendConfigured()) {
+    if (isResendConfigured()) {
       return sendViaResend({ to, subject, text, html, logContext });
     }
-    if (isProduction && isSendGridConfigured()) {
+    if (isSendGridConfigured()) {
       return sendViaSendGrid({ to, subject, text, html, logContext });
     }
 

@@ -1,7 +1,7 @@
 # ExpertsHub V2: Full Project Overview and AI Features Implementation Plan
 
 ## 1. Project Summary
-ExpertsHub V2 (UrbanPro V2 workspace) is a service marketplace platform where customers can discover and book local professionals, workers can manage availability and earnings, and admins can control verification, disputes, and platform operations.
+ExpertsHub V2 (ExpertsHub V2 workspace) is a service marketplace platform where customers can discover and book local professionals, workers can manage availability and earnings, and admins can control verification, disputes, and platform operations.
 
 The platform is implemented as a hybrid architecture:
 - Frontend: React + Vite application in `client/`

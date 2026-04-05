@@ -40,8 +40,6 @@ if (FRONTEND_URL) {
 }
 
 if (NODE_ENV !== 'production') {
-  // Preview wildcard is limited to non-production to avoid over-broad credentialed CORS in prod.
-  allowedOriginsSet.add('https://*.vercel.app');
   allowedOriginsSet.add('http://localhost:5173');
   allowedOriginsSet.add('http://localhost:5174');
 }

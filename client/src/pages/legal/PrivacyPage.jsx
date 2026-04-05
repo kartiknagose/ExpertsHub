@@ -37,7 +37,7 @@ export function PrivacyPage() {
 
       <h2>5. Your Rights</h2>
       <p>
-        You may request access to, correction of, or deletion of your personal data at any time by contacting us at <strong>privacy@ExpertsHub.com</strong>. We will respond within 30 days.
+        You may request access to, correction of, or deletion of your personal data at any time by contacting us at <strong>privacy@expertshub.tech</strong>. We will respond within 30 days.
       </p>
 
       <h2>6. Cookies</h2>
@@ -47,7 +47,7 @@ export function PrivacyPage() {
 
       <h2>7. Contact Us</h2>
       <p>
-        Questions about this policy? Email us at <strong>privacy@ExpertsHub.com</strong> or write to our registered office.
+        Questions about this policy? Email us at <strong>privacy@expertshub.tech</strong> or write to our registered office.
       </p>
     </LegalLayout>
   );

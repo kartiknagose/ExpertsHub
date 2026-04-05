@@ -678,7 +678,7 @@ export function WorkerProfilePage() {
                         {t('Base Location & Service Radius')}
                       </h3>
                       {Number.isFinite(Number(profileData?.baseLatitude)) && Number.isFinite(Number(profileData?.baseLongitude)) ? (
-                        <div className="overflow-hidden rounded-lg border border-neutral-200 dark:border-dark-700">
+                        <div className="rounded-lg border border-neutral-200 dark:border-dark-700">
                           <MiniMap
                             lat={Number(profileData.baseLatitude)}
                             lng={Number(profileData.baseLongitude)}

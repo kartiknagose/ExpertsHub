@@ -15,7 +15,7 @@ const PLANS = {
  * Get current subscription status for a user
  */
 async function getSubscriptionInfo(userId) {
-  const sub = await prisma.urbanProPlusSubscription.findUnique({
+  const sub = await prisma.ExpertsHubPlusSubscription.findUnique({
     where: { userId },
   });
 
@@ -43,7 +43,7 @@ async function subscribeUser(userId, planId) {
   const endDate = new Date();
   endDate.setMonth(endDate.getMonth() + plan.durationMonths);
 
-  const sub = await prisma.urbanProPlusSubscription.upsert({
+  const sub = await prisma.ExpertsHubPlusSubscription.upsert({
     where: { userId },
     create: {
       userId,
@@ -66,13 +66,13 @@ async function subscribeUser(userId, planId) {
  * Cancel subscription auto-renewal
  */
 async function cancelSubscription(userId) {
-  const sub = await prisma.urbanProPlusSubscription.findUnique({
+  const sub = await prisma.ExpertsHubPlusSubscription.findUnique({
     where: { userId },
   });
 
   if (!sub) throw new AppError(404, 'No active subscription found.');
 
-  return prisma.urbanProPlusSubscription.update({
+  return prisma.ExpertsHubPlusSubscription.update({
     where: { userId },
     data: { status: 'CANCELLED' },
   });

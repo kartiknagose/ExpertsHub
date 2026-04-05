@@ -10,4 +10,4 @@ Disallow: /login
 Disallow: /register
 
 # Sitemap
-# Sitemap: https://ExpertsHub.com/sitemap.xml
+# Sitemap: https://expertshub.tech/sitemap.xml

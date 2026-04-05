@@ -30,11 +30,58 @@ function validateRequiredParams(requiredParams = [], params = {}) {
   return missing;
 }
 
-function buildEndpoint(tool, params) {
-  if (tool.name === 'cancelBooking') {
-    return tool.endpoint.replace(':id', encodeURIComponent(String(params.bookingId)));
+function resolvePathParamValue(key, params) {
+  if (params[key] !== undefined && params[key] !== null && String(params[key]).trim() !== '') {
+    return params[key];
   }
-  return tool.endpoint;
+
+  const aliases = {
+    id: ['bookingId', 'availabilityId', 'applicationId', 'workerProfileId', 'contactId'],
+    workerId: ['workerProfileId'],
+    serviceId: ['serviceId'],
+  };
+
+  const fallbackKeys = aliases[key] || [];
+  for (const fallbackKey of fallbackKeys) {
+    if (params[fallbackKey] !== undefined && params[fallbackKey] !== null && String(params[fallbackKey]).trim() !== '') {
+      return params[fallbackKey];
+    }
+  }
+
+  return undefined;
+}
+
+function buildEndpoint(tool, params) {
+  const pathParams = [];
+  const endpoint = String(tool.endpoint || '').replace(/:([A-Za-z0-9_]+)/g, (_match, key) => {
+    const value = resolvePathParamValue(key, params);
+    if (value === undefined || value === null || String(value).trim() === '') {
+      throw new Error(`Missing path param: ${key}`);
+    }
+    pathParams.push(key);
+    return encodeURIComponent(String(value));
+  });
+
+  return { endpoint, pathParams };
+}
+
+function buildRequestBody(params, pathParams = []) {
+  const body = { ...params };
+  delete body.userId;
+  delete body.role;
+  delete body.token;
+
+  for (const key of pathParams) {
+    delete body[key];
+  }
+
+  // Normalize common alias fields that should never be sent back to the API.
+  delete body.bookingId;
+  delete body.availabilityId;
+  delete body.applicationId;
+  delete body.workerProfileId;
+
+  return body;
 }
 
 async function ensureBookingOwnership(params, userContext, axiosConfig) {
@@ -90,28 +137,17 @@ async function executeTool({ toolName, params = {}, userContext = {} }) {
       return unauthorizedResult();
     }
 
-    // Safety re-check right before execution.
-    if (!isRoleAllowed(tool.allowedRoles, role)) {
-      console.log(`[ai-tool] role_denied_recheck tool=${tool.name} role=${role}`);
-      return unauthorizedResult();
-    }
-    if (validateRequiredParams(tool.requiredParams, params).length > 0) {
-      console.log(`[ai-tool] missing_params_recheck tool=${tool.name}`);
-      return unauthorizedResult();
-    }
-
-    const endpoint = buildEndpoint(tool, params);
+    const { endpoint, pathParams } = buildEndpoint(tool, params);
     const url = `${INTERNAL_API_BASE_URL}${endpoint}`;
 
     const axiosConfig = {
       headers: {
         Authorization: `Bearer ${token}`,
-        'X-AI-Actor-User-Id': String(userId),
       },
       timeout: Number(process.env.AI_TOOL_TIMEOUT_MS || 12000),
     };
 
-    if (tool.name === 'cancelBooking') {
+    if (['cancelBooking', 'payBooking', 'rescheduleBooking', 'getBookingById'].includes(tool.name)) {
       const ownership = await ensureBookingOwnership(params, userContext, axiosConfig);
       if (!ownership.success) {
         console.log(`[ai-tool] ownership_failed userId=${userId} bookingId=${params?.bookingId}`);
@@ -123,16 +159,13 @@ async function executeTool({ toolName, params = {}, userContext = {} }) {
     if (tool.method === 'GET') {
       response = await axios.get(url, axiosConfig);
     } else if (tool.method === 'POST') {
-      const body = tool.name === 'createBooking' ? { ...params } : {};
-      delete body.userId;
-      delete body.role;
+      const body = buildRequestBody(params, pathParams);
       response = await axios.post(url, body, axiosConfig);
     } else if (tool.method === 'PATCH') {
-      const body = { ...params };
-      delete body.userId;
-      delete body.role;
-      delete body.bookingId;
+      const body = buildRequestBody(params, pathParams);
       response = await axios.patch(url, body, axiosConfig);
+    } else if (tool.method === 'DELETE') {
+      response = await axios.delete(url, axiosConfig);
     } else {
       return { success: false, data: null, error: `Unsupported method: ${tool.method}` };
     }

@@ -38,7 +38,7 @@ exports.generateBookingInvoicePDF = async ({ bookingId, requesterId, requesterRo
     doc.fontSize(10)
         .text('ExpertsHub Logistics & Services Platform', { align: 'right' })
         .text('GSTIN: 27AABCU9603R1ZM', { align: 'right' })
-        .text('Support: support@ExpertsHub.com', { align: 'right' });
+        .text('Support: support@expertshub.tech', { align: 'right' });
 
     doc.moveDown();
 

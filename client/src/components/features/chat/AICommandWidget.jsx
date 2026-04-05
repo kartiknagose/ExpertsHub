@@ -1,16 +1,91 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bot, Download, Loader2, MessageSquare, Mic, Send, Square, X } from 'lucide-react';
-import { sendAIChatMessage, sendAIVoiceAudio } from '../../../api/ai';
+import { sendAIChatMessage, sendAIVoiceTranscript } from '../../../api/ai';
+import { useSOS } from '../../../context/SOSContext';
+import { useAuth } from '../../../hooks/useAuth';
 
 const CHAT_STATE_KEY = 'ai_command_widget_state_v1';
 
-const starterSuggestions = [
-  'Book plumber tomorrow 10 AM in Pune',
-  'Show my wallet balance',
-  'Show my latest booking status',
-  'Cancel booking 12',
-];
+const ROLE_CONFIG = {
+  CUSTOMER: {
+    assistantName: 'Customer Copilot',
+    roleLabel: 'Customer',
+    accentClass: 'from-sky-600 via-cyan-500 to-emerald-500',
+    starterSuggestions: [
+      'Book plumber tomorrow 10 AM in Pune',
+      'Show my wallet balance',
+      'Show my latest booking status',
+      'Help me understand pending payments',
+    ],
+    quickActions: [
+      { label: 'Book Service', prompt: 'Book electrician tomorrow 11 AM in Mumbai' },
+      { label: 'My Bookings', prompt: 'Show my latest booking' },
+      { label: 'Wallet', prompt: 'Show my wallet balance' },
+      { label: 'Notifications', prompt: 'Show notifications' },
+    ],
+  },
+  WORKER: {
+    assistantName: 'Worker Copilot',
+    roleLabel: 'Professional',
+    accentClass: 'from-emerald-600 via-teal-500 to-cyan-500',
+    starterSuggestions: [
+      'Show my worker bookings',
+      'Show payout history',
+      'Show verification status',
+      'Add availability monday 10:00 to 13:00',
+    ],
+    quickActions: [
+      { label: 'Bookings', prompt: 'Show my worker bookings' },
+      { label: 'Payouts', prompt: 'Show payout details' },
+      { label: 'Availability', prompt: 'Show availability' },
+      { label: 'Verify', prompt: 'Show verification status' },
+    ],
+  },
+  ADMIN: {
+    assistantName: 'Admin Copilot',
+    roleLabel: 'Administrator',
+    accentClass: 'from-amber-600 via-orange-500 to-rose-500',
+    starterSuggestions: [
+      'Show dashboard',
+      'Show verification queue',
+      'Show fraud alerts',
+      'Show ai audits',
+    ],
+    quickActions: [
+      { label: 'Dashboard', prompt: 'Show dashboard' },
+      { label: 'Users', prompt: 'Show users' },
+      { label: 'Verification', prompt: 'Show verification queue' },
+      { label: 'Fraud', prompt: 'Show fraud alerts' },
+    ],
+  },
+  GUEST: {
+    assistantName: 'AI Assistant',
+    roleLabel: 'Guest',
+    accentClass: 'from-sky-600 via-cyan-500 to-emerald-500',
+    starterSuggestions: [
+      'Show services',
+      'Show top workers',
+      'Open profile',
+      'Show notifications',
+    ],
+    quickActions: [
+      { label: 'Services', prompt: 'Show services' },
+      { label: 'Workers', prompt: 'Show top workers' },
+      { label: 'Bookings', prompt: 'Show my bookings' },
+      { label: 'Wallet', prompt: 'Show my wallet balance' },
+    ],
+  },
+};
+
+function getRoleConfig(role) {
+  const key = String(role || '').toUpperCase();
+  return ROLE_CONFIG[key] || ROLE_CONFIG.GUEST;
+}
+
+function getStarterSuggestions(role) {
+  return getRoleConfig(role).starterSuggestions;
+}
 
 const intentSuggestions = {
   create_booking: ['Book electrician tomorrow 11 AM in Mumbai', 'Show services list', 'Show my latest booking status', 'Cancel booking 12'],
@@ -27,9 +102,56 @@ const intentSuggestions = {
   platform_guide: ['Show my wallet balance', 'Show notifications', 'My conversations', 'Show profile'],
 };
 
-function suggestionsFromIntent(intentName) {
+function suggestionsFromIntent(intentName, role) {
   const key = String(intentName || '').trim();
-  return intentSuggestions[key] || starterSuggestions;
+  return intentSuggestions[key] || getStarterSuggestions(role);
+}
+
+function AssistantMessageContent({ text }) {
+  const normalized = String(text || '').replace(/\r\n/g, '\n').trim();
+  if (!normalized) return null;
+
+  const paragraphs = normalized.split(/\n{2,}/).map((entry) => entry.trim()).filter(Boolean);
+
+  return (
+    <div className="space-y-2">
+      {paragraphs.map((paragraph, index) => {
+        const lines = paragraph.split('\n').map((line) => line.trim()).filter(Boolean);
+        const isBullet = lines.length > 0 && lines.every((line) => /^[-*•]\s+/.test(line));
+        const isNumbered = lines.length > 0 && lines.every((line) => /^\d+\.\s+/.test(line));
+
+        if (isBullet) {
+          return (
+            <ul key={`p-${index}`} className="space-y-1 pl-4">
+              {lines.map((line, itemIndex) => (
+                <li key={`b-${itemIndex}`} className="list-disc">
+                  {line.replace(/^[-*•]\s+/, '')}
+                </li>
+              ))}
+            </ul>
+          );
+        }
+
+        if (isNumbered) {
+          return (
+            <ol key={`p-${index}`} className="space-y-1 pl-4">
+              {lines.map((line, itemIndex) => (
+                <li key={`n-${itemIndex}`} className="list-decimal">
+                  {line.replace(/^\d+\.\s+/, '')}
+                </li>
+              ))}
+            </ol>
+          );
+        }
+
+        return (
+          <p key={`p-${index}`} className="leading-relaxed">
+            {lines.join(' ')}
+          </p>
+        );
+      })}
+    </div>
+  );
 }
 
 function MessageBubble({ role, text }) {
@@ -38,18 +160,48 @@ function MessageBubble({ role, text }) {
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div
         className={[
-          'max-w-[85%] rounded-2xl px-3 py-2 text-sm leading-relaxed',
-          isUser ? 'bg-sky-600 text-white' : 'bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100',
+          'max-w-[88%] rounded-2xl px-3.5 py-2.5 text-sm break-words',
+          isUser
+            ? 'bg-sky-600 text-white shadow-md shadow-sky-600/20'
+            : 'border border-zinc-200 bg-zinc-50 text-zinc-900 shadow-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100',
         ].join(' ')}
       >
-        {text}
+        {isUser ? text : <AssistantMessageContent text={text} />}
       </div>
     </div>
   );
 }
 
+function normalizeAgentTarget(target, role) {
+  const raw = String(target || '').trim();
+  if (!raw) return raw;
+
+  const userRole = String(role || '').toUpperCase();
+  if (raw === '/bookings') {
+    if (userRole === 'WORKER') return '/worker/bookings';
+    if (userRole === 'ADMIN') return '/admin/bookings';
+    return '/customer/bookings';
+  }
+
+  if (raw === '/profile') {
+    if (userRole === 'WORKER') return '/worker/profile';
+    return '/customer/profile';
+  }
+
+  const aliasMap = {
+    '/notifications': '/notifications/preferences',
+    '/admin/ai-audits': '/admin/ai-audit',
+    '/wallet': userRole === 'WORKER' ? '/worker/earnings' : '/customer/wallet',
+  };
+
+  return aliasMap[raw] || raw;
+}
+
 export default function AICommandWidget() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { activeBooking } = useSOS();
+  const roleConfig = useMemo(() => getRoleConfig(user?.role), [user?.role]);
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -61,17 +213,15 @@ export default function AICommandWidget() {
   const [messages, setMessages] = useState([
     {
       role: 'assistant',
-      text: 'Hi, I can help with booking, wallet, and booking status. Type your request.',
+      text: 'Hi. I can help with bookings, wallet, notifications, and role-specific actions. Pick an option or type your request.',
     },
   ]);
-  const [suggestions, setSuggestions] = useState(starterSuggestions);
+  const [suggestions, setSuggestions] = useState(getStarterSuggestions(user?.role));
   const messagesContainerRef = useRef(null);
   const messagesEndRef = useRef(null);
-  const mediaRecorderRef = useRef(null);
-  const mediaStreamRef = useRef(null);
-  const audioChunksRef = useRef([]);
   const recordingTimerRef = useRef(null);
-  const recordingMimeTypeRef = useRef('audio/webm');
+  const recognitionRef = useRef(null);
+  const voiceTranscriptRef = useRef('');
 
   const exportChat = () => {
     try {
@@ -128,6 +278,10 @@ export default function AICommandWidget() {
   }, []);
 
   useEffect(() => {
+    setSuggestions((prev) => (prev?.length ? prev : getStarterSuggestions(user?.role)));
+  }, [user?.role]);
+
+  useEffect(() => {
     try {
       window.sessionStorage.setItem(
         CHAT_STATE_KEY,
@@ -166,7 +320,14 @@ export default function AICommandWidget() {
   }, [open, messages, loading]);
 
   useEffect(() => () => {
-    mediaStreamRef.current?.getTracks?.().forEach((track) => track.stop());
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.abort();
+      } catch {
+        // Best-effort cleanup.
+      }
+      recognitionRef.current = null;
+    }
     if (recordingTimerRef.current) {
       clearInterval(recordingTimerRef.current);
       recordingTimerRef.current = null;
@@ -177,21 +338,6 @@ export default function AICommandWidget() {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-  };
-
-  const pickRecorderMimeType = () => {
-    if (typeof window.MediaRecorder?.isTypeSupported !== 'function') {
-      return '';
-    }
-
-    const candidates = [
-      'audio/webm;codecs=opus',
-      'audio/webm',
-      'audio/mp4',
-      'audio/ogg;codecs=opus',
-    ];
-
-    return candidates.find((type) => window.MediaRecorder.isTypeSupported(type)) || '';
   };
 
   const applyAiResponse = (data, fallbackMessage) => {
@@ -224,7 +370,7 @@ export default function AICommandWidget() {
     }
 
     if (data?.action === 'navigate' && data?.target) {
-      navigate(String(data.target));
+      navigate(normalizeAgentTarget(data.target, user?.role));
     }
 
     if (Array.isArray(data?.suggestions) && data.suggestions.length) {
@@ -232,7 +378,7 @@ export default function AICommandWidget() {
       return;
     }
 
-    const nextSuggestions = suggestionsFromIntent(data?.intent?.intent);
+    const nextSuggestions = suggestionsFromIntent(data?.intent?.intent, user?.role);
     setSuggestions(nextSuggestions.slice(0, 4));
   };
 
@@ -272,12 +418,13 @@ export default function AICommandWidget() {
 
     const isLocalHost = ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
     if (!window.isSecureContext && !isLocalHost) {
-      appendAssistantMessage('Voice recording requires HTTPS. Open the app on an HTTPS URL and try again.');
+      appendAssistantMessage('Voice input requires HTTPS. Open the app on an HTTPS URL and try again.');
       return;
     }
 
-    if (!navigator?.mediaDevices?.getUserMedia || typeof window.MediaRecorder === 'undefined') {
-      appendAssistantMessage('Voice recording is not supported in this browser. Try Chrome or Edge latest version.');
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      appendAssistantMessage('Voice transcription is not supported in this browser. Try Chrome or Edge, or type your command.');
       return;
     }
 
@@ -294,61 +441,90 @@ export default function AICommandWidget() {
     }
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mimeType = pickRecorderMimeType();
-      const recorder = mimeType
-        ? new window.MediaRecorder(stream, { mimeType })
-        : new window.MediaRecorder(stream);
+      const recognition = new SpeechRecognition();
+      recognition.lang = navigator.language || 'en-IN';
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.maxAlternatives = 1;
 
-      mediaStreamRef.current = stream;
-      mediaRecorderRef.current = recorder;
-      audioChunksRef.current = [];
-      recordingMimeTypeRef.current = recorder.mimeType || mimeType || 'audio/webm';
+      recognitionRef.current = recognition;
+      voiceTranscriptRef.current = '';
 
-      recorder.ondataavailable = (event) => {
-        if (event.data?.size > 0) {
-          audioChunksRef.current.push(event.data);
+      recognition.onresult = (event) => {
+        const transcript = Array.from(event.results)
+          .slice(event.resultIndex)
+          .map((result) => result?.[0]?.transcript || '')
+          .join(' ')
+          .trim();
+
+        if (transcript) {
+          voiceTranscriptRef.current = `${voiceTranscriptRef.current} ${transcript}`.trim();
         }
       };
 
-      recorder.onstop = async () => {
+      recognition.onerror = (event) => {
         if (recordingTimerRef.current) {
           clearInterval(recordingTimerRef.current);
           recordingTimerRef.current = null;
         }
 
-        const blobType = recordingMimeTypeRef.current || 'audio/webm';
-        const extension = blobType.includes('mp4') ? 'm4a' : blobType.includes('ogg') ? 'ogg' : 'webm';
-        const audioBlob = new Blob(audioChunksRef.current, { type: blobType });
-        const audioFile = new File([audioBlob], `ai-voice-${Date.now()}.${extension}`, { type: blobType });
+        recognitionRef.current = null;
+        setIsRecording(false);
+        setIsProcessingVoice(false);
 
-        mediaStreamRef.current?.getTracks?.().forEach((track) => track.stop());
-        mediaStreamRef.current = null;
-        mediaRecorderRef.current = null;
+        const errorName = String(event?.error || '');
+        if (errorName === 'not-allowed' || errorName === 'service-not-allowed') {
+          appendAssistantMessage('Microphone access was denied. Allow microphone for this site in browser permissions and try again.');
+          return;
+        }
 
-        if (!audioBlob.size) {
+        if (errorName === 'no-speech') {
+          appendAssistantMessage('I did not catch anything. Try speaking again, or type your command.');
+          return;
+        }
+
+        appendAssistantMessage('Voice transcription failed. Please try again or use text command.');
+      };
+
+      recognition.onend = async () => {
+        if (recordingTimerRef.current) {
+          clearInterval(recordingTimerRef.current);
+          recordingTimerRef.current = null;
+        }
+
+        const transcript = String(voiceTranscriptRef.current || '').trim();
+        recognitionRef.current = null;
+        setIsRecording(false);
+
+        if (!transcript) {
           setIsProcessingVoice(false);
-          appendAssistantMessage('Could not capture audio. Please try again.');
+          appendAssistantMessage('I could not hear a clear command. Please try again.');
           return;
         }
 
         setLoading(true);
         try {
-          const data = await sendAIVoiceAudio({ audioFile, sessionId });
+          const data = await sendAIVoiceTranscript({ transcript, sessionId, locale: navigator.language || 'en-IN' });
           applyAiResponse(data, 'I could not process your voice command right now.');
         } catch (error) {
-          appendAssistantMessage(error?.response?.data?.error || 'Voice command failed. Please try again.');
+          try {
+            const fallbackData = await sendAIChatMessage({ message: transcript, sessionId });
+            applyAiResponse(fallbackData, 'I could not process your voice command right now.');
+          } catch (fallbackError) {
+            appendAssistantMessage(fallbackError?.response?.data?.error || error?.response?.data?.error || 'Voice command failed. Please try again.');
+          }
         } finally {
           setLoading(false);
           setIsProcessingVoice(false);
+          voiceTranscriptRef.current = '';
         }
       };
 
-      recorder.start();
+      recognition.start();
       setIsRecording(true);
       setRecordingSeconds(0);
       setIsProcessingVoice(false);
-      appendAssistantMessage('Listening... Tap stop to send voice command.');
+      appendAssistantMessage('Listening... Tap stop when you are done speaking.');
       recordingTimerRef.current = setInterval(() => {
         setRecordingSeconds((prev) => prev + 1);
       }, 1000);
@@ -374,16 +550,22 @@ export default function AICommandWidget() {
         return;
       }
 
-      appendAssistantMessage('Unable to start voice recording. Please retry or use text command.');
+      appendAssistantMessage('Unable to start voice transcription. Please retry or use text command.');
     }
   };
 
   const stopVoiceRecording = () => {
-    if (!mediaRecorderRef.current || mediaRecorderRef.current.state === 'inactive') return;
+    if (!recognitionRef.current) return;
     setIsProcessingVoice(true);
-    mediaRecorderRef.current.stop();
-    setIsRecording(false);
+    try {
+      recognitionRef.current.stop();
+    } catch {
+      setIsProcessingVoice(false);
+      setIsRecording(false);
+    }
   };
+
+  const floatingOffsetClass = activeBooking ? 'bottom-40 lg:bottom-28' : 'bottom-5';
 
   return (
     <>
@@ -391,24 +573,67 @@ export default function AICommandWidget() {
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="fixed bottom-5 right-5 z-50 inline-flex items-center gap-2 rounded-full bg-sky-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:bg-sky-500"
+          className={`fixed ${floatingOffsetClass} right-5 z-[70] inline-flex items-center gap-2 rounded-full bg-gradient-to-r ${roleConfig.accentClass} px-4 py-3 text-sm font-semibold text-white shadow-xl transition hover:brightness-110`}
           aria-label="Open AI assistant"
         >
           <Bot size={16} />
-          AI Assistant
+          {roleConfig.assistantName}
         </button>
       )}
 
       {open && (
-        <div className="fixed bottom-5 right-5 z-50 flex h-[520px] w-[360px] max-w-[calc(100vw-1.5rem)] flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-2xl dark:border-zinc-700 dark:bg-zinc-900">
-          <div className="flex items-center justify-between border-b border-zinc-200 bg-zinc-50 px-4 py-3 dark:border-zinc-700 dark:bg-zinc-800">
+        <div className={`fixed ${floatingOffsetClass} right-5 z-[70] flex h-[620px] w-[420px] max-w-[calc(100vw-1.5rem)] flex-col overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-2xl dark:border-zinc-700 dark:bg-zinc-900`}>
+          <div className={`bg-gradient-to-r ${roleConfig.accentClass} p-4 text-white`}>
+            <div className="mb-3 flex items-start justify-between">
+              <div className="flex items-center gap-2">
+                <MessageSquare size={16} className="opacity-90" />
+                <div>
+                  <p className="text-sm font-semibold">{roleConfig.assistantName}</p>
+                  <p className="text-[11px] font-medium opacity-90">{roleConfig.roleLabel} Mode</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={exportChat}
+                  className="rounded-md p-1 text-white/85 transition hover:bg-white/15 hover:text-white"
+                  aria-label="Export chat"
+                  title="Export chat"
+                >
+                  <Download size={16} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  className="rounded-md p-1 text-white/85 transition hover:bg-white/15 hover:text-white"
+                  aria-label="Close AI assistant"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {roleConfig.quickActions.map((actionItem) => (
+                <button
+                  key={actionItem.label}
+                  type="button"
+                  onClick={() => sendMessage(actionItem.prompt)}
+                  className="rounded-full border border-white/40 bg-white/10 px-2.5 py-1 text-[11px] font-medium transition hover:bg-white/20"
+                >
+                  {actionItem.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between border-b border-zinc-200 bg-zinc-50 px-4 py-2.5 dark:border-zinc-700 dark:bg-zinc-800">
             <div className="flex items-center gap-2">
-              <MessageSquare size={16} className="text-sky-500" />
-              <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">AI Command Center</span>
+              <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Conversation</span>
             </div>
 
             {pendingConfirmation && (
-              <div className="mt-2 flex items-center gap-2">
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => handleConfirmation(true)}
@@ -427,28 +652,9 @@ export default function AICommandWidget() {
                 </button>
               </div>
             )}
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={exportChat}
-                className="rounded-md p-1 text-zinc-500 transition hover:bg-zinc-200 hover:text-zinc-800 dark:hover:bg-zinc-700 dark:hover:text-zinc-100"
-                aria-label="Export chat"
-                title="Export chat"
-              >
-                <Download size={16} />
-              </button>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className="rounded-md p-1 text-zinc-500 transition hover:bg-zinc-200 hover:text-zinc-800 dark:hover:bg-zinc-700 dark:hover:text-zinc-100"
-                aria-label="Close AI assistant"
-              >
-                <X size={16} />
-              </button>
-            </div>
           </div>
 
-          <div ref={messagesContainerRef} className="flex-1 space-y-3 overflow-y-auto p-3">
+          <div ref={messagesContainerRef} className="flex-1 space-y-3 overflow-y-auto bg-gradient-to-b from-zinc-50/40 to-white p-3 dark:from-zinc-900 dark:to-zinc-900">
             {messages.map((message, index) => (
               <MessageBubble key={`${message.role}-${index}`} role={message.role} text={message.text} />
             ))}
@@ -462,6 +668,7 @@ export default function AICommandWidget() {
           </div>
 
           <div className="border-t border-zinc-200 p-3 dark:border-zinc-700">
+            <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-zinc-500">Suggested Prompts</p>
             <div className="mb-2 flex flex-wrap gap-2">
               {suggestions.map((suggestion) => (
                 <button

@@ -9,7 +9,7 @@ const router = express.Router();
 const authenticate = require('../../middleware/auth');
 const validate = require('../../middleware/validation');
 const { bookingLimiter, otpLimiter } = require('../../config/rateLimit');
-const { requireCustomer, requireWorker, requireCustomerOrWorker } = require('../../middleware/requireRole');
+const { requireWorker, requireCustomerOrWorker } = require('../../middleware/requireRole');
 
 // Import validation schemas
 const {
@@ -108,7 +108,7 @@ router.patch(
 router.post(
   '/:id/pay',
   authenticate,
-  requireCustomer,
+  requireCustomerOrWorker,
   payBookingSchema,
   validate,
   bookingController.payBooking

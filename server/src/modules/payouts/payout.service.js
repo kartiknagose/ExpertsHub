@@ -1,6 +1,7 @@
 const prisma = require('../../config/prisma');
 const AppError = require('../../common/errors/AppError');
 const { getRazorpayClient } = require('../payments/payment.service');
+const { createNotification } = require('../notifications/notification.service');
 const crypto = require('crypto');
 
 const MIN_PAYOUT_THRESHOLD = 100.0;
@@ -251,7 +252,7 @@ async function processRazorpayTransfer(profile, deductBalance, payoutAmount) {
             transferId = `trf_test_${crypto.randomUUID().replace(/-/g, '').slice(0, 20)}`;
         }
 
-        return prisma.payout.update({
+        const updatedPayout = await prisma.payout.update({
             where: { id: payoutRecord.id },
             data: {
                 status: 'PROCESSED',
@@ -259,6 +260,29 @@ async function processRazorpayTransfer(profile, deductBalance, payoutAmount) {
                 processedAt: new Date()
             }
         });
+
+        // Notify worker of successful payout
+        try {
+            await createNotification({
+                userId: profile.userId,
+                type: 'PAYOUT_SUCCESS',
+                title: 'Payout successful',
+                message: `₹${roundedPayoutAmount.toFixed(2)} has been transferred to your account.`,
+                data: { payoutId: updatedPayout.id, amount: roundedPayoutAmount, transferId }
+            });
+
+            // Broadcast updated worker stats
+            try {
+                const { broadcastWorkerStats } = require('../workers/worker-stats.service');
+                await broadcastWorkerStats(profile.userId);
+            } catch (statsErr) {
+                console.warn('Failed to broadcast worker stats:', statsErr.message);
+            }
+        } catch (notifyErr) {
+            console.warn('Failed to send payout success notification:', notifyErr.message);
+        }
+
+        return updatedPayout;
     } catch (_apiError) {
         // Recovery transaction: refund reserved funds + mark failed.
         await prisma.$transaction(async (tx) => {
@@ -274,6 +298,19 @@ async function processRazorpayTransfer(profile, deductBalance, payoutAmount) {
             maxWait: 10000,
             timeout: 15000,
         });
+
+        // Notify worker of failed payout
+        try {
+            await createNotification({
+                userId: profile.userId,
+                type: 'PAYOUT_FAILED',
+                title: 'Payout failed',
+                message: `Your payout attempt for ₹${roundedPayoutAmount.toFixed(2)} failed. Please try again or contact support.`,
+                data: { payoutId: payoutRecord.id, amount: roundedPayoutAmount, error: _apiError.message }
+            });
+        } catch (notifyErr) {
+            console.warn('Failed to send payout failure notification:', notifyErr.message);
+        }
 
         throw new AppError(502, 'Payout gateway failed to process transfer. Please try again.');
     }

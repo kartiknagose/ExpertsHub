@@ -23,7 +23,7 @@ export function ContactPage() {
   const [message, setMessage] = useState('');
 
   const contactItems = [
-    { icon: Mail,  label: 'Email Us',      value: 'support@ExpertsHub.com', color: 'from-brand-400 to-brand-600', link: 'mailto:support@ExpertsHub.com' },
+    { icon: Mail,  label: 'Email Us',      value: 'support@expertshub.tech', color: 'from-brand-400 to-brand-600', link: 'mailto:support@expertshub.tech' },
     { icon: Phone, label: 'Call Us',       value: '+91 98765 43210',       color: 'from-accent-400 to-accent-600', link: 'tel:+919876543210' },
     { icon: MapPin, label: 'Visit Us',     value: '123 Business St, Pune, MH', color: 'from-emerald-400 to-teal-500', link: null },
     { icon: Clock,  label: 'Support Hours', value: 'Mon–Sat 8AM–8PM\nSun 10AM–4PM', color: 'from-yellow-400 to-orange-500', link: null },

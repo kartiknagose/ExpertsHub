@@ -2,7 +2,7 @@ import axiosInstance from './axios';
 
 const PAYMENT_ENDPOINTS = {
   ME: '/payments/me',
-  ADMIN: '/payments/admin',
+  ADMIN: '/admin/payments',
 };
 
 export const getMyPayments = async () => {

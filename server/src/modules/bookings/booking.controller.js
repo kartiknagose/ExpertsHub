@@ -208,6 +208,13 @@ const createBooking = asyncHandler(async (req, res) => {
     if (getIo) {
       const io = getIo();
       const workerUserId = newBooking.workerProfile?.userId || newBooking.workerUserId;
+      const bookingCustomerId = newBooking.customerId || newBooking.customer?.id;
+
+      // Always notify the booking owner (customer) so dashboards update instantly.
+      if (bookingCustomerId) {
+        io.to(`user:${bookingCustomerId}`).emit('booking:created', newBooking);
+        io.to(`customer:${bookingCustomerId}`).emit('booking:created', newBooking);
+      }
 
       if (workerUserId) {
         // Targeted notification
@@ -219,6 +226,7 @@ const createBooking = asyncHandler(async (req, res) => {
           data: { bookingId: newBooking.id }
         });
         io.to(`user:${workerUserId}`).emit('booking:created', newBooking);
+        io.to(`worker:${workerUserId}`).emit('booking:created', newBooking);
       } else {
         // For public/open jobs, we don't persist notification to all yet (might be noisy)
         // Just broadcast for real-time dashboard updates

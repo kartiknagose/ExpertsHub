@@ -74,7 +74,7 @@ function init(server) {
     }
   });
 
-  ioInstance.on('connection', (socket) => {
+  ioInstance.on('connection', async (socket) => {
     console.log('Socket connected:', socket.id, 'userId=', socket.user.id, 'role=', socket.user.role);
 
     // ─── Auto-join user-specific rooms based on verified identity ───
@@ -82,6 +82,36 @@ function init(server) {
     if (socket.user.role === 'WORKER') socket.join(`worker:${socket.user.id}`);
     if (socket.user.role === 'CUSTOMER') socket.join(`customer:${socket.user.id}`);
     if (socket.user.role === 'ADMIN') socket.join('admin');
+
+    // ─── WORKER ENGAGEMENT: Auto-guidance for availability ───
+    if (socket.user.role === 'WORKER') {
+      try {
+        const prisma = require('./config/prisma');
+        const profile = await prisma.workerProfile.findUnique({
+          where: { userId: socket.user.id },
+          select: { availability: true }
+        });
+
+        if (profile) {
+          const dayOfWeek = new Date().getDay();
+          const availabilityToday = profile.availability?.some(a => a.dayOfWeek === dayOfWeek);
+
+          // Send availability reminder if not set for today
+          if (!availabilityToday) {
+            const { createNotification } = require('./modules/notifications/notification.service');
+            await createNotification({
+              userId: socket.user.id,
+              type: 'AVAILABILITY_REMINDER',
+              title: 'Set your availability',
+              message: 'You haven\'t set your availability for today. Add your working hours to receive more bookings.',
+              data: { actionUrl: '/worker/availability', actionType: 'SET_AVAILABILITY' }
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('Worker availability check error:', err.message);
+      }
+    }
 
     // ─── SECURITY: Validate room join requests ───
     // Users can only join rooms they are authorized for:

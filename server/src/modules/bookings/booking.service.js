@@ -133,6 +133,7 @@ const generateOTP = () => randomInt(1000, 10000).toString();
 
 const SMSService = require('../notifications/sms.service');
 const WhatsAppService = require('../notifications/whatsapp.service');
+const { createNotification } = require('../notifications/notification.service');
 const GrowthService = require('../business_growth/business_growth.service');
 
 /**
@@ -844,6 +845,18 @@ async function updateBookingStatus(bookingId, newStatus, userId, role) {
     return updated;
   });
 
+  // Broadcast updated worker stats after booking status change
+  try {
+    if (updatedBooking.workerProfile?.userId) {
+      const { broadcastWorkerStats } = require('../workers/worker-stats.service');
+      broadcastWorkerStats(updatedBooking.workerProfile.userId).catch(err => 
+        console.warn('Failed to broadcast worker stats:', err.message)
+      );
+    }
+  } catch (err) {
+    console.warn('Worker stats broadcast error:', err.message);
+  }
+
   return updatedBooking;
 }
 
@@ -1007,14 +1020,23 @@ async function releaseEscrowIfEligible(bookingId, tx) {
       }
     });
 
-    // Notify worker of escrow release
+    // Notify worker of earnings released
     try {
       const io = require('../../socket').getIo();
       io.to(`user:${booking.workerProfile.userId}`).emit('payout:released', {
         bookingId, amount: workerCut, message: 'Escrow funds released to your wallet'
       });
+      
+      // Also create a notification record
+      await createNotification({
+        userId: booking.workerProfile.userId,
+        type: 'EARNING_RELEASED',
+        title: 'Earnings released to wallet',
+        message: `You earned ₹${workerCut.toFixed(2)} from booking #${bookingId}. Funds are now available in your wallet.`,
+        data: { bookingId, amount: workerCut, type: 'BOOKING_COMPLETION' }
+      });
     } catch (err) {
-      console.warn('Socket emit ignored for escrow:', err.message);
+      console.warn('Failed to emit or notify escrow release:', err.message);
     }
   }
 }

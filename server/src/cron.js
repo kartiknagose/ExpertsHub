@@ -1,6 +1,7 @@
 const cron = require('node-cron');
 const { processDailyCronPayouts } = require('./modules/payouts/payout.service');
 const { initReminderCron } = require('./modules/bookings/reminder.cron');
+const { sendAvailabilityReminders } = require('./modules/workers/availability-reminder.cron');
 
 let isInitialized = false;
 
@@ -14,6 +15,18 @@ function initCronJobs() {
     isInitialized = true;
     console.log('[CRON] Initializing background jobs...');
     initReminderCron();
+
+    // 8:00 AM IST — Send availability reminders to workers
+    cron.schedule('0 8 * * *', async () => {
+        try {
+            await sendAvailabilityReminders();
+        } catch (err) {
+            console.error('[CRON] Error in availability reminders:', err);
+        }
+    }, {
+        scheduled: true,
+        timezone: "Asia/Kolkata"
+    });
 
     // 11:00 PM IST — Daily automated bank payouts for workers
     cron.schedule('0 23 * * *', async () => {

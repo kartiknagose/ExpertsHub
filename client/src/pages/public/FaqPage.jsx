@@ -175,7 +175,7 @@ export function FaqPage() {
               Our support team is available Mon–Sat 8AM–8PM to help you.
             </p>
             <a
-              href="mailto:support@ExpertsHub.com"
+              href="mailto:support@expertshub.tech"
               className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-brand-500 text-white text-sm font-bold hover:bg-brand-600 transition-colors shadow-brand-sm"
             >
               Email Support

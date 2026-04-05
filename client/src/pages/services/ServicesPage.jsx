@@ -46,10 +46,10 @@ const ServiceCard = memo(({ service }) => {
   const rating = toFixedSafe(service.avgRating, 1, null);
 
   return (
-    <Card hoverable className="h-full flex flex-col relative overflow-hidden group border-0 shadow-2xl ring-1 ring-gray-200 dark:ring-white/10 rounded-[2.5rem]">
+    <Card hoverable className="h-full flex flex-col relative overflow-hidden group border-0 shadow-xl ring-1 ring-gray-200 dark:ring-white/10 rounded-[2rem]">
 
       {/* Image Header */}
-      <div className="relative h-60 overflow-hidden">
+      <div className="relative h-44 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent z-10 transition-opacity duration-300 opacity-70 group-hover:opacity-90"></div>
         <img
           src={bgImage}
@@ -64,9 +64,9 @@ const ServiceCard = memo(({ service }) => {
         />
 
         {/* Rating Badge */}
-        <div className="absolute top-5 right-5 z-20">
+        <div className="absolute top-3 right-3 z-20">
           {rating && (
-            <div className="flex items-center gap-1.5 bg-white text-gray-900 px-3.5 py-2 rounded-2xl text-[10px] font-black shadow-2xl ring-1 ring-black/5">
+            <div className="flex items-center gap-1.5 bg-white text-gray-900 px-3 py-1.5 rounded-xl text-[10px] font-black shadow-xl ring-1 ring-black/5">
               <Star size={10} className="fill-yellow-400 text-yellow-400" />
               {rating}
             </div>
@@ -74,36 +74,36 @@ const ServiceCard = memo(({ service }) => {
         </div>
 
         {/* Category Icon */}
-        <div className="absolute top-5 left-5 z-20">
-          <div className="p-4 rounded-2xl backdrop-blur-2xl bg-white/90 text-brand-600 ring-1 ring-black/5 dark:bg-white/10 dark:text-white dark:ring-white/20 shadow-2xl">
-            {iconType ? createElement(iconType, { size: 24 }) : null}
+        <div className="absolute top-3 left-3 z-20">
+          <div className="p-3 rounded-xl backdrop-blur-2xl bg-white/90 text-brand-600 ring-1 ring-black/5 dark:bg-white/10 dark:text-white dark:ring-white/20 shadow-xl">
+            {iconType ? createElement(iconType, { size: 18 }) : null}
           </div>
         </div>
       </div>
 
-      <div className="p-8 flex-grow flex flex-col">
-        <div className="mb-5">
+      <div className="p-5 flex-grow flex flex-col">
+        <div className="mb-3">
           {service.category && (
-            <span className="text-[10px] font-black uppercase tracking-[0.2em] px-4 py-2 rounded-2xl bg-gray-100 text-gray-500 dark:bg-white/5 dark:text-gray-400">
+            <span className="text-[10px] font-black uppercase tracking-[0.18em] px-3 py-1.5 rounded-xl bg-gray-100 text-gray-500 dark:bg-white/5 dark:text-gray-400">
               {service.category}
             </span>
           )}
         </div>
 
-        <h3 className="text-2xl font-black mb-3 line-clamp-1 group-hover:text-brand-500 transition-colors tracking-tight leading-none text-gray-900 dark:text-white">
+        <h3 className="text-xl font-black mb-2 line-clamp-1 group-hover:text-brand-500 transition-colors tracking-tight leading-tight text-gray-900 dark:text-white">
           {service.name}
         </h3>
 
-        <p className="text-sm line-clamp-2 mb-8 leading-relaxed opacity-70 text-gray-600 dark:text-gray-300">
+        <p className="text-sm line-clamp-2 mb-4 leading-relaxed opacity-70 text-gray-600 dark:text-gray-300">
           {service.description || 'Professional grade service at your doorstep with 100% satisfaction guarantee and verified experts.'}
         </p>
 
-        <div className="mt-auto pt-8 border-t border-gray-100 dark:border-white/5">
+        <div className="mt-auto pt-4 border-t border-gray-100 dark:border-white/5">
           <Link to={`/services/${service.id}`} className="block">
             <Button
               variant="primary"
               fullWidth
-              className="h-14 rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] shadow-2xl shadow-brand-500/30 hover:shadow-brand-500/50 group-hover:scale-[1.02] transition-all border-0 ring-4 ring-brand-500/0 hover:ring-brand-500/10"
+              className="h-11 rounded-xl font-black uppercase tracking-[0.18em] text-[10px] shadow-lg shadow-brand-500/25 hover:shadow-brand-500/40 group-hover:scale-[1.01] transition-all border-0 ring-4 ring-brand-500/0 hover:ring-brand-500/10"
               icon={ArrowRight}
               iconPosition="right"
             >

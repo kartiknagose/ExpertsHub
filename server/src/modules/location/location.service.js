@@ -9,6 +9,9 @@ try {
         retryStrategy: () => null, // Don't retry — fall back to DB
         lazyConnect: true,
     });
+    redisClient.on('error', () => {
+        // Redis is optional here; fallback to DB-only behavior.
+    });
     redisClient.connect().catch(() => {
         console.warn('Location service: Redis unavailable, using database only');
         redisClient = null;

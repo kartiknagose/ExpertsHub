@@ -1,12 +1,14 @@
 const asyncHandler = require('../../common/utils/asyncHandler');
 const AppError = require('../../common/errors/AppError');
 const parseId = require('../../common/utils/parseId');
+const parsePagination = require('../../common/utils/parsePagination');
 const { isValidUploadUrl } = require('../../common/utils/validateUploadUrl');
 const {
   upsertWorkerProfile,
   getMyWorkerProfile,
   addWorkerService,
   getMyWorkerServices,
+  listPublicWorkers,
   getWorkerServicesById,
   getWorkerProfileById,
   removeWorkerService,
@@ -128,6 +130,15 @@ exports.getServices = asyncHandler(async (req, res) => {
   const services = await getMyWorkerServices(userId);
 
   res.json({ services });
+});
+
+// GET /api/workers
+// Public worker directory for browsing/searching workers
+exports.list = asyncHandler(async (req, res) => {
+  const { page, limit, skip } = parsePagination(req.query);
+  const { data: workers, total } = await listPublicWorkers({ skip, limit });
+
+  res.json({ workers, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } });
 });
 
 // GET /api/workers/:workerId/services

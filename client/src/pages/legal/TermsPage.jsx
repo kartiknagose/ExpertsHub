@@ -57,7 +57,7 @@ export function TermsPage() {
 
       <h2>9. Contact</h2>
       <p>
-        For any legal queries, contact us at <strong>legal@ExpertsHub.com</strong>.
+        For any legal queries, contact us at <strong>legal@expertshub.tech</strong>.
       </p>
     </LegalLayout>
   );

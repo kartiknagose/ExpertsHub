@@ -3,8 +3,8 @@ import axiosInstance from './axios';
 const VERIFICATION_ENDPOINTS = {
   ME: '/verification/me',
   APPLY: '/verification/apply',
-  ADMIN_LIST: '/verification/admin',
-  ADMIN_REVIEW: (id) => `/verification/admin/${id}`,
+  ADMIN_LIST: '/admin/verification',
+  ADMIN_REVIEW: (id) => `/admin/verification/${id}`,
 };
 
 export const getMyVerification = async () => {

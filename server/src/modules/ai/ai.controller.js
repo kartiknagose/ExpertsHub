@@ -39,10 +39,13 @@ const voice = asyncHandler(async (req, res) => {
     throw new AppError(400, 'audio file or transcript is required.');
   }
 
+  if (!transcript && req.file) {
+    throw new AppError(400, 'Voice transcription is required. Please use a browser with speech recognition support or send a transcript.');
+  }
+
   const result = await processChatInput({
     user: req.user,
-    message: transcript || '[voice_input]'
-    ,
+    message: transcript,
     sessionId,
     locale: req.locale,
     source: 'voice',
@@ -52,8 +55,8 @@ const voice = asyncHandler(async (req, res) => {
   res.json({
     ...result,
     transcript: transcript || null,
-    sttUsed: false,
-    sttProvider: 'disabled',
+    sttUsed: Boolean(transcript),
+    sttProvider: transcript ? 'browser-speech-recognition' : 'disabled',
   });
 });
 

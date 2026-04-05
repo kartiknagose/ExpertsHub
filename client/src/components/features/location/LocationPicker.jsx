@@ -2,12 +2,19 @@ import { useState, useEffect, useCallback } from 'react';
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap, Circle } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import '../../../utils/leafletSetup';
-import { MapPin, Navigation, Globe, Layers, Zap } from 'lucide-react';
+import { MapPin, Navigation, Globe, Layers, Zap, Satellite, Mountain, Moon } from 'lucide-react';
 import { AddressAutocomplete } from './AddressAutocomplete';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
 import { MAP_TILES, MAP_TILE_ATTRIBUTION } from '../../../utils/mapTiles';
 import { toFixedSafe } from '../../../utils/numberFormat';
+
+const LAYER_OPTIONS = [
+    { id: 'streets', label: 'Streets', icon: Globe, tile: MAP_TILES.streets },
+    { id: 'satellite', label: 'Satellite', icon: Satellite, tile: MAP_TILES.satellite },
+    { id: 'terrain', label: 'Terrain', icon: Mountain, tile: MAP_TILES.terrain },
+    { id: 'dark', label: 'Dark', icon: Moon, tile: MAP_TILES.dark },
+];
 
 /**
  * MapEvents
@@ -176,7 +183,10 @@ export function LocationPicker({ onChange, initialLocation = null, className = '
         }
     }, [normalizedInitialLocation, getUserLocation]);
 
-    const [mapType, setMapType] = useState('satellite');
+    const [activeLayer, setActiveLayer] = useState('satellite');
+    const [isLayerMenuOpen, setIsLayerMenuOpen] = useState(false);
+    const currentTile = LAYER_OPTIONS.find((layer) => layer.id === activeLayer)?.tile || MAP_TILES.streets;
+    const ActiveLayerIcon = LAYER_OPTIONS.find((layer) => layer.id === activeLayer)?.icon || Globe;
 
     return (
         <div className="space-y-4">
@@ -204,7 +214,8 @@ export function LocationPicker({ onChange, initialLocation = null, className = '
                 </button>
             </div>
 
-            <div className={`relative h-72 rounded-3xl overflow-hidden border-2 shadow-2xl border-gray-100 shadow-brand-500/10 dark:border-dark-700 dark:shadow-brand-500/5 ${className}`}>
+            <div className={`relative h-72 rounded-3xl border-2 shadow-2xl border-gray-100 shadow-brand-500/10 dark:border-dark-700 dark:shadow-brand-500/5 ${className}`}>
+                <div className="absolute inset-0 overflow-hidden rounded-3xl">
                 {position && typeof position.lat === 'number' && typeof position.lng === 'number' && !isNaN(position.lat) && !isNaN(position.lng) ? (
                     <MapContainer
                         center={position}
@@ -214,17 +225,7 @@ export function LocationPicker({ onChange, initialLocation = null, className = '
                         attributionControl={false}
                     >
                         <ChangeView center={position} />
-                        {mapType === 'streets' ? (
-                            <TileLayer
-                                url={MAP_TILES.streets}
-                                attribution={MAP_TILE_ATTRIBUTION}
-                            />
-                        ) : (
-                            <TileLayer
-                                url={MAP_TILES.satellite}
-                                attribution={MAP_TILE_ATTRIBUTION}
-                            />
-                        )}
+                        <TileLayer url={currentTile} attribution={MAP_TILE_ATTRIBUTION} key={activeLayer} />
                         <Marker position={position} />
                         
                         {/* Visual Service Radius Indicator */}
@@ -252,6 +253,7 @@ export function LocationPicker({ onChange, initialLocation = null, className = '
                         </div>
                     </div>
                 )}
+                </div>
 
                 {/* Floating Controls Overlay - Stacked Cleanly */}
                 <div className="absolute top-6 right-6 z-[400] flex flex-col items-end gap-3 pointer-events-none">
@@ -269,16 +271,41 @@ export function LocationPicker({ onChange, initialLocation = null, className = '
                         </div>
                     </div>
 
-                    <button
-                        type="button"
-                        onClick={() => setMapType(mapType === 'streets' ? 'satellite' : 'streets')}
-                        className="pointer-events-auto p-4 rounded-2xl shadow-2xl border backdrop-blur-xl transition-all active:scale-95 
-                                 bg-white/90 border-white/20 dark:bg-dark-950/90 dark:border-dark-700 text-brand-500
-                                 hover:bg-brand-500 hover:text-white dark:hover:bg-brand-600"
-                        title={`Switch to ${mapType === 'streets' ? 'Satellite' : 'Streets'} View`}
-                    >
-                        {mapType === 'streets' ? <Globe size={20} /> : <Layers size={20} />}
-                    </button>
+                    <div className="relative pointer-events-auto">
+                        <button
+                            type="button"
+                            onClick={() => setIsLayerMenuOpen((open) => !open)}
+                            className={`p-4 rounded-2xl shadow-2xl border backdrop-blur-xl transition-all active:scale-95 bg-white/90 border-white/20 text-brand-500 hover:bg-brand-500 hover:text-white dark:bg-dark-950/90 dark:border-dark-700 dark:hover:bg-brand-600 ${isLayerMenuOpen ? 'ring-2 ring-brand-500/30' : ''}`}
+                            title={t('Switch map layer')}
+                        >
+                            <ActiveLayerIcon size={20} />
+                        </button>
+
+                        {isLayerMenuOpen && (
+                            <div className="absolute right-0 top-full mt-2 w-44 overflow-hidden rounded-2xl border border-white/20 bg-white/95 shadow-2xl backdrop-blur-xl dark:border-dark-700 dark:bg-dark-950/95">
+                                {LAYER_OPTIONS.map((layer) => {
+                                    const LayerIcon = layer.icon;
+                                    const isActive = activeLayer === layer.id;
+
+                                    return (
+                                        <button
+                                            key={layer.id}
+                                            type="button"
+                                            onClick={() => {
+                                                setActiveLayer(layer.id);
+                                                setIsLayerMenuOpen(false);
+                                            }}
+                                            className={`flex w-full items-center gap-2.5 px-3.5 py-3 text-left text-[11px] font-bold uppercase tracking-[0.18em] transition-colors ${isActive ? 'bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-white'}`}
+                                        >
+                                            <LayerIcon size={14} className={isActive ? 'text-brand-500' : 'opacity-60'} />
+                                            <span>{layer.label}</span>
+                                            {isActive && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-brand-500" />}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {/* Coordinate Display Overlay */}

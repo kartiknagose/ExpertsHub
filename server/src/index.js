@@ -38,11 +38,13 @@ const customerRoutes = require('./modules/customers/customer.routes');
 const locationRoutes = require('./modules/location/location.routes');
 const notificationRoutes = require('./modules/notifications/notification.routes');
 const paymentRoutes = require('./modules/payments/payment.routes');
+const paymentAdminRoutes = require('./modules/payments/payment.admin.routes');
 const reviewRoutes = require('./modules/reviews/review.routes');
 const safetyRoutes = require('./modules/safety/safety.routes');
 const serviceRoutes = require('./modules/services/service.routes');
 const uploadRoutes = require('./modules/uploads/upload.routes');
 const verificationRoutes = require('./modules/verification/verification.routes');
+const verificationAdminRoutes = require('./modules/verification/verification.admin.routes');
 const workerRoutes = require('./modules/workers/worker.routes');
 const growthRoutes = require('./modules/business_growth/growth.routes'); // Referrals, Wallet, Coupons
 const payoutRoutes = require('./modules/payouts/payout.routes');
@@ -245,6 +247,9 @@ app.use('/api/uploads', uploadRoutes);
 app.use('/api/availability', availabilityRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/verification', verificationRoutes);
+// Mount admin-scoped subroutes for specific modules to avoid misrouting
+app.use('/api/admin/verification', verificationAdminRoutes);
+app.use('/api/admin/payments', paymentAdminRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/safety', safetyRoutes);
@@ -310,6 +315,9 @@ if (require.main === module) {
         if (smtp.ok) {
           console.log('[SMTP] Preflight connected');
           logger.info('SMTP preflight: connected');
+        } else if (smtp.reason === 'SMTP transport not configured' && (isResendConfigured() || isSendGridConfigured())) {
+          console.log('[SMTP] Preflight: SMTP disabled, fallback provider configured');
+          logger.info('SMTP preflight: SMTP disabled, fallback provider configured');
         } else {
           console.error('[SMTP] Preflight failed:', smtp);
           logger.error('SMTP preflight: failed', {

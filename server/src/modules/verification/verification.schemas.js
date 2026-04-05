@@ -41,8 +41,8 @@ const applyVerificationSchema = [
 const reviewVerificationSchema = [
   body('status')
     .notEmpty()
-    .isIn(['PENDING', 'APPROVED', 'REJECTED', 'MORE_INFO'])
-    .withMessage('Status must be one of: PENDING, APPROVED, REJECTED, MORE_INFO'),
+    .isIn(['PENDING', 'APPROVED', 'REJECTED', 'MORE_INFO', 'RESUBMIT'])
+    .withMessage('Status must be one of: PENDING, APPROVED, REJECTED, MORE_INFO, RESUBMIT'),
   body('score')
     .optional()
     .isInt({ min: 0, max: 100 })

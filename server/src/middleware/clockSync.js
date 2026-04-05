@@ -37,8 +37,6 @@ const clockSyncMiddleware = (req, res, next) => {
   if (!isCloudinaryUploadRoute(req)) {
     return next();
   }
-
-  const now = Date.now();
   
   // Simple heuristic: if system reports a year 2026 but timestamp seems very old,
   // we might have a clock skew. This is a best-effort check.

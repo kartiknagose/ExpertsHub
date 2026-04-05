@@ -301,15 +301,27 @@ export const BookingCard = memo(function BookingCard({
                                 )}
 
                                 {booking.status === 'COMPLETED' && (
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        className="rounded-xl px-5 h-9 text-xs border-brand-200 text-brand-700 hover:bg-brand-50 dark:border-brand-500/20 dark:text-brand-400 dark:hover:bg-brand-500/10"
-                                        onClick={(e) => handleAction(e, 'DOWNLOAD_INVOICE')}
-                                        icon={Download}
-                                    >
-                                        {t('Invoice')}
-                                    </Button>
+                                    <div className="flex gap-2">
+                                        {booking.paymentStatus !== 'PAID' && (
+                                            <Button
+                                                size="sm"
+                                                variant="warning"
+                                                className="rounded-xl px-4 h-9 text-xs"
+                                                onClick={(e) => handleAction(e, 'VERIFY_CASH')}
+                                            >
+                                                {t('Verify Cash Collected')}
+                                            </Button>
+                                        )}
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="rounded-xl px-5 h-9 text-xs border-brand-200 text-brand-700 hover:bg-brand-50 dark:border-brand-500/20 dark:text-brand-400 dark:hover:bg-brand-500/10"
+                                            onClick={(e) => handleAction(e, 'DOWNLOAD_INVOICE')}
+                                            icon={Download}
+                                        >
+                                            {t('Invoice')}
+                                        </Button>
+                                    </div>
                                 )}
 
                                 {booking.status === 'COMPLETED' && !hasUserReviewed && (

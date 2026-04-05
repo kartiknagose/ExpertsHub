@@ -53,7 +53,7 @@ export function CookiesPage() {
 
       <h2>8. Contact</h2>
       <p>
-        Questions? Email us at <strong>privacy@ExpertsHub.com</strong>.
+        Questions? Email us at <strong>privacy@expertshub.tech</strong>.
       </p>
     </LegalLayout>
   );

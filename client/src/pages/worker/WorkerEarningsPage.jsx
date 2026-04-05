@@ -21,6 +21,7 @@ import { getPageLayout } from '../../constants/layout';
 import { queryKeys } from '../../utils/queryKeys';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { toastErrorFromResponse } from '../../utils/notifications';
+import { useSocketEvent } from '../../hooks/useSocket';
 
 export function WorkerEarningsPage() {
   const { t, i18n } = useTranslation();
@@ -149,6 +150,20 @@ export function WorkerEarningsPage() {
     };
   }, [bankData?.payoutMethod, bankData?.payoutMode, bankData?.isLinked, stats.walletBalance, t]);
 
+  useSocketEvent('payout:released', () => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.worker.payments() });
+    queryClient.invalidateQueries({ queryKey: ['bank-details'] });
+  }, [queryClient]);
+
+  useSocketEvent('payout:deducted', () => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.worker.payments() });
+    queryClient.invalidateQueries({ queryKey: ['bank-details'] });
+  }, [queryClient]);
+
+  useSocketEvent('booking:status_updated', () => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.worker.payments() });
+  }, [queryClient]);
+
   const openPayoutModal = () => {
     setPayoutForm({
       payoutMethod: bankData?.payoutMethod || 'BANK',
@@ -261,7 +276,7 @@ export function WorkerEarningsPage() {
                   <Button
                     onClick={() => instantPayoutMutation.mutate()}
                     loading={instantPayoutMutation.isPending}
-                    disabled={!bankData?.isLinked && bankData?.payoutMode === 'LIVE'}
+                    disabled={!payoutReadiness.isReady || instantPayoutMutation.isPending}
                     className="h-12 rounded-2xl font-bold uppercase tracking-widest text-xs"
                   >
                     {t('Redeem Now')}

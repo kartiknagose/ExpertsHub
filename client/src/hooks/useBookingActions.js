@@ -185,6 +185,10 @@ export function useBookingActions({ invalidateKeys = [] } = {}) {
           rating: payload.rating,
           comment: payload.comment,
         });
+      } else if (type === 'VERIFY_CASH') {
+        await payBooking(actionId, { paymentReference: 'CASH' });
+        invalidateAll();
+        toast.success('Cash payment verified successfully.');
       } else if (type === 'DOWNLOAD_INVOICE') {
         toast.promise(downloadInvoice(actionId), {
           loading: 'Generating PDF Invoice...',

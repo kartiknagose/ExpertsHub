@@ -4,9 +4,12 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "dev": "nodemon src/index.js",
+    "dev": "nodemon --watch src --ext js,mjs,cjs,json src/index.js",
     "start": "node src/index.js",
+    "test:ai-prompts": "node tests/ai-role-prompt-matrix.test.js",
     "prisma": "prisma",
+    "studio": "prisma studio",
+    "studio:safe": "node --max-old-space-size=6144 ./node_modules/prisma/build/index.js studio --browser none",
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
     "prisma:reset": "prisma migrate reset",

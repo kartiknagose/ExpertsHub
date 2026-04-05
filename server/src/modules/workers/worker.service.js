@@ -186,6 +186,50 @@ async function getMyWorkerServices(userId) {
   });
 }
 
+async function listPublicWorkers({ skip = 0, limit = 20 } = {}) {
+  const [data, total] = await Promise.all([
+    prisma.workerProfile.findMany({
+      select: {
+        id: true,
+        bio: true,
+        skills: true,
+        hourlyRate: true,
+        rating: true,
+        totalReviews: true,
+        serviceAreas: true,
+        baseLatitude: true,
+        baseLongitude: true,
+        serviceRadius: true,
+        isVerified: true,
+        isProbation: true,
+        verificationLevel: true,
+        user: {
+          select: {
+            id: true,
+            name: true,
+            profilePhotoUrl: true,
+          },
+        },
+        services: {
+          include: {
+            service: { select: { id: true, name: true, category: true } },
+          },
+        },
+      },
+      orderBy: [
+        { rating: 'desc' },
+        { totalReviews: 'desc' },
+        { id: 'desc' },
+      ],
+      skip,
+      take: limit,
+    }),
+    prisma.workerProfile.count(),
+  ]);
+
+  return { data, total };
+}
+
 // Get all services offered by a specific worker (public endpoint)
 async function getWorkerServicesById(workerId) {
   // workerId here is the profile ID, not user ID
@@ -274,6 +318,7 @@ module.exports = {
   getMyWorkerProfile,
   addWorkerService,
   getMyWorkerServices,
+  listPublicWorkers,
   getWorkerServicesById,
   getWorkerProfileById,
   getWorkerProfileByUserId,

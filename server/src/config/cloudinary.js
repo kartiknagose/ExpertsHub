@@ -74,7 +74,7 @@ function uploadToCloudinary(buffer, options = {}, retryCount = 0) {
             }, Math.min(1000 * Math.pow(2, retryCount), 3000)); // Exponential backoff
           } else if (isClockSkewError) {
             // Clock skew persists after retries - likely server clock issue
-            const clockInfo = getClockSkewInfo();
+            const _clockInfo = getClockSkewInfo();
             const criticalMsg = `[CRITICAL] Cloudinary clock skew persists after ${MAX_RETRIES} retries. Server time: ${new Date().toISOString()}. Check system clock and sync with NTP. Original error: ${error.message}`;
             logger.error(criticalMsg);
             
