@@ -29,7 +29,6 @@ const {
   deleteScopedMapEntries,
 } = require('./stateStore');
 
-const GROQ_UNAVAILABLE_MESSAGE = 'I could not reach the AI model right now. You can still use direct commands like "show bookings", "show wallet", or "book plumber tomorrow 10 AM".';
 const LLM_PARSE_FALLBACK_MESSAGE = 'I can help with bookings, wallet, or notifications. What do you want to do?';
 const FAILSAFE_MESSAGE = "Something went wrong. Let's try that again.";
 const DUPLICATE_ACTION_MESSAGE = 'A similar action is already in progress. Please wait a few seconds and try again.';
@@ -71,7 +70,7 @@ function normalizeText(text) {
 function sanitizeLlmInput(text) {
   const value = String(text || '')
     .replace(/```[\s\S]*?```/g, ' ')
-    .replace(/\u0000/g, ' ')
+    .split('\0').join(' ')
     .replace(/\r\n/g, '\n')
     .replace(/[ \t]{2,}/g, ' ')
     .trim();
@@ -80,13 +79,6 @@ function sanitizeLlmInput(text) {
     .replace(/\b(ignore|disregard|override)\s+(all|previous|earlier)\s+(instructions?|prompts?)\b/gi, '[redacted]')
     .replace(/\b(system|developer|assistant)\s*:/gi, '[redacted]:')
     .slice(0, 2000);
-}
-
-function toFailsafeTextResponse(sessionId) {
-  return toTextResponse({
-    sessionId,
-    message: FAILSAFE_MESSAGE,
-  });
 }
 
 function nowIso() {
@@ -786,7 +778,7 @@ function extractRadiusAndLimit(message) {
 
 function extractAdminServicePayload(message) {
   const text = normalizeText(message);
-  const quotedName = text.match(/['\"]([^'\"]{3,100})['\"]/);
+  const quotedName = text.match(/['"]([^'"]{3,100})['"]/);
   const serviceName = quotedName?.[1]?.trim() || null;
   const categoryMatch = text.match(/\bcategory\s*[:=]?\s*([A-Za-z0-9\s&-]{2,50})/i);
   const priceMatch = text.match(/\b(?:price|base price|basePrice)\s*[:=]?\s*(\d{1,7}(?:\.\d{1,2})?)\b/i);
