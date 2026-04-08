@@ -71,6 +71,15 @@ async function createReview(userId, userRole, data) {
     throw new AppError(403, 'You are not involved in this booking.');
   }
 
+  const activeReviewee = await prisma.user.findFirst({
+    where: { id: revieweeId, deletedAt: null },
+    select: { id: true },
+  });
+
+  if (!activeReviewee) {
+    throw new AppError(404, 'User not found.');
+  }
+
   // 3. Check if this user already reviewed this booking
   const existingReview = await prisma.review.findUnique({
     where: {

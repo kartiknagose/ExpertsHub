@@ -34,11 +34,13 @@ exports.getWorkerBankDetails = async (userId) => {
             upiId: true,
             payoutMethod: true,
             walletBalance: true,
-            razorpayAccountId: true
+            razorpayAccountId: true,
+            user: { select: { deletedAt: true, isActive: true } },
         }
     });
 
     if (!profile) throw new AppError(404, 'Worker profile not found');
+    if (!profile.user || profile.user.deletedAt || !profile.user.isActive) throw new AppError(404, 'Worker profile not found');
 
     // Mask account number
     const maskedAcc = profile.bankAccountNumber ?
@@ -60,8 +62,12 @@ exports.getWorkerBankDetails = async (userId) => {
 };
 
 exports.updateWorkerBankDetails = async (userId, payload = {}) => {
-    const profile = await prisma.workerProfile.findUnique({ where: { userId }, include: { user: true } });
+    const profile = await prisma.workerProfile.findUnique({
+        where: { userId },
+        include: { user: { select: { deletedAt: true, isActive: true } } },
+    });
     if (!profile) throw new AppError(404, 'Worker profile not found');
+    if (!profile.user || profile.user.deletedAt || !profile.user.isActive) throw new AppError(404, 'Worker profile not found');
 
     const payoutMethod = String(payload.payoutMethod || 'BANK').toUpperCase();
     if (!SUPPORTED_PAYOUT_METHODS.includes(payoutMethod)) {
@@ -133,8 +139,12 @@ exports.updateWorkerBankDetails = async (userId, payload = {}) => {
 };
 
 exports.processInstantPayout = async (userId) => {
-    const profile = await prisma.workerProfile.findUnique({ where: { userId }, include: { user: true } });
+    const profile = await prisma.workerProfile.findUnique({
+        where: { userId },
+        include: { user: { select: { deletedAt: true, isActive: true } } },
+    });
     if (!profile) throw new AppError(404, 'Worker profile not found');
+    if (!profile.user || profile.user.deletedAt || !profile.user.isActive) throw new AppError(404, 'Worker profile not found');
 
     const payoutMethod = String(profile.payoutMethod || 'BANK').toUpperCase();
     const hasBank = Boolean(profile.bankAccountNumber && profile.bankIfsc);
@@ -176,12 +186,15 @@ exports.processDailyCronPayouts = async () => {
             walletBalance: { gte: MIN_PAYOUT_THRESHOLD },
             razorpayAccountId: { not: null }
         },
-        include: { user: true }
+        include: { user: { select: { id: true, deletedAt: true, isActive: true } } }
     });
 
     console.log(`[CRON] Found ${eligibleWorkers.length} eligible workers for payout.`);
 
     for (const profile of eligibleWorkers) {
+        if (!profile.user || profile.user.deletedAt || !profile.user.isActive) {
+            continue;
+        }
         try {
             const balance = Number(profile.walletBalance);
             // Scheduled payouts have zero fees

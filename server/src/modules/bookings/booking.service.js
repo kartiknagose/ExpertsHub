@@ -256,6 +256,8 @@ async function filterWorkersByDistance(lat, lng, serviceId, radiusKm = 10) {
         AND wp."baseLatitude" IS NOT NULL
         AND wp."baseLongitude" IS NOT NULL
         AND (wl."isOnline" IS NULL OR wl."isOnline" = true)
+        AND u."deletedAt" IS NULL
+        AND u."isActive" = true
     ) AS worker_results
     WHERE distance <= ${radiusKm}
     ORDER BY distance ASC

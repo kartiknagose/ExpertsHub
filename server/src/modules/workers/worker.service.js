@@ -16,7 +16,10 @@ async function upsertWorkerProfile(userId, { bio, hourlyRate, skills, serviceAre
   };
 
   return prisma.$transaction(async (tx) => {
-    const user = await tx.user.findUnique({ where: { id: userId }, select: { role: true } });
+    const user = await tx.user.findUnique({ where: { id: userId }, select: { role: true, deletedAt: true } });
+    if (!user || user.deletedAt) {
+      throw new AppError(404, 'User not found.');
+    }
     // If profile exists -> update, else -> create
     const existing = await tx.workerProfile.findUnique({ where: { userId } });
     let profile;
@@ -55,10 +58,11 @@ async function getMyWorkerProfile(userId) {
           profilePhotoUrl: true,
           emailVerified: true,
           isProfileComplete: true,
+          deletedAt: true,
         },
       },
     },
-  });
+  }).then((profile) => (profile && profile.user && !profile.user.deletedAt ? profile : null));
 }
 
 /**
@@ -77,6 +81,7 @@ async function getWorkerProfileById(profileId) {
           profilePhotoUrl: true,
           rating: true,
           totalReviews: true,
+          deletedAt: true,
           reviewsReceived: {
             include: {
               reviewer: {
@@ -97,7 +102,7 @@ async function getWorkerProfileById(profileId) {
       availability: true,
       location: true,
     },
-  });
+  }).then((profile) => (profile && profile.user && !profile.user.deletedAt ? profile : null));
 }
 
 /**
@@ -116,10 +121,11 @@ async function getWorkerProfileByUserId(userId) {
           profilePhotoUrl: true,
           rating: true,
           totalReviews: true,
+          deletedAt: true,
         },
       },
     },
-  });
+  }).then((profile) => (profile && profile.user && !profile.user.deletedAt ? profile : null));
 }
 
 // Add a service to the worker's offered services
