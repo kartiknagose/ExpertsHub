@@ -9,7 +9,32 @@ const GrowthService = require('../business_growth/business_growth.service');
 const isProduction = process.env.NODE_ENV === 'production';
 const requireEmailVerification = String(process.env.REQUIRE_EMAIL_VERIFICATION || '').toLowerCase() === 'true';
 const smtpSendTimeoutMs = Number(process.env.SMTP_SEND_TIMEOUT_MS || 20000);
-const cookieDomain = process.env.COOKIE_DOMAIN;
+
+function normalizeCookieDomain(rawDomain) {
+  const value = String(rawDomain || '').trim();
+  if (!value) return '';
+
+  // Accept values like "expertshub.tech" or ".expertshub.tech".
+  // If someone accidentally sets a full URL, extract the hostname.
+  let candidate = value;
+  if (/^https?:\/\//i.test(candidate)) {
+    try {
+      candidate = new URL(candidate).hostname;
+    } catch (_err) {
+      return '';
+    }
+  }
+
+  candidate = candidate.replace(/^\.+/, '').replace(/\/+$/, '');
+  if (!candidate || candidate.includes(' ')) return '';
+
+  // Domain option should not include port, protocol, or path.
+  if (candidate.includes(':') || candidate.includes('/')) return '';
+
+  return `.${candidate}`;
+}
+
+const cookieDomain = normalizeCookieDomain(process.env.COOKIE_DOMAIN);
 const cookieMaxAgeMs = Number(process.env.AUTH_COOKIE_MAX_AGE_MS || 24 * 60 * 60 * 1000);
 
 const COOKIE_OPTIONS = {

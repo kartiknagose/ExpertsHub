@@ -231,7 +231,16 @@ export function LandingPage() {
                   >
                     <div className="absolute inset-0 bg-gradient-to-br from-brand-500 to-accent-600" />
                     {IMAGES.HERO_LANDING && (
-                      <img src={IMAGES.HERO_LANDING} alt="Professional at work" className="absolute inset-0 w-full h-full object-cover mix-blend-overlay opacity-70" />
+                      <img
+                        src={IMAGES.HERO_LANDING}
+                        alt="Professional at work"
+                        className="absolute inset-0 w-full h-full object-cover opacity-95"
+                        onError={(event) => {
+                          if (event.currentTarget.src !== IMAGES.CATEGORY_CLEANING) {
+                            event.currentTarget.src = IMAGES.CATEGORY_CLEANING;
+                          }
+                        }}
+                      />
                     )}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
                     <div className="absolute bottom-4 left-4 right-4 z-10">
