@@ -6,7 +6,7 @@ services:
     plan: starter
     region: oregon
     buildCommand: npm ci && npx prisma generate
-    startCommand: sh -c 'set -e; MIGRATION_DATABASE_URL=${DIRECT_DATABASE_URL:-$DATABASE_URL}; DATABASE_URL="$MIGRATION_DATABASE_URL" npx prisma migrate deploy; exec node src/index.js'
+    startCommand: npm start
     healthCheckPath: /health
     autoDeploy: true
     envVars:
