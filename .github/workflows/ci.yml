@@ -11,9 +11,25 @@ jobs:
   server:
     name: Server Lint
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: shadow_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d shadow_db"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
     defaults:
       run:
         working-directory: server
+    env:
+      SHADOW_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/shadow_db?schema=public
     steps:
       - uses: actions/checkout@v4
 
@@ -25,7 +41,7 @@ jobs:
 
       - run: npm ci
       - run: npx prisma generate
-      - run: npx prisma migrate diff --from-migrations ./prisma/migrations --to-schema-datamodel ./prisma/schema.prisma --exit-code
+      - run: npx prisma migrate diff --from-migrations ./prisma/migrations --to-schema-datamodel ./prisma/schema.prisma --shadow-database-url "$SHADOW_DATABASE_URL" --exit-code
       - run: npm run lint
 
   # ── Client: lint + build ──
