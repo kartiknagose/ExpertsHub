@@ -106,6 +106,8 @@ model User {
   loyaltyPoints  LoyaltyPoints?
   loyaltyTransactions LoyaltyTransaction[]
   proPlusSubscription ExpertsHubPlusSubscription?
+
+  @@index([deletedAt])
 }
 
 model EmailVerification {
