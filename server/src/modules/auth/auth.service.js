@@ -6,6 +6,42 @@ const AppError = require('../../common/errors/AppError');
 const { getTokenVersion, incrementTokenVersion } = require('../../common/utils/tokenVersion');
 const { sanitizeText } = require('../../common/utils/sanitize');
 
+function isSchemaDriftError(error) {
+  const code = String(error?.code || '').toUpperCase();
+  return code === 'P2021' || code === 'P2022';
+}
+
+async function findUserForLogin(normalizedEmail) {
+  try {
+    return await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+      include: {
+        workerProfile: {
+          select: { isVerified: true }
+        }
+      }
+    });
+  } catch (error) {
+    if (!isSchemaDriftError(error)) throw error;
+
+    // Fallback for partially migrated production databases.
+    return prisma.user.findUnique({
+      where: { email: normalizedEmail },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        passwordHash: true,
+        isActive: true,
+        emailVerified: true,
+        profilePhotoUrl: true,
+        isProfileComplete: true,
+      },
+    });
+  }
+}
+
 async function registerUser({ name, email, mobile, password, role = 'CUSTOMER', referralCode = null }) {
   const normalizedName = sanitizeText(String(name || '').trim());
   const normalizedEmail = String(email || '').trim().toLowerCase();
@@ -76,15 +112,7 @@ async function loginUser({ email, password }) {
   const normalizedEmail = String(email || '').trim().toLowerCase();
   const requireEmailVerification = String(process.env.REQUIRE_EMAIL_VERIFICATION || '').toLowerCase() === 'true';
 
-  const user = await prisma.user.findUnique({
-    where: { email: normalizedEmail },
-    // Soft-deleted users cannot log in.
-    include: {
-      workerProfile: {
-        select: { isVerified: true }
-      }
-    }
-  });
+  const user = await findUserForLogin(normalizedEmail);
   if (!user || user.deletedAt) throw new AppError(401, 'Invalid credentials');
 
   const storedHash = String(user.passwordHash || '').trim();
@@ -102,10 +130,10 @@ async function loginUser({ email, password }) {
   }
 
   if (!ok) throw new AppError(401, 'Invalid credentials');
-  if (requireEmailVerification && !user.emailVerified && process.env.NODE_ENV !== 'development') {
+  if (requireEmailVerification && user.emailVerified === false && process.env.NODE_ENV !== 'development') {
     throw new AppError(403, 'Email not verified. Please check your inbox.');
   }
-  if (!user.isActive) throw new AppError(403, 'Account suspended. Please contact support.');
+  if (user.isActive === false) throw new AppError(403, 'Account suspended. Please contact support.');
 
   const tokenVersion = await getTokenVersion(user.id);
   const token = signJwt({ id: user.id, role: user.role, tv: tokenVersion });

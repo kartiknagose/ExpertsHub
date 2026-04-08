@@ -6,6 +6,11 @@ const { registerUser, loginUser, verifyEmailToken, requestPasswordReset, resetPa
 const { sendVerificationEmail, sendPasswordResetEmail } = require('../../common/utils/mailer');
 const GrowthService = require('../business_growth/business_growth.service');
 
+function isSchemaDriftError(error) {
+  const code = String(error?.code || '').toUpperCase();
+  return code === 'P2021' || code === 'P2022';
+}
+
 const isProduction = process.env.NODE_ENV === 'production';
 const requireEmailVerification = String(process.env.REQUIRE_EMAIL_VERIFICATION || '').toLowerCase() === 'true';
 const smtpSendTimeoutMs = Number(process.env.SMTP_SEND_TIMEOUT_MS || 20000);
@@ -192,21 +197,39 @@ exports.logout = asyncHandler(async (_req, res) => {
 
 exports.me = asyncHandler(async (req, res) => {
   // Fetch full user for consistent UI hydration (photo + name).
-  const user = await prisma.user.findUnique({
-    where: { id: req.user.id },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      role: true,
-      profilePhotoUrl: true,
-      emailVerified: true,
-      isProfileComplete: true,
-      workerProfile: {
-        select: { isVerified: true }
-      }
-    },
-  });
+  let user;
+  try {
+    user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        profilePhotoUrl: true,
+        emailVerified: true,
+        isProfileComplete: true,
+        workerProfile: {
+          select: { isVerified: true }
+        }
+      },
+    });
+  } catch (error) {
+    if (!isSchemaDriftError(error)) throw error;
+
+    user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        profilePhotoUrl: true,
+        emailVerified: true,
+        isProfileComplete: true,
+      },
+    });
+  }
 
   if (!user) {
     throw new AppError(404, 'User not found');

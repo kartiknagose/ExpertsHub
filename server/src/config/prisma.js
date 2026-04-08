@@ -64,6 +64,11 @@ const removeDeletedAtFromArgs = (args = {}) => {
   if (nextArgs.where && typeof nextArgs.where === 'object') {
     nextArgs.where = stripDeletedAtFilter(nextArgs.where);
   }
+  if (nextArgs.select && typeof nextArgs.select === 'object' && Object.prototype.hasOwnProperty.call(nextArgs.select, 'deletedAt')) {
+    const nextSelect = { ...nextArgs.select };
+    delete nextSelect.deletedAt;
+    nextArgs.select = nextSelect;
+  }
   return nextArgs;
 };
 
