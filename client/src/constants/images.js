@@ -1,6 +1,5 @@
 /**
- * Centralized collection of high-quality Unsplash images for the application.
- * Using source.unsplash.com with specific keywords and IDs for consistency.
+ * Centralized image URLs for app surfaces and service cards.
  */
 
 export const IMAGES = {
@@ -9,18 +8,26 @@ export const IMAGES = {
     AUTH_REGISTER_BG: 'https://images.unsplash.com/photo-1542744173-8e7e53415bb0?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80',
     HERO_LANDING: 'https://images.unsplash.com/photo-1581578731117-104f2a412727?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80',
 
-    // Service Categories (Thumbnails)
-    CATEGORY_CLEANING: 'https://images.unsplash.com/photo-1581578731117-104f2a412727?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-    CATEGORY_PLUMBING: 'https://images.unsplash.com/photo-1504328345606-18bbc8c9d7d1?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-    CATEGORY_ELECTRICAL: 'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-    CATEGORY_PAINTING: 'https://images.unsplash.com/photo-1589939705384-5185137a7f0f?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-    CATEGORY_AC: 'https://images.unsplash.com/photo-1621905252507-b35492cc253e?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-    CATEGORY_APPLIANCE_REPAIR: 'https://images.unsplash.com/photo-1581579188871-45ea61f2a45e?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-    CATEGORY_CARPENTRY: 'https://images.unsplash.com/photo-1622675363311-ac05f3a0c9a3?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-    CATEGORY_BEAUTY: 'https://images.unsplash.com/photo-1560750588-73207b1ef5b8?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-    CATEGORY_PERSONAL_CARE: 'https://images.unsplash.com/photo-1519823551278-64ac92734fb1?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-    CATEGORY_PEST_CONTROL: 'https://images.unsplash.com/photo-1588612140418-47bf20977462?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
+    // Service Categories (user-provided sources)
+    CATEGORY_CLEANING: 'https://tse1.mm.bing.net/th/id/OIP.XTpGpugbZ3NTl6zyT7bAiwHaEU?rs=1&pid=ImgDetMain&o=7&rm=3',
+    CATEGORY_PLUMBING: 'https://tse2.mm.bing.net/th/id/OIP.rrS1D2mztOgAeFiLX3n1LQHaE8?rs=1&pid=ImgDetMain&o=7&rm=3',
+    CATEGORY_ELECTRICAL: 'https://tse4.mm.bing.net/th/id/OIP.m5keiSbkHU176I74w32CNgHaEK?rs=1&pid=ImgDetMain&o=7&rm=3',
+    CATEGORY_PAINTING: 'https://mywallworks.com/wp-content/uploads/2018/08/hiring-a-painter.jpeg',
+    CATEGORY_AC: 'https://tse2.mm.bing.net/th/id/OIP.gl1FGkxb4d_gR-kjT696WwHaE8?rs=1&pid=ImgDetMain&o=7&rm=3',
+    CATEGORY_APPLIANCE_REPAIR: 'https://tse3.mm.bing.net/th/id/OIP.yYxxiSGbU4jXiKI80oPptwHaEK?rs=1&pid=ImgDetMain&o=7&rm=3',
+    CATEGORY_CARPENTRY: 'https://img.freepik.com/premium-photo/carpenter-male-worker-cuts-wood-with-circular-saw-wooden-house-construction-lumber-factory-construction-site_140555-2831.jpg',
+    CATEGORY_BEAUTY: 'https://tse1.mm.bing.net/th/id/OIP.8HRu8PHWwjtSOtPW5nDL8QHaE8?rs=1&pid=ImgDetMain&o=7&rm=3',
+    CATEGORY_PERSONAL_CARE: 'https://tse2.mm.bing.net/th/id/OIP.Qrx1QXzg7piOTIV3gsgFFwHaE8?rs=1&pid=ImgDetMain&o=7&rm=3',
+    CATEGORY_PEST_CONTROL: 'https://tse1.mm.bing.net/th/id/OIP.4l_IZaVck-m5ujyhYVYgrgHaE8?rs=1&pid=ImgDetMain&o=7&rm=3',
     CATEGORY_DEFAULT: 'https://images.unsplash.com/photo-1503387762-592deb58ef4e?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
+
+    // Specific service images
+    SERVICE_WASHING_MACHINE_REPAIR: 'https://tse3.mm.bing.net/th/id/OIP.yYxxiSGbU4jXiKI80oPptwHaEK?rs=1&pid=ImgDetMain&o=7&rm=3',
+    SERVICE_REFRIGERATOR_REPAIR: 'https://tse1.mm.bing.net/th/id/OIP.xBMrb1ZwE-rxQlwDf94QzQHaE8?rs=1&pid=ImgDetMain&o=7&rm=3',
+    SERVICE_MICROWAVE_REPAIR: 'https://tse3.mm.bing.net/th/id/OIP.RP3QKkwSmzub1_BS0GUAMAHaE8?rs=1&pid=ImgDetMain&o=7&rm=3',
+    SERVICE_SALON_WOMEN: 'https://tse1.mm.bing.net/th/id/OIP.8HRu8PHWwjtSOtPW5nDL8QHaE8?rs=1&pid=ImgDetMain&o=7&rm=3',
+    SERVICE_SALON_MEN: 'https://tse1.mm.bing.net/th/id/OIP.lyk2c5Ui0UwQcl3ToY8AqgHaEz?rs=1&pid=ImgDetMain&o=7&rm=3',
+    SERVICE_MASSAGE: 'https://tse2.mm.bing.net/th/id/OIP.Qrx1QXzg7piOTIV3gsgFFwHaE8?rs=1&pid=ImgDetMain&o=7&rm=3',
 
     // User Avatars
     AVATAR_USER_1: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?ixlib=rb-4.0.3&auto=format&fit=crop&w=200&q=80',
@@ -36,12 +43,13 @@ export const IMAGES = {
 export const getServiceImage = (input) => {
     const norm = (typeof input === 'string' ? input : '').toLowerCase();
 
-    // Use dynamic generic images based on keywords if we don't have a specific mapping, 
-    // or fallback to the category mapping above.
-    // For specific service names, we can return a direct unsplash search URL to be more dynamic.
-
-    // NOTE: Direct unsplash source is deprecated. We must rely on our fixed list or a proxy.
-    // Let's improve the matching logic to map specific tasks to our fixed categories better.
+    // Specific service mappings should come before broader category checks.
+    if (norm.includes('washing machine')) return IMAGES.SERVICE_WASHING_MACHINE_REPAIR;
+    if (norm.includes('refrigerator') || norm.includes('fridge') || norm.includes('refrigirator')) return IMAGES.SERVICE_REFRIGERATOR_REPAIR;
+    if (norm.includes('microwave')) return IMAGES.SERVICE_MICROWAVE_REPAIR;
+    if (norm.includes('salon for women')) return IMAGES.SERVICE_SALON_WOMEN;
+    if (norm.includes('salon for men')) return IMAGES.SERVICE_SALON_MEN;
+    if (norm.includes('massage')) return IMAGES.SERVICE_MASSAGE;
 
     // Cleaning services
     if (norm.includes('clean') || norm.includes('maid') || norm.includes('house') || norm.includes('sweep') || norm.includes('mop') || norm.includes('dust') || norm.includes('kitchen') || norm.includes('bathroom')) return IMAGES.CATEGORY_CLEANING;
@@ -65,7 +73,7 @@ export const getServiceImage = (input) => {
     if (norm.includes('carpenter') || norm.includes('wood') || norm.includes('furniture') || norm.includes('door') || norm.includes('drill') || norm.includes('cabinet')) return IMAGES.CATEGORY_CARPENTRY;
 
     // Beauty & personal care services
-    if (norm.includes('beauty') || norm.includes('hair') || norm.includes('facial') || norm.includes('massage') || norm.includes('salon') || norm.includes('spa') || norm.includes('care') || norm.includes('men') || norm.includes('women')) return IMAGES.CATEGORY_PERSONAL_CARE;
+    if (norm.includes('beauty') || norm.includes('hair') || norm.includes('facial') || norm.includes('salon') || norm.includes('spa') || norm.includes('care') || norm.includes('men') || norm.includes('women')) return IMAGES.CATEGORY_PERSONAL_CARE;
 
     // Pest control
     if (norm.includes('pest') || norm.includes('bug') || norm.includes('insect') || norm.includes('termite') || norm.includes('cockroach') || norm.includes('rodent')) return IMAGES.CATEGORY_PEST_CONTROL;
