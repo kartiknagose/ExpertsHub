@@ -50,7 +50,7 @@ const ROLE_CONFIG = {
       'Show dashboard',
       'Show verification queue',
       'Show fraud alerts',
-      'Show ai audits',
+      'Show analytics summary',
     ],
     quickActions: [
       { label: 'Dashboard', prompt: 'Show dashboard' },
@@ -190,7 +190,7 @@ function normalizeAgentTarget(target, role) {
 
   const aliasMap = {
     '/notifications': '/notifications/preferences',
-    '/admin/ai-audits': '/admin/ai-audit',
+    '/admin/fraud-alerts': '/admin/fraud',
     '/wallet': userRole === 'WORKER' ? '/worker/earnings' : '/customer/wallet',
   };
 
@@ -394,11 +394,20 @@ export default function AICommandWidget() {
       const data = await sendAIChatMessage({ message, sessionId });
       applyAiResponse(data, 'I could not generate a response right now.');
     } catch (error) {
+      const rawError = String(error?.response?.data?.error || error?.message || '').toLowerCase();
+      let friendlyError = error?.response?.data?.error || 'Something went wrong. Please try again.';
+
+      if (rawError.includes('authentication service unavailable') || rawError.includes('unauthorized')) {
+        friendlyError = 'Session check failed. Please refresh once and sign in again.';
+      } else if (rawError.includes('timeout') || rawError.includes('econnaborted')) {
+        friendlyError = 'The request timed out. Please try again in a few seconds.';
+      }
+
       setMessages((prev) => [
         ...prev,
         {
           role: 'assistant',
-          text: error?.response?.data?.error || 'Something went wrong. Please try again.',
+          text: friendlyError,
         },
       ]);
     } finally {

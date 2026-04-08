@@ -1227,7 +1227,7 @@ function getBypassResponseMeta(toolName) {
     return {
       title: 'Analytics',
       message: 'Here is the admin analytics summary.',
-      suggestions: ['Open dashboard', 'View AI audits'],
+      suggestions: ['Open dashboard', 'View fraud alerts'],
       target: '/admin/analytics',
     };
   }
@@ -1333,7 +1333,7 @@ function getDynamicSuggestionsForData(toolName, data) {
   }
 
   if (toolName === 'getAdminAnalytics') {
-    return ['Open dashboard', 'View AI audits'];
+    return ['Open dashboard', 'View fraud alerts'];
   }
 
   if (toolName === 'createAdminService' || toolName === 'updateAdminService' || toolName === 'deleteAdminService') {
@@ -1637,7 +1637,6 @@ function normalizeNavigationTarget(rawTarget) {
 
   const aliasMap = {
     '/notifications': '/notifications/preferences',
-    '/admin/ai-audits': '/admin/ai-audit',
     '/wallet': '/customer/wallet',
   };
 
@@ -2985,6 +2984,82 @@ async function handleSingleCommand({ user, message, sessionId, token, locale }) 
 
   if (userRole === 'ADMIN') {
     try {
+      const adminRouteResponse = ({ title, message, target, suggestions = ['Open dashboard', 'View analytics'] }) => ({
+        type: 'data',
+        title,
+        data: null,
+        message,
+        reply: message,
+        suggestions,
+        action: 'navigate',
+        target,
+        sessionId,
+      });
+
+      // Deterministic admin routing for core panel commands.
+      if (/\bdashboard\b/i.test(text)) {
+        return adminRouteResponse({
+          title: 'Admin Dashboard',
+          message: 'Opening admin dashboard.',
+          target: '/admin/dashboard',
+          suggestions: ['View analytics', 'Show fraud alerts'],
+        });
+      }
+
+      if (isAdminVerificationQueueRequest(text)) {
+        return adminRouteResponse({
+          title: 'Verification Queue',
+          message: 'Opening verification review queue.',
+          target: '/admin/verification',
+          suggestions: ['Show pending applications', 'Open users'],
+        });
+      }
+
+      if (/\b(fraud|alerts|fraud alerts?)\b/i.test(text)) {
+        return adminRouteResponse({
+          title: 'Fraud Alerts',
+          message: 'Opening fraud and quality alerts.',
+          target: '/admin/fraud',
+          suggestions: ['Open dashboard', 'Open analytics'],
+        });
+      }
+
+      if (/\busers\b/i.test(text)) {
+        return adminRouteResponse({
+          title: 'User Management',
+          message: 'Opening user management.',
+          target: '/admin/users',
+          suggestions: ['Open workers', 'Open verification'],
+        });
+      }
+
+      if (/\bworkers\b/i.test(text)) {
+        return adminRouteResponse({
+          title: 'Worker Management',
+          message: 'Opening worker management.',
+          target: '/admin/workers',
+          suggestions: ['Open verification', 'Open dashboard'],
+        });
+      }
+
+      if (/\bcoupon(s)?\b/i.test(text)) {
+        return adminRouteResponse({
+          title: 'Coupons',
+          message: 'Opening coupon management.',
+          target: '/admin/coupons',
+          suggestions: ['Create coupon', 'Open analytics'],
+        });
+      }
+
+      if (/\b(ai\s*)?audit(s)?\b/i.test(text)) {
+        return adminRouteResponse({
+          title: 'Admin Analytics',
+          message: 'AI Audit page has been retired. Opening analytics instead.',
+          target: '/admin/analytics',
+          suggestions: ['Open dashboard', 'Show fraud alerts'],
+        });
+      }
+
       if (isAdminPaymentsRequest(text)) {
         const response = await callInternalApi({ method: 'GET', endpoint: '/api/admin/payments', token: authToken });
         return {
@@ -3138,7 +3213,7 @@ async function handleSingleCommand({ user, message, sessionId, token, locale }) 
           message: 'Here are the latest fraud and quality alerts.',
           reply: 'Here are the latest fraud and quality alerts.',
           action: 'navigate',
-          target: '/admin/fraud-alerts',
+          target: '/admin/fraud',
           sessionId,
         };
       }
@@ -3166,7 +3241,7 @@ async function handleSingleCommand({ user, message, sessionId, token, locale }) 
           message: 'Here is the AI audit summary.',
           reply: 'Here is the AI audit summary.',
           action: 'navigate',
-          target: '/admin/ai-audit',
+          target: '/admin/analytics',
           sessionId,
         };
       }
@@ -3180,7 +3255,7 @@ async function handleSingleCommand({ user, message, sessionId, token, locale }) 
           message: 'Here are recent AI audit logs.',
           reply: 'Here are recent AI audit logs.',
           action: 'navigate',
-          target: '/admin/ai-audit',
+          target: '/admin/analytics',
           sessionId,
         };
       }
