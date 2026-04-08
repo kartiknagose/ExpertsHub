@@ -45,6 +45,48 @@ export const getActiveBooking = async () => {
 };
 
 /**
+ * CREATE BOOKING REPORT
+ * @param {Object} data - { bookingId, category, details, evidenceUrl? }
+ */
+export const createBookingReport = async (data) => {
+    const response = await axiosInstance.post('/safety/reports', data);
+    return response.data;
+};
+
+/**
+ * GET MY BOOKING REPORTS
+ * @param {Object} params - optional { bookingId, page, limit }
+ */
+export const getMyBookingReports = async (params = {}) => {
+    const response = await axiosInstance.get('/safety/reports/me', { params });
+    return response.data;
+};
+
+/**
+ * ADMIN: GET BOOKING REPORT SUMMARY
+ */
+export const getBookingReportSummary = async () => {
+    const response = await axiosInstance.get('/safety/reports/summary');
+    return response.data;
+};
+
+/**
+ * ADMIN: GET BOOKING REPORTS
+ */
+export const getBookingReports = async (params = {}) => {
+    const response = await axiosInstance.get('/safety/reports', { params });
+    return response.data;
+};
+
+/**
+ * ADMIN: UPDATE BOOKING REPORT STATUS
+ */
+export const updateBookingReportStatus = async (reportId, data) => {
+    const response = await axiosInstance.patch(`/safety/reports/${reportId}/status`, data);
+    return response.data;
+};
+
+/**
  * ADMIN: GET ALL ACTIVE SOS ALERTS
  */
 export const getActiveSosAlerts = async () => {

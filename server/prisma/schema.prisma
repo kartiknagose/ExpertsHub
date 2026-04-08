@@ -91,6 +91,9 @@ model User {
   messages                       Message[]
   statusChanges                  BookingStatusHistory[]
   aiActionAudits                 AIActionAudit[]
+  bookingReportsSubmitted        BookingReport[]                  @relation("BookingReportsSubmitted")
+  bookingReportsReceived         BookingReport[]                  @relation("BookingReportsReceived")
+  bookingReportsReviewed         BookingReport[]                  @relation("BookingReportsReviewedBy")
   invoices                       Invoice[]                       @relation("CustomerInvoices")
 
   // Business Growth (Sprint 17)
@@ -196,6 +199,30 @@ enum VerificationLevel {
   DOCUMENTS
   VERIFIED
   PREMIUM
+}
+
+enum BookingReportCategory {
+  SAFETY
+  HARASSMENT
+  NO_SHOW
+  PROPERTY_DAMAGE
+  PAYMENT_DISPUTE
+  MISCONDUCT
+  FRAUD
+  OTHER
+}
+
+enum BookingReportStatus {
+  OPEN
+  UNDER_REVIEW
+  RESOLVED
+  DISMISSED
+}
+
+enum BookingReportPriority {
+  LOW
+  MEDIUM
+  HIGH
 }
 
 model WorkerProfile {
@@ -372,6 +399,7 @@ model Booking {
   payments      Payment[]
   photos        BookingPhoto[]
   sosAlerts     SOSAlert[]
+  bookingReports BookingReport[]
   conversation  Conversation?
   sessions      BookingSession[]
   statusHistory BookingStatusHistory[]
@@ -468,6 +496,35 @@ enum SOSStatus {
   ACTIVE
   ACKNOWLEDGED
   RESOLVED
+}
+
+model BookingReport {
+  id             Int                   @id @default(autoincrement())
+  bookingId      Int
+  booking        Booking               @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  reporterId     Int
+  reporter       User                  @relation("BookingReportsSubmitted", fields: [reporterId], references: [id], onDelete: Cascade)
+  reportedUserId Int
+  reportedUser   User                  @relation("BookingReportsReceived", fields: [reportedUserId], references: [id], onDelete: Cascade)
+  reportedRole   Role
+  category       BookingReportCategory
+  status         BookingReportStatus    @default(OPEN)
+  priority       BookingReportPriority  @default(MEDIUM)
+  details        String                @db.Text
+  evidenceUrl    String?
+  adminNotes     String?               @db.Text
+  reviewedById   Int?
+  reviewedBy     User?                 @relation("BookingReportsReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt     DateTime?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  @@index([bookingId])
+  @@index([reporterId])
+  @@index([reportedUserId])
+  @@index([status])
+  @@index([priority])
+  @@index([createdAt])
 }
 
 model Notification {

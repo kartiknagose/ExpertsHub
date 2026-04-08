@@ -74,6 +74,9 @@ export const queryKeys = {
   safety: {
     sosAlerts: () => ['sos-alerts'],
     emergencyContacts: () => ['emergency-contacts'],
+    reports: (bookingId, role) => ['booking-reports', bookingId, role],
+    adminReports: (filters) => ['booking-reports', 'admin', filters],
+    reportSummary: () => ['booking-reports', 'summary'],
   },
 
   // ── Notifications ─────────────────────────────────────────

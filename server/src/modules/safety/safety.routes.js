@@ -1,6 +1,6 @@
 const { Router } = require('express');
 const auth = require('../../middleware/auth');
-const { requireAdmin } = require('../../middleware/requireRole');
+const { requireAdmin, requireCustomerOrWorker } = require('../../middleware/requireRole');
 const validate = require('../../middleware/validation');
 const {
 	triggerSosSchema,
@@ -8,6 +8,9 @@ const {
 	deleteContactSchema,
 	listSosAlertsQuerySchema,
 	updateSosAlertStatusSchema,
+	createBookingReportSchema,
+	listReportsQuerySchema,
+	updateBookingReportStatusSchema,
 } = require('./safety.schemas');
 const safetyController = require('./safety.controller');
 
@@ -24,6 +27,15 @@ router.delete('/contacts/:id', auth, deleteContactSchema, validate, safetyContro
 
 // Get current active booking (for global floating SOS button)
 router.get('/active-booking', auth, safetyController.getActiveBooking);
+
+// Booking reports / complaints
+router.post('/reports', auth, requireCustomerOrWorker, createBookingReportSchema, validate, safetyController.createBookingReport);
+router.get('/reports/me', auth, safetyController.getMyBookingReports);
+
+// Admin report review queue
+router.get('/reports/summary', auth, requireAdmin, safetyController.getBookingReportSummary);
+router.get('/reports', auth, requireAdmin, listReportsQuerySchema, validate, safetyController.getBookingReports);
+router.patch('/reports/:id/status', auth, requireAdmin, updateBookingReportStatusSchema, validate, safetyController.updateBookingReportStatus);
 
 // ─── Admin endpoints ─────────────────────────────────────────────────────────
 router.get('/sos/alerts', auth, requireAdmin, listSosAlertsQuerySchema, validate, safetyController.getActiveSosAlerts);

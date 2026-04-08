@@ -73,6 +73,7 @@ const AdminSOSAlertsPage = lazy(() => import('../pages/admin/AdminSOSAlertsPage.
 const AdminAnalyticsPage = lazy(() => import('../pages/admin/AdminAnalyticsPage.jsx').then(m => ({ default: m.AdminAnalyticsPage })));
 const AdminFraudPage = lazy(() => import('../pages/admin/AdminFraudPage.jsx').then(m => ({ default: m.AdminFraudPage })));
 const AdminCouponsPage = lazy(() => import('../pages/admin/AdminCouponsPage.jsx').then(m => ({ default: m.AdminCouponsPage })));
+const AdminReportsPage = lazy(() => import('../pages/admin/AdminReportsPage.jsx').then(m => ({ default: m.AdminReportsPage })));
 
 function RoutePrefetcher() {
   const { isAuthenticated, user } = useAuth();
@@ -234,6 +235,7 @@ export function AppRoutes() {
         <Route path="/admin/sos-alerts" element={<AdminRoute><AdminSOSAlertsPage /></AdminRoute>} />
         <Route path="/admin/analytics" element={<AdminRoute><AdminAnalyticsPage /></AdminRoute>} />
         <Route path="/admin/fraud" element={<AdminRoute><AdminFraudPage /></AdminRoute>} />
+        <Route path="/admin/reports" element={<AdminRoute><AdminReportsPage /></AdminRoute>} />
         <Route path="/admin/coupons" element={<AdminRoute><AdminCouponsPage /></AdminRoute>} />
 
         {/* 404 - Wildcard */}

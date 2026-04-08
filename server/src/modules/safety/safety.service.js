@@ -1,6 +1,7 @@
 const prisma = require('../../config/prisma');
 const AppError = require('../../common/errors/AppError');
 const { sendEmail } = require('../../common/utils/mailer');
+const { createNotification } = require('../notifications/notification.service');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Email-to-SMS Gateway map (free, no API key needed)
@@ -21,6 +22,163 @@ const SMS_GATEWAYS = {
 
 // Default gateway when carrier is unknown — tries jio (most common in India)
 const DEFAULT_GATEWAY = '@jiomail.com';
+
+const REPORT_CATEGORIES = ['SAFETY', 'HARASSMENT', 'NO_SHOW', 'PROPERTY_DAMAGE', 'PAYMENT_DISPUTE', 'MISCONDUCT', 'FRAUD', 'OTHER'];
+const REPORT_STATUSES = ['OPEN', 'UNDER_REVIEW', 'RESOLVED', 'DISMISSED'];
+const REPORT_PRIORITIES = ['LOW', 'MEDIUM', 'HIGH'];
+
+const bookingReportSelect = {
+    id: true,
+    bookingId: true,
+    reporterId: true,
+    reportedUserId: true,
+    reportedRole: true,
+    category: true,
+    status: true,
+    priority: true,
+    details: true,
+    evidenceUrl: true,
+    adminNotes: true,
+    reviewedById: true,
+    reviewedAt: true,
+    createdAt: true,
+    updatedAt: true,
+    booking: {
+        select: {
+            id: true,
+            status: true,
+            scheduledAt: true,
+            service: { select: { id: true, name: true, category: true } },
+            customer: {
+                select: { id: true, name: true, email: true, mobile: true, profilePhotoUrl: true, role: true },
+            },
+            workerProfile: {
+                select: {
+                    id: true,
+                    userId: true,
+                    user: { select: { id: true, name: true, email: true, mobile: true, profilePhotoUrl: true, role: true } },
+                },
+            },
+        },
+    },
+    reporter: {
+        select: { id: true, name: true, email: true, mobile: true, profilePhotoUrl: true, role: true },
+    },
+    reportedUser: {
+        select: { id: true, name: true, email: true, mobile: true, profilePhotoUrl: true, role: true },
+    },
+    reviewedBy: {
+        select: { id: true, name: true, email: true, role: true },
+    },
+};
+
+function resolveReportPriority(category) {
+    switch (category) {
+        case 'SAFETY':
+        case 'HARASSMENT':
+        case 'FRAUD':
+            return 'HIGH';
+        case 'PROPERTY_DAMAGE':
+        case 'PAYMENT_DISPUTE':
+            return 'MEDIUM';
+        case 'NO_SHOW':
+        case 'MISCONDUCT':
+            return 'MEDIUM';
+        default:
+            return 'LOW';
+    }
+}
+
+function normalizeReportStatus(status) {
+    const normalized = String(status || '').toUpperCase();
+    if (!REPORT_STATUSES.includes(normalized)) {
+        throw new AppError(400, 'Invalid report status.');
+    }
+    return normalized;
+}
+
+function normalizeReportCategory(category) {
+    const normalized = String(category || '').toUpperCase();
+    if (!REPORT_CATEGORIES.includes(normalized)) {
+        throw new AppError(400, 'Invalid report category.');
+    }
+    return normalized;
+}
+
+function normalizeReportPriority(priority) {
+    const normalized = String(priority || '').toUpperCase();
+    if (!REPORT_PRIORITIES.includes(normalized)) {
+        throw new AppError(400, 'Invalid report priority.');
+    }
+    return normalized;
+}
+
+function buildReportWhere(filters = {}) {
+    const where = {};
+
+    if (filters.status) where.status = String(filters.status).toUpperCase();
+    if (filters.category) where.category = String(filters.category).toUpperCase();
+    if (filters.priority) where.priority = normalizeReportPriority(filters.priority);
+    if (filters.bookingId) where.bookingId = Number(filters.bookingId);
+
+    return where;
+}
+
+function emitReportEvent(eventName, payload) {
+    try {
+        const { getIo } = require('../../socket');
+        const io = getIo();
+        if (!io) return;
+        io.to('admin').emit(eventName, payload);
+    } catch (err) {
+        console.warn('[REPORT] Socket emit failed:', err.message);
+    }
+}
+
+async function notifyReportAdmins(report, reporterRole) {
+    try {
+        const admins = await prisma.user.findMany({
+            where: { role: 'ADMIN', isActive: true, deletedAt: null },
+            select: { id: true },
+        });
+
+        await Promise.allSettled(admins.map((admin) => createNotification({
+            userId: admin.id,
+            type: 'BOOKING_REPORT',
+            title: 'New booking report',
+            message: `A ${reporterRole.toLowerCase()} reported ${report.reportedRole.toLowerCase()} for booking #${report.bookingId}.`,
+            data: {
+                bookingId: report.bookingId,
+                reportId: report.id,
+                category: report.category,
+                status: report.status,
+                url: '/admin/reports',
+            },
+        })));
+    } catch (err) {
+        console.warn('[REPORT] Admin notifications failed:', err.message);
+    }
+}
+
+async function notifyReportReporter(report, message, url) {
+    try {
+        await createNotification({
+            userId: report.reporterId,
+            type: 'BOOKING_REPORT',
+            title: 'Report received',
+            message,
+            data: {
+                bookingId: report.bookingId,
+                reportId: report.id,
+                category: report.category,
+                status: report.status,
+                url,
+            },
+        });
+    } catch (err) {
+        console.warn('[REPORT] Reporter notification failed:', err.message);
+    }
+}
 
 /**
  * Send SMS via Email-to-SMS gateway (free)
@@ -323,6 +481,218 @@ async function getActiveBookingForUser(userId) {
     return booking;
 }
 
+async function createBookingReport({ bookingId, reporterId, reporterRole, category, details, evidenceUrl }) {
+    const normalizedCategory = normalizeReportCategory(category);
+    const cleanedDetails = String(details || '').trim();
+    const cleanedEvidenceUrl = evidenceUrl ? String(evidenceUrl).trim() : null;
+
+    if (cleanedDetails.length < 20) {
+        throw new AppError(400, 'Report details must be at least 20 characters long.');
+    }
+
+    const booking = await prisma.booking.findUnique({
+        where: { id: bookingId },
+        select: {
+            id: true,
+            status: true,
+            customerId: true,
+            customer: { select: { id: true, name: true, email: true, mobile: true, profilePhotoUrl: true, role: true } },
+            workerProfile: {
+                select: {
+                    id: true,
+                    userId: true,
+                    user: { select: { id: true, name: true, email: true, mobile: true, profilePhotoUrl: true, role: true } },
+                },
+            },
+            service: { select: { id: true, name: true } },
+        },
+    });
+
+    if (!booking) {
+        throw new AppError(404, 'Booking not found.');
+    }
+
+    if (!booking.workerProfile?.userId) {
+        throw new AppError(409, 'This booking does not have a professional assigned yet.');
+    }
+
+    const reporterRoleUpper = String(reporterRole || '').toUpperCase();
+    const reportTarget = reporterRoleUpper === 'CUSTOMER'
+        ? { reportedUserId: booking.workerProfile.userId, reportedRole: 'WORKER' }
+        : reporterRoleUpper === 'WORKER'
+            ? { reportedUserId: booking.customerId, reportedRole: 'CUSTOMER' }
+            : null;
+
+    if (reporterRoleUpper === 'CUSTOMER') {
+        if (Number(booking.customerId) !== Number(reporterId)) {
+            throw new AppError(403, 'You can only report bookings that belong to you.');
+        }
+    } else if (reporterRoleUpper === 'WORKER') {
+        if (Number(booking.workerProfile.userId) !== Number(reporterId)) {
+            throw new AppError(403, 'You can only report bookings assigned to you.');
+        }
+    } else {
+        throw new AppError(403, 'Only customers and workers can file booking reports.');
+    }
+
+    if (!reportTarget) {
+        throw new AppError(403, 'Only customers and workers can file booking reports.');
+    }
+
+    const existingOpenReport = await prisma.bookingReport.findFirst({
+        where: {
+            bookingId,
+            reporterId,
+            status: { in: ['OPEN', 'UNDER_REVIEW'] },
+        },
+        select: { id: true, status: true },
+    });
+
+    if (existingOpenReport) {
+        throw new AppError(409, 'You already have an open report for this booking.');
+    }
+
+    const report = await prisma.bookingReport.create({
+        data: {
+            bookingId,
+            reporterId,
+            reportedUserId: reportTarget.reportedUserId,
+            reportedRole: reportTarget.reportedRole,
+            category: normalizedCategory,
+            priority: resolveReportPriority(normalizedCategory),
+            details: cleanedDetails,
+            evidenceUrl: cleanedEvidenceUrl,
+        },
+        select: bookingReportSelect,
+    });
+
+    await Promise.allSettled([
+        notifyReportAdmins(report, reporterRoleUpper.toLowerCase()),
+        notifyReportReporter(
+            report,
+            'We received your report and the safety team will review it shortly.',
+            reporterRoleUpper === 'CUSTOMER' ? `/customer/bookings/${bookingId}` : `/worker/bookings/${bookingId}`,
+        ),
+    ]);
+
+    emitReportEvent('reports:created', {
+        reportId: report.id,
+        bookingId: report.bookingId,
+        category: report.category,
+        status: report.status,
+        priority: report.priority,
+    });
+
+    return report;
+}
+
+async function getMyBookingReports(userId, { bookingId, skip = 0, limit = 20 } = {}) {
+    const where = {
+        reporterId: userId,
+        ...(bookingId ? { bookingId } : {}),
+    };
+
+    const [data, total] = await Promise.all([
+        prisma.bookingReport.findMany({
+            where,
+            orderBy: { createdAt: 'desc' },
+            skip,
+            take: limit,
+            select: bookingReportSelect,
+        }),
+        prisma.bookingReport.count({ where }),
+    ]);
+
+    return { data, total };
+}
+
+async function getAdminBookingReports(filters = {}, { skip = 0, limit = 20 } = {}) {
+    const where = buildReportWhere(filters);
+
+    const [data, total] = await Promise.all([
+        prisma.bookingReport.findMany({
+            where,
+            orderBy: { createdAt: 'desc' },
+            skip,
+            take: limit,
+            select: bookingReportSelect,
+        }),
+        prisma.bookingReport.count({ where }),
+    ]);
+
+    return { data, total };
+}
+
+async function getBookingReportSummary() {
+    const [total, open, underReview, resolved, dismissed, urgent, byCategory] = await Promise.all([
+        prisma.bookingReport.count(),
+        prisma.bookingReport.count({ where: { status: 'OPEN' } }),
+        prisma.bookingReport.count({ where: { status: 'UNDER_REVIEW' } }),
+        prisma.bookingReport.count({ where: { status: 'RESOLVED' } }),
+        prisma.bookingReport.count({ where: { status: 'DISMISSED' } }),
+        prisma.bookingReport.count({ where: { priority: 'HIGH' } }),
+        prisma.bookingReport.groupBy({
+            by: ['category'],
+            _count: { category: true },
+        }),
+    ]);
+
+    return {
+        total,
+        open,
+        underReview,
+        resolved,
+        dismissed,
+        urgent,
+        byCategory: byCategory.reduce((acc, entry) => {
+            acc[entry.category] = entry._count.category;
+            return acc;
+        }, {}),
+    };
+}
+
+async function updateBookingReportStatus({ reportId, adminId, status, adminNotes }) {
+    const normalizedStatus = normalizeReportStatus(status);
+    const report = await prisma.bookingReport.findUnique({
+        where: { id: reportId },
+        select: bookingReportSelect,
+    });
+
+    if (!report) {
+        throw new AppError(404, 'Report not found.');
+    }
+
+    const updated = await prisma.bookingReport.update({
+        where: { id: reportId },
+        data: {
+            status: normalizedStatus,
+            adminNotes: adminNotes ? String(adminNotes).trim() : report.adminNotes,
+            reviewedById: adminId,
+            reviewedAt: new Date(),
+        },
+        select: bookingReportSelect,
+    });
+
+    await Promise.allSettled([
+        notifyReportReporter(
+            updated,
+            `Your report for booking #${updated.bookingId} is now ${updated.status.toLowerCase().replace(/_/g, ' ')}.`,
+            updated.booking?.customer?.id === updated.reporterId
+                ? `/customer/bookings/${updated.bookingId}`
+                : `/worker/bookings/${updated.bookingId}`,
+        ),
+    ]);
+
+    emitReportEvent('reports:updated', {
+        reportId: updated.id,
+        bookingId: updated.bookingId,
+        status: updated.status,
+        priority: updated.priority,
+    });
+
+    return updated;
+}
+
 module.exports = {
     triggerSOS,
     addEmergencyContact,
@@ -331,4 +701,9 @@ module.exports = {
     getActiveSosAlerts,
     updateSosAlertStatus,
     getActiveBookingForUser,
+    createBookingReport,
+    getMyBookingReports,
+    getAdminBookingReports,
+    getBookingReportSummary,
+    updateBookingReportStatus,
 };

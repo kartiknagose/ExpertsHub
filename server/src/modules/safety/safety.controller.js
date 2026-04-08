@@ -53,6 +53,71 @@ const getActiveBooking = asyncHandler(async (req, res) => {
     res.status(200).json({ booking });
 });
 
+const createBookingReport = asyncHandler(async (req, res) => {
+    const { bookingId, category, details, evidenceUrl } = req.body;
+    const report = await safetyService.createBookingReport({
+        bookingId: parseId(bookingId, 'Booking ID'),
+        reporterId: req.user.id,
+        reporterRole: req.user.role,
+        category,
+        details,
+        evidenceUrl,
+    });
+
+    res.status(201).json({
+        message: 'Report submitted successfully',
+        report,
+    });
+});
+
+const getMyBookingReports = asyncHandler(async (req, res) => {
+    const { page, limit, skip } = parsePagination(req.query);
+    const bookingId = req.query.bookingId ? parseId(req.query.bookingId, 'Booking ID') : undefined;
+    const { data: reports, total } = await safetyService.getMyBookingReports(req.user.id, { bookingId, skip, limit });
+
+    res.status(200).json({
+        reports,
+        pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    });
+});
+
+const getBookingReports = asyncHandler(async (req, res) => {
+    const { page, limit, skip } = parsePagination(req.query);
+    const filters = {
+        status: req.query.status,
+        category: req.query.category,
+        priority: req.query.priority,
+        bookingId: req.query.bookingId,
+    };
+    const { data: reports, total } = await safetyService.getAdminBookingReports(filters, { skip, limit });
+
+    res.status(200).json({
+        reports,
+        pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    });
+});
+
+const getBookingReportSummary = asyncHandler(async (_req, res) => {
+    const summary = await safetyService.getBookingReportSummary();
+    res.status(200).json({ summary });
+});
+
+const updateBookingReportStatus = asyncHandler(async (req, res) => {
+    const reportId = parseId(req.params.id, 'Report ID');
+    const { status, adminNotes } = req.body;
+    const report = await safetyService.updateBookingReportStatus({
+        reportId,
+        adminId: req.user.id,
+        status,
+        adminNotes,
+    });
+
+    res.status(200).json({
+        message: 'Report updated successfully',
+        report,
+    });
+});
+
 module.exports = {
     triggerSOS,
     getContacts,
@@ -61,4 +126,9 @@ module.exports = {
     getActiveSosAlerts,
     updateSosAlertStatus,
     getActiveBooking,
+    createBookingReport,
+    getMyBookingReports,
+    getBookingReports,
+    getBookingReportSummary,
+    updateBookingReportStatus,
 };

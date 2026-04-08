@@ -3,6 +3,7 @@ import { User, Phone, Mail, MessageCircle } from 'lucide-react';
 import { Card, Button, Badge } from '../../../components/common';
 import { resolveProfilePhotoUrl } from '../../../utils/profilePhoto';
 import { ChatToggle } from '../../../components/features/chat/ChatWindow';
+import { BookingReportCard } from '../../../components/features/safety/BookingReportCard';
 
 export function WorkerContactSidebar({ booking, isOnline, toggleOnline, isUpdating }) {
     const { t } = useTranslation();
@@ -145,6 +146,12 @@ export function WorkerContactSidebar({ booking, isOnline, toggleOnline, isUpdati
                         <p className="text-2xs leading-tight text-gray-500">{t('Confirm the job to see client contact details.')}</p>
                     </div>
                 )}
+
+                <BookingReportCard
+                    booking={booking}
+                    reporterRole="WORKER"
+                    className="mt-4"
+                />
             </div>
         </Card>
     );

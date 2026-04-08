@@ -51,7 +51,7 @@ async function createNotification({ userId, type, title, message, data }) {
                 icon: '/pwa-192x192.png',
                 badge: '/pwa-64x64.png',
                 tag: `${type}-${notification.id}`,
-                data: { url: getNotificationUrl(type, data), ...(data || {}) },
+                data: { url: data?.url || getNotificationUrl(type, data), ...(data || {}) },
             }).catch(() => {}); // fire-and-forget — don't block the main flow
         }
     } catch (error) {
@@ -69,6 +69,8 @@ function getNotificationUrl(type, data) {
     switch (type) {
         case 'BOOKING_UPDATE':
             return data.bookingId ? `/bookings/${data.bookingId}` : '/dashboard';
+        case 'BOOKING_REPORT':
+            return data.bookingId ? `/bookings/${data.bookingId}` : '/admin/reports';
         case 'REVIEW_RECEIVED':
             return '/reviews';
         case 'PAYMENT':
