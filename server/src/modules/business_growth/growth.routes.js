@@ -17,7 +17,6 @@ const {
 	subscribeProPlusSchema,
 	purchaseGiftCardSchema,
 	redeemGiftCardSchema,
-	giftCardCodeParamSchema,
 } = require('./growth.schemas');
 const {
 	walletTopupCreateLimiter,
