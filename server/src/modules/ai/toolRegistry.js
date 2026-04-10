@@ -359,6 +359,14 @@ const TOOL_REGISTRY = {
     requiredParams: ['workerId'],
     allowedRoles: ['AUTHENTICATED'],
   },
+  getCustomerProfile: {
+    name: 'getCustomerProfile',
+    description: 'Get the authenticated customer profile details.',
+    method: 'GET',
+    endpoint: '/api/customers/profile',
+    requiredParams: [],
+    allowedRoles: ['CUSTOMER'],
+  },
   updateCustomerProfile: {
     name: 'updateCustomerProfile',
     description: 'Create or update the authenticated customer profile.',

@@ -113,7 +113,6 @@ async function registerUser({ name, email, mobile, password, role = 'CUSTOMER', 
 
 async function loginUser({ email, password }) {
   const normalizedEmail = String(email || '').trim().toLowerCase();
-  const requireEmailVerification = String(process.env.REQUIRE_EMAIL_VERIFICATION || '').toLowerCase() === 'true';
 
   const user = await findUserForLogin(normalizedEmail);
   if (!user || user.deletedAt) throw new AppError(401, 'Invalid credentials');
@@ -133,9 +132,6 @@ async function loginUser({ email, password }) {
   }
 
   if (!ok) throw new AppError(401, 'Invalid credentials');
-  if (requireEmailVerification && user.emailVerified === false && process.env.NODE_ENV !== 'development') {
-    throw new AppError(403, 'Email not verified. Please check your inbox.');
-  }
   if (user.isActive === false) throw new AppError(403, 'Account suspended. Please contact support.');
 
   const tokenVersion = await getTokenVersion(user.id);

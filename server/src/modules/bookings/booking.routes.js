@@ -7,6 +7,7 @@ const router = express.Router();
 
 // Import middleware
 const authenticate = require('../../middleware/auth');
+const requireVerifiedEmail = require('../../middleware/requireVerifiedEmail');
 const validate = require('../../middleware/validation');
 const { bookingLimiter, otpLimiter } = require('../../config/rateLimit');
 const { requireWorker, requireCustomerOrWorker } = require('../../middleware/requireRole');
@@ -47,6 +48,7 @@ router.post(
 router.post(
   '/',
   authenticate,
+  requireVerifiedEmail,
   requireCustomerOrWorker,
   bookingLimiter,
   createBookingSchema,
@@ -109,6 +111,7 @@ router.patch(
 router.post(
   '/:id/pay',
   authenticate,
+  requireVerifiedEmail,
   requireCustomerOrWorker,
   payBookingSchema,
   validate,
@@ -121,6 +124,7 @@ router.post(
 router.post(
   '/:id/accept',
   authenticate,
+  requireVerifiedEmail,
   requireWorker,
   bookingController.acceptBooking
 );
@@ -128,6 +132,7 @@ router.post(
 router.post(
   '/:id/reject',
   authenticate,
+  requireVerifiedEmail,
   requireWorker,
   rejectBookingSchema,
   validate,
@@ -140,6 +145,7 @@ router.post(
 router.post(
   '/:id/start',
   authenticate,
+  requireVerifiedEmail,
   requireWorker,
   otpLimiter,
   bookingOtpSchema,
@@ -153,6 +159,7 @@ router.post(
 router.post(
   '/:id/complete',
   authenticate,
+  requireVerifiedEmail,
   requireWorker,
   otpLimiter,
   bookingOtpSchema,
@@ -166,6 +173,7 @@ router.post(
 router.post(
   '/:id/otp/refresh',
   authenticate,
+  requireVerifiedEmail,
   requireWorker,
   otpLimiter,
   refreshOtpSchema,
@@ -190,6 +198,7 @@ router.get(
 router.post(
   '/:id/sessions',
   authenticate,
+  requireVerifiedEmail,
   requireWorker,
   createSessionSchema,
   validate,
@@ -202,6 +211,7 @@ router.post(
 router.post(
   '/:id/sessions/:sessionId/start',
   authenticate,
+  requireVerifiedEmail,
   requireWorker,
   otpLimiter,
   startSessionSchema,
@@ -215,6 +225,7 @@ router.post(
 router.post(
   '/:id/sessions/:sessionId/end',
   authenticate,
+  requireVerifiedEmail,
   requireWorker,
   bookingController.endSession
 );

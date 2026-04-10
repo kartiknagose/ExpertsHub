@@ -20,6 +20,8 @@ const PROMPTS = {
     'cancel my latest booking',
     'show wallet',
     'show notifications',
+    'mark all my notifications as read',
+    'show my customer profile details',
     'open my profile',
     'help me understand pending payments'
   ],

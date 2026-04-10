@@ -11,6 +11,7 @@ import { AuthLayout } from '../../components/layout/AuthLayout';
 import { Button } from '../../components/common';
 import { FormField } from '../../components/common/forms';
 import { useAuth } from '../../hooks/useAuth';
+import { resendVerificationEmail } from '../../api/auth';
 import { toastSuccess, toastErrorFromResponse } from '../../utils/notifications';
 import { IMAGES } from '../../constants/images';
 import { usePageTitle } from '../../hooks/usePageTitle';
@@ -27,13 +28,34 @@ export function LoginPage() {
   const location  = useLocation();
   const { email: defaultEmail, message: successMessage } = location.state || {};
   const [serverError, setServerError] = useState('');
+  const [isResending, setIsResending] = useState(false);
 
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm({
+  const { register, handleSubmit, getValues, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(loginSchema),
     mode: 'onBlur',
     reValidateMode: 'onChange',
     defaultValues: { email: defaultEmail || '' },
   });
+
+  const verificationBlocked = /verify your email|email not verified/i.test(serverError || authError || '');
+
+  const handleResendVerification = async () => {
+    const email = String(getValues('email') || '').trim();
+    if (!email) {
+      toastErrorFromResponse({ message: 'Enter your email address first.' });
+      return;
+    }
+
+    try {
+      setIsResending(true);
+      const result = await resendVerificationEmail({ email });
+      toastSuccess(result.message || 'Verification email sent. Check your inbox.');
+    } catch (error) {
+      toastErrorFromResponse(error, 'Failed to resend verification email');
+    } finally {
+      setIsResending(false);
+    }
+  };
 
   const onSubmit = async (data) => {
     setServerError('');
@@ -126,7 +148,25 @@ export function LoginPage() {
             animate={{ opacity: 1, y: 0 }}
             className="p-4 rounded-2xl bg-error-50 dark:bg-error-500/10 border border-error-200 dark:border-error-500/30 text-sm font-medium text-error-700 dark:text-error-400"
           >
-            {serverError || authError}
+            <div className="space-y-3">
+              <p>{serverError || authError}</p>
+              {verificationBlocked && (
+                <div className="rounded-xl border border-error-200/70 bg-white/70 p-3 text-xs text-error-700 dark:border-error-500/30 dark:bg-dark-900/50 dark:text-error-300">
+                  <p className="font-semibold">Your account is not verified yet.</p>
+                  <p className="mt-1 opacity-90">Use the button below to send a new verification email, then open the link from your inbox.</p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleResendVerification}
+                    loading={isResending}
+                    className="mt-3 h-9 rounded-xl font-bold"
+                  >
+                    Resend verification email
+                  </Button>
+                </div>
+              )}
+            </div>
           </Motion.div>
         )}
 

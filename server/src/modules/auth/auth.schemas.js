@@ -46,6 +46,10 @@ const forgotPasswordSchema = [
   body('email').trim().normalizeEmail().isEmail().withMessage('Valid email required'),
 ];
 
+const resendVerificationSchema = [
+  body('email').trim().normalizeEmail().isEmail().withMessage('Valid email required'),
+];
+
 const resetPasswordSchema = [
   body('token').trim().isLength({ min: 32, max: 256 }).withMessage('Reset token required'),
   body('password')
@@ -68,6 +72,7 @@ module.exports = {
   loginSchema,
   verifyEmailSchema,
   forgotPasswordSchema,
+  resendVerificationSchema,
   resetPasswordSchema,
   changePasswordSchema,
 };

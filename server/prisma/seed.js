@@ -85,53 +85,103 @@ async function main() {
     }
     console.log('✅ 15+ Services across 4 categories populated.');
 
-    // 3. Create TEST WORKER (Fully Verified)
-    const workerEmail = 'worker@test.com';
-    const worker = await prisma.user.upsert({
-        where: { email: workerEmail },
-        update: {
-            passwordHash: hashedPassword,
-            emailVerified: true,
-            isProfileComplete: true,
-        },
-        create: {
-            name: 'John Expert',
-            email: workerEmail,
-            passwordHash: hashedPassword,
-            mobile: '9876543210',
-            role: 'WORKER',
-            emailVerified: true,
-            isProfileComplete: true,
-            workerProfile: {
-                create: {
-                    skills: ['Plumbing Repair', 'AC Service & Repair'],
-                    bio: 'Top-rated professional with 10 years of experience in maintenance.',
-                    isVerified: true,
-                    rating: 4.8,
-                    totalReviews: 24,
-                }
-            }
-        },
-        include: { workerProfile: true }
-    });
-
-    // Link services to worker
     const plumbingSvc = await prisma.service.findUnique({ where: { name: 'Plumbing Repair' } });
     const acSvc = await prisma.service.findUnique({ where: { name: 'AC Service & Repair' } });
 
-    if (worker.workerProfile) {
-        await prisma.workerService.upsert({
-            where: { workerId_serviceId: { workerId: worker.workerProfile.id, serviceId: plumbingSvc.id } },
-            update: {},
-            create: { workerId: worker.workerProfile.id, serviceId: plumbingSvc.id }
+    const verifiedWorkers = [
+        {
+            name: 'John Expert',
+            email: 'worker@test.com',
+            mobile: '9876543210',
+            hourlyRate: 650,
+            rating: 4.8,
+            totalReviews: 24,
+            bio: 'Top-rated professional with 10 years of experience in maintenance.',
+        },
+        {
+            name: 'Rahul Fixer',
+            email: 'worker2@test.com',
+            mobile: '9876543211',
+            hourlyRate: 520,
+            rating: 4.6,
+            totalReviews: 18,
+            bio: 'Verified technician with strong plumbing and AC service experience.',
+        },
+        {
+            name: 'Amit Pro',
+            email: 'worker3@test.com',
+            mobile: '9876543212',
+            hourlyRate: 470,
+            rating: 4.7,
+            totalReviews: 20,
+            bio: 'Reliable maintenance expert focused on fast response and quality work.',
+        },
+    ];
+
+    for (const workerInfo of verifiedWorkers) {
+        const worker = await prisma.user.upsert({
+            where: { email: workerInfo.email },
+            update: {
+                name: workerInfo.name,
+                passwordHash: hashedPassword,
+                mobile: workerInfo.mobile,
+                emailVerified: true,
+                isProfileComplete: true,
+            },
+            create: {
+                name: workerInfo.name,
+                email: workerInfo.email,
+                passwordHash: hashedPassword,
+                mobile: workerInfo.mobile,
+                role: 'WORKER',
+                emailVerified: true,
+                isProfileComplete: true,
+                workerProfile: {
+                    create: {
+                        skills: ['Plumbing Repair', 'AC Service & Repair'],
+                        bio: workerInfo.bio,
+                        isVerified: true,
+                        isProbation: false,
+                        verificationLevel: 'VERIFIED',
+                        rating: workerInfo.rating,
+                        totalReviews: workerInfo.totalReviews,
+                        hourlyRate: workerInfo.hourlyRate,
+                    }
+                }
+            },
+            include: { workerProfile: true }
         });
-        await prisma.workerService.upsert({
-            where: { workerId_serviceId: { workerId: worker.workerProfile.id, serviceId: acSvc.id } },
-            update: {},
-            create: { workerId: worker.workerProfile.id, serviceId: acSvc.id }
-        });
+
+        if (worker.workerProfile) {
+            await prisma.workerService.upsert({
+                where: { workerId_serviceId: { workerId: worker.workerProfile.id, serviceId: plumbingSvc.id } },
+                update: {},
+                create: { workerId: worker.workerProfile.id, serviceId: plumbingSvc.id }
+            });
+            await prisma.workerService.upsert({
+                where: { workerId_serviceId: { workerId: worker.workerProfile.id, serviceId: acSvc.id } },
+                update: {},
+                create: { workerId: worker.workerProfile.id, serviceId: acSvc.id }
+            });
+
+            await prisma.workerLocation.upsert({
+                where: { workerProfileId: worker.workerProfile.id },
+                update: {
+                    latitude: 19.076,
+                    longitude: 72.8777,
+                    isOnline: true,
+                },
+                create: {
+                    workerProfileId: worker.workerProfile.id,
+                    latitude: 19.076,
+                    longitude: 72.8777,
+                    isOnline: true,
+                },
+            });
+        }
+
+        console.log(`✅ Verified Worker created: ${workerInfo.email} (Password: password123)`);
     }
-    console.log('✅ Verified Worker created: worker@test.com (Password: password123)');
 
     // 4. Create TEST CUSTOMER
     const customerEmail = 'customer@test.com';

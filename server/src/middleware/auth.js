@@ -18,6 +18,7 @@ module.exports = async (req, res, next) => {
   const bearerMatch = authHeader.match(/^Bearer\s+(.+)$/i);
   const bearerToken = bearerMatch ? bearerMatch[1].trim() : '';
   const token = cookieToken || bearerToken;
+  let user;
 
   if (!token) return res.status(401).json({ error: 'Authentication required', statusCode: 401 });
 
@@ -27,9 +28,9 @@ module.exports = async (req, res, next) => {
   }
 
   try {
-    const user = await prisma.user.findUnique({
+    user = await prisma.user.findUnique({
       where: { id: payload.id },
-      select: { isActive: true, deletedAt: true },
+      select: { isActive: true, deletedAt: true, emailVerified: true },
     });
 
     if (!user || user.deletedAt || !user.isActive) {
@@ -52,6 +53,6 @@ module.exports = async (req, res, next) => {
 
   // Attach the authenticated user's payload to the request so downstream
   // handlers and authorization middleware can reference `req.user`.
-  req.user = payload; // e.g., { id, role }
+  req.user = { ...payload, emailVerified: Boolean(user?.emailVerified) }; // e.g., { id, role, emailVerified }
   next();
 };

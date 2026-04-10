@@ -12,7 +12,7 @@ function isSchemaDriftError(error) {
 }
 
 const isProduction = process.env.NODE_ENV === 'production';
-const requireEmailVerification = String(process.env.REQUIRE_EMAIL_VERIFICATION || '').toLowerCase() === 'true';
+const requireEmailVerification = String(process.env.REQUIRE_EMAIL_VERIFICATION ?? 'true').toLowerCase() !== 'false';
 const smtpSendTimeoutMs = Number(process.env.SMTP_SEND_TIMEOUT_MS || 20000);
 const normalizeSameSite = (value) => {
   const normalized = String(value || '').trim().toLowerCase();
@@ -216,6 +216,7 @@ exports.login = asyncHandler(async (req, res) => {
       email: user.email,
       role: user.role,
       profilePhotoUrl: user.profilePhotoUrl || null,
+      emailVerified: user.emailVerified || false,
       isProfileComplete: user.isProfileComplete,
       isVerified: user.isVerified || false, // For workers
     },
@@ -280,6 +281,50 @@ exports.verifyEmail = asyncHandler(async (req, res) => {
   const { token } = req.query;
   const result = await verifyEmailToken({ token });
   res.json({ message: 'Email verified successfully', ...result });
+});
+
+exports.resendVerification = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+
+  const user = await prisma.user.findUnique({
+    where: { email: normalizedEmail },
+    select: { id: true, email: true, emailVerified: true },
+  });
+
+  const message = 'If an account exists and is not verified, a new verification email has been sent.';
+
+  if (!user || user.emailVerified) {
+    return res.json({ message });
+  }
+
+  const baseUrl = resolveFrontendBaseUrl(req);
+  const { generateEmailVerificationToken } = require('../../common/utils/tokenGenerator');
+  const { token, expiresAt } = generateEmailVerificationToken();
+  const verificationLink = `${baseUrl}/verify-email?token=${encodeURIComponent(token)}`;
+
+  await prisma.$transaction(async (tx) => {
+    await tx.emailVerification.deleteMany({
+      where: { userId: user.id, verified: false },
+    });
+
+    await tx.emailVerification.create({
+      data: {
+        userId: user.id,
+        email: user.email,
+        token,
+        expiresAt,
+      },
+    });
+  });
+
+  await sendVerificationEmail({ to: user.email, link: verificationLink });
+
+  if (process.env.NODE_ENV === 'development') {
+    console.log('DEV ONLY - Resent Verification Link:', verificationLink);
+  }
+
+  res.json({ message });
 });
 
 exports.forgotPassword = asyncHandler(async (req, res) => {

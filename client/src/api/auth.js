@@ -8,6 +8,7 @@ const AUTH_ENDPOINTS = {
   REGISTER_CUSTOMER: '/auth/register',
   REGISTER_WORKER: '/auth/register-worker',
   LOGIN: '/auth/login',
+  RESEND_VERIFICATION: '/auth/resend-verification',
   LOGOUT: '/auth/logout',
   GET_ME: '/auth/me',
   VERIFY_EMAIL: '/auth/verify-email',
@@ -93,6 +94,17 @@ export const login = async (credentials) => {
     () => axiosInstance.post(AUTH_ENDPOINTS.LOGIN, credentials),
     1
   );
+  return response.data;
+};
+
+/**
+ * Resend verification email for an unverified account.
+ * @param {Object} data
+ * @param {string} data.email
+ * @returns {Promise}
+ */
+export const resendVerificationEmail = async (data) => {
+  const response = await axiosInstance.post(AUTH_ENDPOINTS.RESEND_VERIFICATION, data);
   return response.data;
 };
 

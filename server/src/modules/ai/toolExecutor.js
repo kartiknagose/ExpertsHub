@@ -9,6 +9,7 @@ const READ_TOOL_CACHEABLE_TOOLS = new Set([
   'getWallet',
   'getBookings',
   'getNotifications',
+  'getCustomerProfile',
   'getEmergencyContacts',
   'getVerificationStatus',
 ]);

@@ -574,7 +574,9 @@ export default function AICommandWidget() {
     }
   };
 
-  const floatingOffsetClass = activeBooking ? 'bottom-40 lg:bottom-28' : 'bottom-5';
+  const floatingOffsetClass = activeBooking ? 'bottom-28 lg:bottom-24' : 'bottom-5';
+  const floatingRightClass = 'right-20 sm:right-24 lg:right-28';
+  const floatingPanelStyle = { maxHeight: 'calc(100dvh - 7rem)' };
 
   return (
     <>
@@ -614,7 +616,7 @@ export default function AICommandWidget() {
                 <button
                   type="button"
                   onClick={() => setOpen(false)}
-                  className="rounded-md p-1 text-white/85 transition hover:bg-white/15 hover:text-white"
+                  className={`fixed ${floatingOffsetClass} ${floatingRightClass} z-[70] inline-flex items-center gap-2 rounded-full bg-gradient-to-r ${roleConfig.accentClass} px-4 py-3 text-sm font-semibold text-white shadow-xl transition hover:brightness-110`}
                   aria-label="Close AI assistant"
                 >
                   <X size={16} />
@@ -622,7 +624,10 @@ export default function AICommandWidget() {
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-2">
+                <div
+                  className={`fixed ${floatingOffsetClass} ${floatingRightClass} z-[70] flex h-[620px] w-[420px] max-w-[calc(100vw-6rem)] flex-col overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-2xl dark:border-zinc-700 dark:bg-zinc-900`}
+                  style={floatingPanelStyle}
+                >
               {roleConfig.quickActions.map((actionItem) => (
                 <button
                   key={actionItem.label}

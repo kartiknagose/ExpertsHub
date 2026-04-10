@@ -38,10 +38,20 @@ const conversationMemoryStore = new Map();
 
 const intentPatterns = {
   wallet: ['wallet', 'balance', 'money', 'amount', 'remaining', 'funds', 'transaction', 'transactions', 'history', 'statement', 'payment', 'payments', 'due'],
-  bookings: ['booking', 'bookings', 'orders', 'services', 'jobs', 'appointments'],
+  bookings: ['booking', 'bookings', 'orders', 'services', 'jobs', 'appointments', 'appointment', 'upcoming', 'past', 'active', 'status', 'placed'],
   notifications: ['notifications', 'alerts', 'updates', 'messages'],
   payouts: ['payout', 'payouts', 'redeem', 'withdraw', 'bank details', 'upi'],
 };
+
+const bookingStrongIntentPatterns = [
+  /\bbooking(?:s)?\b/i,
+  /\bappointment(?:s)?\b/i,
+  /\b(?:upcoming|past|active|latest|recent)\b.*\bbooking(?:s)?\b/i,
+  /\bbooking(?:s)?\b.*\b(?:history|status)\b/i,
+  /\border(?:s)?\b.*\b(?:placed|history|status)\b/i,
+];
+
+const walletStrongIntentPattern = /\b(wallet|balance|transaction|transactions|top[-\s]?up|redeem|payment|payments|due)\b/i;
 
 const intentToolMap = {
   wallet: 'getWallet',
@@ -49,14 +59,76 @@ const intentToolMap = {
   notifications: 'getNotifications',
 };
 
-const serviceMap = {
-  plumber: 'plumbing',
-  ac: 'ac repair',
-  cleaning: 'cleaning',
-  electrician: 'electrician',
-  electric: 'electrician',
-  electrical: 'electrician',
-};
+const serviceAliasMatchers = [
+  {
+    serviceName: 'plumbing repair',
+    patterns: [
+      /\bplumb(?:er|ing)?\b/i,
+      /\bleak(?:ing)?\b.*\b(sink|tap|pipe|faucet|drain)\b/i,
+    ],
+  },
+  {
+    serviceName: 'electrical wiring',
+    patterns: [
+      /\belectric(?:ian|al)?\b/i,
+      /\bwiring\b/i,
+    ],
+  },
+  {
+    serviceName: 'ac service & repair',
+    patterns: [
+      /\b(?:ac|air\s*conditioner|aircon)\b/i,
+      /\bac\s*repair\b/i,
+      /\bac\s*service\b/i,
+      /\bcooling\b/i,
+    ],
+  },
+  {
+    serviceName: 'washing machine repair',
+    patterns: [
+      /\bwashing\s*machine\b/i,
+      /\bwasher\b/i,
+      /\blaundry\s*machine\b/i,
+    ],
+  },
+  {
+    serviceName: 'carpenter works',
+    patterns: [
+      /\bcarpent(?:er|ry)\b/i,
+      /\bwood\s*work\b/i,
+      /\bwooden\s*repair\b/i,
+    ],
+  },
+  {
+    serviceName: 'pest control',
+    patterns: [
+      /\bpest\s*control\b/i,
+      /\bpest\b/i,
+      /\btermite\b/i,
+      /\bcockroach\b/i,
+    ],
+  },
+  {
+    serviceName: 'deep home cleaning',
+    patterns: [
+      /\bdeep\s*clean(?:ing)?\b/i,
+      /\bhome\s*clean(?:ing)?\b/i,
+      /\bclean(?:ing|er)?\b/i,
+      /\bhouse\s*clean(?:ing)?\b/i,
+    ],
+  },
+  {
+    serviceName: 'salon for women',
+    patterns: [
+      /\bsalon\b/i,
+      /\bbeauty\b/i,
+      /\bmakeup\b/i,
+      /\bspa\b/i,
+      /\bhair\s*stylist\b/i,
+      /\bhaircut\b/i,
+    ],
+  },
+];
 
 function createSessionId() {
   return crypto.randomUUID();
@@ -329,7 +401,7 @@ function inferIntentFromTool(toolName) {
   if (toolName === 'getEmergencyContacts' || toolName === 'addEmergencyContact' || toolName === 'deleteEmergencyContact' || toolName === 'triggerSos') return 'safety';
   if (toolName === 'listWorkers' || toolName === 'searchWorkers' || toolName === 'getTopWorkers' || toolName === 'getWorkerDetails' || toolName === 'getServiceWorkers') return 'workers';
   if (toolName === 'listServices' || toolName === 'getServiceWorkers') return 'services';
-  if (toolName === 'updateCustomerProfile' || toolName === 'updateWorkerProfile') return 'profile';
+  if (toolName === 'getCustomerProfile' || toolName === 'updateCustomerProfile' || toolName === 'updateWorkerProfile') return 'profile';
   if (toolName === 'listAvailability' || toolName === 'addAvailability' || toolName === 'removeAvailability') return 'availability';
   if (
     toolName === 'getVerificationStatus'
@@ -370,7 +442,10 @@ function splitCommands(message) {
 }
 
 function isCancelRequest(message) {
-  return /\bcancel\b/i.test(String(message || ''));
+  const text = String(message || '');
+  if (/\bcancel\b/i.test(text)) return true;
+  return /\b(stop|abort|delete|drop)\b/i.test(text)
+    && /\b(booking|bookings|appointment|appointments|order|orders)\b/i.test(text);
 }
 
 function hasContextReference(message) {
@@ -460,6 +535,21 @@ function detectIntent(message) {
     }
   }
 
+  const hasBookingStrongSignal = bookingStrongIntentPatterns.some((pattern) => pattern.test(text));
+  const hasWalletStrongSignal = walletStrongIntentPattern.test(text);
+
+  if (hasBookingStrongSignal) {
+    scores.bookings += 0.8;
+  }
+
+  if (hasWalletStrongSignal) {
+    scores.wallet += 0.5;
+  }
+
+  if (hasBookingStrongSignal && !hasWalletStrongSignal) {
+    scores.wallet = Math.max(0, scores.wallet - 0.25);
+  }
+
   const entries = Object.entries(scores).sort((a, b) => b[1] - a[1]);
   const [bestIntent, bestScore] = entries[0] || [null, 0];
 
@@ -500,10 +590,10 @@ function extractParams(message) {
 }
 
 function detectService(message) {
-  const text = normalizeText(message).toLowerCase();
-  for (const [keyword, serviceName] of Object.entries(serviceMap)) {
-    if (text.includes(keyword)) {
-      return serviceName;
+  const text = normalizeText(message);
+  for (const matcher of serviceAliasMatchers) {
+    if (matcher.patterns.some((pattern) => pattern.test(text))) {
+      return matcher.serviceName;
     }
   }
   return null;
@@ -518,7 +608,16 @@ function isBookingRequest(message) {
 }
 
 function isRescheduleRequest(message) {
-  return /\b(reschedule|change time)\b/i.test(String(message || ''));
+  const text = String(message || '');
+  if (/\breschedule\b/i.test(text)) return true;
+  return /\b(change|move|shift|postpone|update)\b/i.test(text)
+    && /\b(time|date|slot|booking|appointment|order)\b/i.test(text);
+}
+
+function isBookingDetailsRequest(message) {
+  const text = String(message || '');
+  if (!/\b(booking|appointment|order)\b/i.test(text)) return false;
+  return /\b(detail|details|status|info|information|open|view|check|show|tell me about)\b/i.test(text);
 }
 
 function isPartialBookingHint(message) {
@@ -669,8 +768,10 @@ function extractRating(message) {
 }
 
 function isPayBookingRequest(message) {
-  return /\b(pay|payment|settle)\b/i.test(String(message || ''))
-    && /\b(booking|bill|due|amount)\b/i.test(String(message || ''));
+  const text = String(message || '');
+  const hasPayVerb = /\b(pay|payment|settle|process|complete|clear)\b/i.test(text);
+  const hasPaymentObject = /\b(booking|bookings|appointment|appointments|order|orders|bill|due|amount)\b/i.test(text);
+  return hasPayVerb && hasPaymentObject;
 }
 
 function isOpenJobsRequest(message) {
@@ -873,12 +974,17 @@ async function callInternalApi({ method, endpoint, token, body = null }) {
   };
 
   if (normalizedMethod === 'GET') {
-    const cached = getCachedResponse(normalizedMethod, endpoint);
-    if (cached !== null) {
-      return { data: cached };
+    const shouldBypassCache = /^\/api\/services\/[^/]+\/workers$/i.test(String(endpoint || ''));
+    if (!shouldBypassCache) {
+      const cached = getCachedResponse(normalizedMethod, endpoint);
+      if (cached !== null) {
+        return { data: cached };
+      }
     }
     const response = await axios.get(url, config);
-    setCachedResponse(normalizedMethod, endpoint, response?.data ?? null);
+    if (!shouldBypassCache) {
+      setCachedResponse(normalizedMethod, endpoint, response?.data ?? null);
+    }
     return response;
   }
   if (normalizedMethod === 'POST') {
@@ -1187,12 +1293,30 @@ function getBypassResponseMeta(toolName) {
     };
   }
 
+  if (toolName === 'markNotificationsRead') {
+    return {
+      title: 'Notifications Updated',
+      message: 'Marked your notifications as read.',
+      suggestions: ['Show notifications'],
+      target: '/notifications/preferences',
+    };
+  }
+
   if (toolName === 'getChatConversations') {
     return {
       title: 'Messages',
       message: 'Here are your conversations.',
       suggestions: ['Open messages', 'Browse services'],
       target: '/messages',
+    };
+  }
+
+  if (toolName === 'getCustomerProfile') {
+    return {
+      title: 'Your Profile',
+      message: 'Here are your customer profile details.',
+      suggestions: ['Update my profile address'],
+      target: '/customer/profile',
     };
   }
 
@@ -1308,8 +1432,16 @@ function getDynamicSuggestionsForData(toolName, data) {
     return ['Mark all as read'];
   }
 
+  if (toolName === 'markNotificationsRead') {
+    return ['Show notifications'];
+  }
+
   if (toolName === 'getChatConversations') {
     return ['Open messages', 'Browse services'];
+  }
+
+  if (toolName === 'getCustomerProfile') {
+    return ['Update my profile address'];
   }
 
   if (toolName === 'getFavorites' || toolName === 'toggleFavorite') {
@@ -1486,8 +1618,17 @@ function buildWalletTransactionsMessage(raw) {
 }
 
 function isViewTransactionsRequest(message) {
-  return /\b(view|show|see|check)\b.*\b(transaction|transactions|history|statement)\b/i.test(String(message || ''))
-    || /\b(transaction|transactions|history|statement)\b/i.test(String(message || ''));
+  const text = String(message || '');
+  const hasTxnTerms = /\b(transaction|transactions|history|statement)\b/i.test(text);
+  const hasWalletContext = /\b(wallet|balance|funds|money|top\s?up|redeem)\b/i.test(text);
+  const hasBookingContext = /\b(booking|bookings|appointment|appointments|order|orders|service)\b/i.test(text);
+
+  if (hasBookingContext && !hasWalletContext) {
+    return false;
+  }
+
+  return /\b(view|show|see|check)\b.*\b(transaction|transactions|history|statement)\b/i.test(text)
+    || (hasTxnTerms && hasWalletContext);
 }
 
 function isAddMoneyRequest(message) {
@@ -1498,6 +1639,12 @@ function isAddMoneyRequest(message) {
 function isPendingPaymentsRequest(message) {
   return /\b(pending|due|unpaid)\b.*\b(payment|payments|amount|bill|bills)\b/i.test(String(message || ''))
     || /\b(payment|payments|amount|bill|bills)\b.*\b(pending|due|unpaid)\b/i.test(String(message || ''));
+}
+
+function isMarkAllNotificationsReadRequest(message) {
+  const text = String(message || '');
+  return /\b(mark|set)\b.*\b(all|every)\b.*\b(notification|notifications|alerts)\b.*\b(read)\b/i.test(text)
+    || /\b(read)\b.*\b(all|every)\b.*\b(notification|notifications|alerts)\b/i.test(text);
 }
 
 function isProfileNavigationRequest(message) {
@@ -1555,20 +1702,30 @@ function formatConversationalResponse(data = {}) {
       : (bestReviews > 0 ? `${bestReviews} reviews` : 'strong reviews');
 
     if (bestName && cheapName && cheapPrice !== null && cheapPrice !== undefined) {
-      return `I found a great option - ${bestName} has a ${bestRating.toFixed(1)}⭐ rating and ${trust}. If budget matters, ${cheapName} is the most affordable at ${formatPrice(cheapPrice)}.`;
+      return [
+        'I found a great option -',
+        `${bestName} has a ${bestRating.toFixed(1)}⭐ rating and ${trust}.`,
+        'If budget matters,',
+        `${cheapName} is the most affordable at ${formatPrice(cheapPrice)}.`,
+      ].join('\n');
     }
 
     return data.fallbackMessage || 'I found a few good options for you.';
   }
 
   if (data.type === 'booking_summary') {
-    const parts = [];
-    if (data.serviceName) parts.push(data.serviceName);
-    if (data.scheduledAt) parts.push(`at ${data.scheduledAt}`);
-    if (data.workerName) parts.push(`with ${data.workerName}`);
-    if (data.price !== null && data.price !== undefined) parts.push(`for ${formatPrice(data.price)}`);
-    const detail = parts.length > 0 ? `You're booking ${parts.join(' ')}.` : 'You are about to place this booking.';
-    return `${detail}${data.trustSignal ? ` ${data.trustSignal}` : ''}`.trim();
+    const lines = [];
+    if (data.serviceName) {
+      lines.push(`Booking ${data.serviceName}`);
+    } else {
+      lines.push('You are about to place this booking.');
+    }
+    if (data.scheduledAt) lines.push(`When: ${data.scheduledAt}`);
+    if (data.workerName) lines.push(`Worker: ${data.workerName}`);
+    if (data.price !== null && data.price !== undefined) lines.push(`Price: ${formatPrice(data.price)}`);
+    if (data.trustSignal) lines.push(data.trustSignal);
+    lines.push('Confirm?');
+    return lines.join('\n');
   }
 
   if (data.type === 'wallet') {
@@ -1576,7 +1733,7 @@ function formatConversationalResponse(data = {}) {
     const wallet = raw?.wallet || raw?.data?.wallet || raw || {};
     const balance = wallet?.balance ?? wallet?.walletBalance ?? wallet?.availableBalance ?? wallet?.amount ?? null;
     if (balance !== null && balance !== undefined && Number.isFinite(Number(balance))) {
-      return `Your wallet balance is ${formatPrice(balance)}.`;
+      return ['Wallet balance', `${formatPrice(balance)}`].join('\n');
     }
     return data.fallbackMessage || "Here's your wallet summary.";
   }
@@ -1762,6 +1919,26 @@ function buildWorkerRecommendationMessage(workerMetadata) {
     cheapestWorkerPrice: workerMetadata.cheapestWorkerPrice,
     fallbackMessage: 'I found a few workers you can choose from.',
   });
+}
+
+function buildWorkerOptionsMessage(workers = []) {
+  if (!Array.isArray(workers) || workers.length === 0) {
+    return 'I found a few workers you can choose from.';
+  }
+
+  const lines = workers.slice(0, 3).map((worker, index) => {
+    const name = String(worker?.name || 'Worker').trim();
+    const rating = Number(worker?.rating || 0);
+    const ratingText = Number.isFinite(rating) && rating > 0 ? `${rating.toFixed(1)}⭐` : 'rating n/a';
+    const priceText = formatPrice(worker?.price || worker?.hourlyRate);
+    return `${index + 1}. ${name} - ${ratingText}${priceText !== 'N/A' ? ` - ${priceText}/hr` : ''}`;
+  });
+
+  return [
+    '-------------------------------------------------------',
+    ...lines,
+    'Reply 1, 2, or 3 or the name of the worker to choose a worker.',
+  ].join('\n');
 }
 
 function buildBookingTrustSignal({ selectedWorkerId, bestWorkerId, cheapestWorkerId, workerMetadata }) {
@@ -2064,16 +2241,17 @@ async function handleSingleCommand({ user, message, sessionId, token, locale }) 
   ) {
     context.pendingBooking.workerId = null;
     const recommendationMsg = buildWorkerRecommendationMessage(context.workerMetadata);
+    const optionsMsg = buildWorkerOptionsMessage(context.lastWorkerOptions);
     const msg = recommendationMsg
-      ? `${recommendationMsg}. Choose a different worker.`
-      : 'Choose a different worker.';
+      ? `${recommendationMsg}. Choose a different worker.\n\n${optionsMsg}`
+      : optionsMsg;
     return {
       type: 'data',
       title: 'Available Workers',
       data: context.lastWorkerOptions,
       message: msg,
       reply: msg,
-      suggestions: ['Book best worker', 'Book cheapest worker'],
+      suggestions: context.lastWorkerOptions.slice(0, 3).map((worker, index) => `Book worker ${index + 1}`),
       sessionId,
     };
   }
@@ -2135,6 +2313,31 @@ async function handleSingleCommand({ user, message, sessionId, token, locale }) 
       target: userRole === 'WORKER' ? '/worker/earnings' : '/customer/wallet',
       sessionId,
     };
+  }
+
+  if ((userRole === 'CUSTOMER' || userRole === 'WORKER') && isMarkAllNotificationsReadRequest(text)) {
+    const markReadResult = await executeTool({
+      toolName: 'markNotificationsRead',
+      params: {},
+      userContext: {
+        userId: user.id,
+        role: user.role,
+        token: authToken,
+      },
+    });
+
+    if (!markReadResult.success) {
+      return toTextResponse({
+        sessionId,
+        message: FAILSAFE_MESSAGE,
+      });
+    }
+
+    return buildBypassDataResponse({
+      sessionId,
+      toolName: 'markNotificationsRead',
+      data: markReadResult.data,
+    });
   }
 
   if (isChatConversationsRequest(text)) {
@@ -2235,6 +2438,17 @@ async function handleSingleCommand({ user, message, sessionId, token, locale }) 
     }
 
     if (!payParams.bookingId) {
+      const isLikelySingleCurrentBookingReference = /\b(latest|recent|current|pending)\b/i.test(text)
+        || /\b(?:my|the)\s+(?:booking|appointment|order)\b/i.test(text);
+      if (isLikelySingleCurrentBookingReference) {
+        const latest = await resolveLatestBookingId({ user, token: authToken });
+        if (latest.success && latest.bookingId) {
+          payParams.bookingId = latest.bookingId;
+        }
+      }
+    }
+
+    if (!payParams.bookingId) {
       return toTextResponse({
         sessionId,
         message: 'Please share the booking id to pay. Example: pay booking 42.',
@@ -2267,9 +2481,17 @@ async function handleSingleCommand({ user, message, sessionId, token, locale }) 
         sessionId,
       };
     } catch (_error) {
+      const detail = String(
+        _error?.response?.data?.error
+        || _error?.response?.data?.message
+        || ''
+      ).trim();
+      const message = detail
+        ? `I could not start payment for booking #${payParams.bookingId}. ${detail}`
+        : `I could not start payment for booking #${payParams.bookingId} right now.`;
       return toTextResponse({
         sessionId,
-        message: 'I could not start that payment right now. Please try again from your bookings page.',
+        message: `${message} Please try another booking id or open your bookings page.`,
       });
     }
   }
@@ -3432,7 +3654,11 @@ async function handleSingleCommand({ user, message, sessionId, token, locale }) 
 
     // Discover workers when none selected yet.
     if (!pendingBooking.workerId) {
-      if (!Array.isArray(context.availableWorkers) || context.availableWorkers.length === 0) {
+      const bookingSessionChanged = String(context.pendingBookingSessionId || '') !== String(sessionId);
+      const serviceChanged = pendingBooking.serviceId && String(context.pendingBooking?.serviceId || '') !== String(pendingBooking.serviceId);
+      const shouldRefreshWorkers = bookingSessionChanged || serviceChanged || !Array.isArray(context.availableWorkers) || context.availableWorkers.length === 0;
+
+      if (shouldRefreshWorkers) {
         try {
           const workerData = await fetchTopWorkersForService({
             serviceId: pendingBooking.serviceId,
@@ -3476,9 +3702,11 @@ async function handleSingleCommand({ user, message, sessionId, token, locale }) 
       } else if (context.availableWorkers.length > 0) {
         // Build recommendation message with best and cheapest info
         const recommendationMsg = buildWorkerRecommendationMessage(context.workerMetadata);
+        const optionsMsg = buildWorkerOptionsMessage(context.availableWorkers);
         const message = recommendationMsg
-          ? `${recommendationMsg} Choose a worker to continue.`
-          : 'I found a few workers. Choose one to continue booking.';
+          ? `${recommendationMsg}\n\n${optionsMsg}`
+          : optionsMsg;
+        const suggestions = context.availableWorkers.slice(0, 3).map((worker, index) => `Book worker ${index + 1}`);
         
         return {
           type: 'data',
@@ -3486,7 +3714,7 @@ async function handleSingleCommand({ user, message, sessionId, token, locale }) 
           data: context.availableWorkers,
           message,
           reply: message,
-          suggestions: ['Book best worker', 'Book cheapest worker'],
+          suggestions: suggestions.length > 0 ? suggestions : ['Book best worker', 'Book cheapest worker'],
           sessionId,
         };
       }
@@ -3636,6 +3864,17 @@ async function handleSingleCommand({ user, message, sessionId, token, locale }) 
     }
 
     if (!rescheduleParams.bookingId) {
+      const isLikelySingleCurrentBookingReference = /\b(latest|recent|current)\b/i.test(text)
+        || /\b(?:my|the)\s+(?:booking|appointment|order)\b/i.test(text);
+      if (isLikelySingleCurrentBookingReference) {
+        const latest = await resolveLatestBookingId({ user, token: authToken });
+        if (latest.success && latest.bookingId) {
+          rescheduleParams.bookingId = latest.bookingId;
+        }
+      }
+    }
+
+    if (!rescheduleParams.bookingId) {
       return toTextResponse({
         sessionId,
         message: 'Please share the booking id to reschedule.',
@@ -3669,9 +3908,17 @@ async function handleSingleCommand({ user, message, sessionId, token, locale }) 
         sessionId,
       };
     } catch (_error) {
+      const detail = String(
+        _error?.response?.data?.error
+        || _error?.response?.data?.message
+        || ''
+      ).trim();
+      const humanMessage = detail
+        ? `I could not reschedule booking #${rescheduleParams.bookingId}. ${detail}`
+        : `I could not reschedule booking #${rescheduleParams.bookingId}. It may already be completed or cancelled.`;
       return toTextResponse({
         sessionId,
-        message: FAILSAFE_MESSAGE,
+        message: `${humanMessage} Please share another booking id or say reschedule latest booking to 6 PM tomorrow.`,
       });
     }
   }
@@ -3689,6 +3936,17 @@ async function handleSingleCommand({ user, message, sessionId, token, locale }) 
       const latest = await resolveLatestBookingId({ user, token: authToken });
       if (latest.success && latest.bookingId) {
         cancelParams.bookingId = latest.bookingId;
+      }
+    }
+
+    if (!cancelParams.bookingId) {
+      const isLikelySingleCurrentBookingReference = /\b(latest|recent|current)\b/i.test(text)
+        || /\b(?:my|the)\s+(?:booking|appointment|order)\b/i.test(text);
+      if (isLikelySingleCurrentBookingReference) {
+        const latest = await resolveLatestBookingId({ user, token: authToken });
+        if (latest.success && latest.bookingId) {
+          cancelParams.bookingId = latest.bookingId;
+        }
       }
     }
 
@@ -3729,6 +3987,65 @@ async function handleSingleCommand({ user, message, sessionId, token, locale }) 
         bookingId,
       },
     });
+  }
+
+  if (isBookingDetailsRequest(text)) {
+    if (!hasRoleAccessToTool(user.role, 'getBookingById')) {
+      return toTextResponse({
+        sessionId,
+        message: 'This action is not allowed for your role.',
+      });
+    }
+
+    const detailsParams = { ...paramsWithContext };
+    if (!detailsParams.bookingId && detailsParams.latestBooking) {
+      const latest = await resolveLatestBookingId({ user, token: authToken });
+      if (latest.success && latest.bookingId) {
+        detailsParams.bookingId = latest.bookingId;
+      }
+    }
+
+    if (!detailsParams.bookingId) {
+      return toTextResponse({
+        sessionId,
+        message: 'Please share the booking id, or say show my latest booking details.',
+      });
+    }
+
+    const bookingResult = await executeTool({
+      toolName: 'getBookingById',
+      params: { bookingId: detailsParams.bookingId },
+      userContext: {
+        userId: user.id,
+        role: user.role,
+        token: authToken,
+      },
+    });
+
+    if (!bookingResult.success) {
+      return toTextResponse({
+        sessionId,
+        message: `I could not fetch booking #${detailsParams.bookingId}. Please confirm the booking id and try again.`,
+      });
+    }
+
+    const numeric = Number.parseInt(String(detailsParams.bookingId), 10);
+    if (Number.isFinite(numeric)) {
+      context.lastBookingId = numeric;
+    }
+    context.lastIntent = 'bookings';
+
+    return {
+      type: 'data',
+      title: 'Booking Details',
+      data: bookingResult.data,
+      message: `Here are the details for booking #${detailsParams.bookingId}.`,
+      reply: `Here are the details for booking #${detailsParams.bookingId}.`,
+      suggestions: ['Cancel this booking', 'Reschedule this booking', 'Show my bookings'],
+      action: 'navigate',
+      target: '/bookings',
+      sessionId,
+    };
   }
 
   if (detected.intent === 'bookings' && extracted.latestBooking) {
@@ -3773,7 +4090,10 @@ async function handleSingleCommand({ user, message, sessionId, token, locale }) 
     });
   }
 
-  if (detected.intent && detected.score >= 1) {
+  const bypassIntentWithLowerThreshold = ['wallet', 'notifications', 'bookings'].includes(detected.intent)
+    && detected.score >= 0.15;
+
+  if (detected.intent && (detected.score >= 1 || bypassIntentWithLowerThreshold)) {
     const toolName = intentToolMap[detected.intent];
     if (!hasRoleAccessToTool(user.role, toolName)) {
       return toTextResponse({
