@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bot, Download, Loader2, MessageSquare, Mic, Send, Square, X } from 'lucide-react';
-import { sendAIChatMessage, sendAIVoiceTranscript } from '../../../api/ai';
+import { Bot, Download, Loader2, MessageSquare, Send, X } from 'lucide-react';
+import { sendAIChatMessage } from '../../../api/ai';
 import { useSOS } from '../../../context/SOSContext';
 import { useAuth } from '../../../hooks/useAuth';
 
@@ -163,7 +163,7 @@ function MessageBubble({ role, text }) {
           'max-w-[88%] rounded-2xl px-3.5 py-2.5 text-sm break-words',
           isUser
             ? 'bg-sky-600 text-white shadow-md shadow-sky-600/20'
-            : 'border border-zinc-200 bg-zinc-50 text-zinc-900 shadow-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100',
+            : 'border border-white/10 bg-white/8 text-white shadow-sm shadow-black/20',
         ].join(' ')}
       >
         {isUser ? text : <AssistantMessageContent text={text} />}
@@ -206,9 +206,6 @@ export default function AICommandWidget() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [sessionId, setSessionId] = useState(null);
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordingSeconds, setRecordingSeconds] = useState(0);
-  const [isProcessingVoice, setIsProcessingVoice] = useState(false);
   const [pendingConfirmation, setPendingConfirmation] = useState(null);
   const [messages, setMessages] = useState([
     {
@@ -219,9 +216,6 @@ export default function AICommandWidget() {
   const [suggestions, setSuggestions] = useState(getStarterSuggestions(user?.role));
   const messagesContainerRef = useRef(null);
   const messagesEndRef = useRef(null);
-  const recordingTimerRef = useRef(null);
-  const recognitionRef = useRef(null);
-  const voiceTranscriptRef = useRef('');
 
   const exportChat = () => {
     try {
@@ -319,27 +313,6 @@ export default function AICommandWidget() {
     scrollToLatest();
   }, [open, messages, loading]);
 
-  useEffect(() => () => {
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.abort();
-      } catch {
-        // Best-effort cleanup.
-      }
-      recognitionRef.current = null;
-    }
-    if (recordingTimerRef.current) {
-      clearInterval(recordingTimerRef.current);
-      recordingTimerRef.current = null;
-    }
-  }, []);
-
-  const formatDuration = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-  };
-
   const applyAiResponse = (data, fallbackMessage) => {
     if (data?.sessionId && !sessionId) {
       setSessionId(data.sessionId);
@@ -422,161 +395,12 @@ export default function AICommandWidget() {
     setPendingConfirmation(null);
   };
 
-  const startVoiceRecording = async () => {
-    if (loading || isRecording) return;
-
-    const isLocalHost = ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
-    if (!window.isSecureContext && !isLocalHost) {
-      appendAssistantMessage('Voice input requires HTTPS. Open the app on an HTTPS URL and try again.');
-      return;
-    }
-
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      appendAssistantMessage('Voice transcription is not supported in this browser. Try Chrome or Edge, or type your command.');
-      return;
-    }
-
-    if (navigator.permissions?.query) {
-      try {
-        const permissionStatus = await navigator.permissions.query({ name: 'microphone' });
-        if (permissionStatus.state === 'denied') {
-          appendAssistantMessage('Microphone access is blocked in browser settings. Allow mic for this site and reload once.');
-          return;
-        }
-      } catch {
-        // Some browsers do not support querying microphone permission state.
-      }
-    }
-
-    try {
-      const recognition = new SpeechRecognition();
-      recognition.lang = navigator.language || 'en-IN';
-      recognition.continuous = false;
-      recognition.interimResults = true;
-      recognition.maxAlternatives = 1;
-
-      recognitionRef.current = recognition;
-      voiceTranscriptRef.current = '';
-
-      recognition.onresult = (event) => {
-        const transcript = Array.from(event.results)
-          .slice(event.resultIndex)
-          .map((result) => result?.[0]?.transcript || '')
-          .join(' ')
-          .trim();
-
-        if (transcript) {
-          voiceTranscriptRef.current = `${voiceTranscriptRef.current} ${transcript}`.trim();
-        }
-      };
-
-      recognition.onerror = (event) => {
-        if (recordingTimerRef.current) {
-          clearInterval(recordingTimerRef.current);
-          recordingTimerRef.current = null;
-        }
-
-        recognitionRef.current = null;
-        setIsRecording(false);
-        setIsProcessingVoice(false);
-
-        const errorName = String(event?.error || '');
-        if (errorName === 'not-allowed' || errorName === 'service-not-allowed') {
-          appendAssistantMessage('Microphone access was denied. Allow microphone for this site in browser permissions and try again.');
-          return;
-        }
-
-        if (errorName === 'no-speech') {
-          appendAssistantMessage('I did not catch anything. Try speaking again, or type your command.');
-          return;
-        }
-
-        appendAssistantMessage('Voice transcription failed. Please try again or use text command.');
-      };
-
-      recognition.onend = async () => {
-        if (recordingTimerRef.current) {
-          clearInterval(recordingTimerRef.current);
-          recordingTimerRef.current = null;
-        }
-
-        const transcript = String(voiceTranscriptRef.current || '').trim();
-        recognitionRef.current = null;
-        setIsRecording(false);
-
-        if (!transcript) {
-          setIsProcessingVoice(false);
-          appendAssistantMessage('I could not hear a clear command. Please try again.');
-          return;
-        }
-
-        setLoading(true);
-        try {
-          const data = await sendAIVoiceTranscript({ transcript, sessionId, locale: navigator.language || 'en-IN' });
-          applyAiResponse(data, 'I could not process your voice command right now.');
-        } catch (error) {
-          try {
-            const fallbackData = await sendAIChatMessage({ message: transcript, sessionId });
-            applyAiResponse(fallbackData, 'I could not process your voice command right now.');
-          } catch (fallbackError) {
-            appendAssistantMessage(fallbackError?.response?.data?.error || error?.response?.data?.error || 'Voice command failed. Please try again.');
-          }
-        } finally {
-          setLoading(false);
-          setIsProcessingVoice(false);
-          voiceTranscriptRef.current = '';
-        }
-      };
-
-      recognition.start();
-      setIsRecording(true);
-      setRecordingSeconds(0);
-      setIsProcessingVoice(false);
-      appendAssistantMessage('Listening... Tap stop when you are done speaking.');
-      recordingTimerRef.current = setInterval(() => {
-        setRecordingSeconds((prev) => prev + 1);
-      }, 1000);
-    } catch (error) {
-      const errorName = String(error?.name || '');
-      if (errorName === 'NotAllowedError' || errorName === 'PermissionDeniedError') {
-        appendAssistantMessage('Microphone access was denied. Allow microphone for this site in browser permissions and reload.');
-        return;
-      }
-
-      if (errorName === 'NotFoundError' || errorName === 'DevicesNotFoundError') {
-        appendAssistantMessage('No microphone was found on this device. Connect a microphone and try again.');
-        return;
-      }
-
-      if (errorName === 'NotReadableError' || errorName === 'TrackStartError') {
-        appendAssistantMessage('Microphone is currently busy in another app/tab. Close other apps using mic and try again.');
-        return;
-      }
-
-      if (errorName === 'SecurityError') {
-        appendAssistantMessage('Voice recording is blocked due to browser security context. Use HTTPS and reload.');
-        return;
-      }
-
-      appendAssistantMessage('Unable to start voice transcription. Please retry or use text command.');
-    }
+  const floatingOffsetClass = activeBooking ? 'bottom-24 lg:bottom-10' : 'bottom-5';
+  const floatingRightClass = activeBooking ? 'right-5 lg:right-8' : 'right-5';
+  const floatingPanelStyle = {
+    width: 'min(24rem, calc(100vw - 1rem))',
+    height: 'min(34rem, calc(100dvh - 6.5rem))',
   };
-
-  const stopVoiceRecording = () => {
-    if (!recognitionRef.current) return;
-    setIsProcessingVoice(true);
-    try {
-      recognitionRef.current.stop();
-    } catch {
-      setIsProcessingVoice(false);
-      setIsRecording(false);
-    }
-  };
-
-  const floatingOffsetClass = activeBooking ? 'bottom-28 lg:bottom-24' : 'bottom-5';
-  const floatingRightClass = 'right-20 sm:right-24 lg:right-28';
-  const floatingPanelStyle = { maxHeight: 'calc(100dvh - 7rem)' };
 
   return (
     <>
@@ -584,7 +408,7 @@ export default function AICommandWidget() {
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className={`fixed ${floatingOffsetClass} right-5 z-[70] inline-flex items-center gap-2 rounded-full bg-gradient-to-r ${roleConfig.accentClass} px-4 py-3 text-sm font-semibold text-white shadow-xl transition hover:brightness-110`}
+          className={`fixed ${floatingOffsetClass} ${floatingRightClass} z-[70] inline-flex items-center gap-2 rounded-full bg-gradient-to-r ${roleConfig.accentClass} px-4 py-3 text-sm font-semibold text-white shadow-xl transition hover:brightness-110`}
           aria-label="Open AI assistant"
         >
           <Bot size={16} />
@@ -593,21 +417,32 @@ export default function AICommandWidget() {
       )}
 
       {open && (
-        <div className={`fixed ${floatingOffsetClass} right-5 z-[70] flex h-[620px] w-[420px] max-w-[calc(100vw-1.5rem)] flex-col overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-2xl dark:border-zinc-700 dark:bg-zinc-900`}>
-          <div className={`bg-gradient-to-r ${roleConfig.accentClass} p-4 text-white`}>
-            <div className="mb-3 flex items-start justify-between">
-              <div className="flex items-center gap-2">
-                <MessageSquare size={16} className="opacity-90" />
-                <div>
-                  <p className="text-sm font-semibold">{roleConfig.assistantName}</p>
-                  <p className="text-[11px] font-medium opacity-90">{roleConfig.roleLabel} Mode</p>
+        <div
+          className={`fixed ${floatingOffsetClass} ${floatingRightClass} z-[70] flex flex-col overflow-hidden rounded-3xl border border-zinc-200 bg-zinc-950/95 shadow-2xl shadow-black/40 backdrop-blur-xl dark:border-zinc-700 dark:bg-zinc-950/95`}
+          style={floatingPanelStyle}
+        >
+          <div className={`bg-gradient-to-r ${roleConfig.accentClass} px-4 py-4 text-white shadow-lg shadow-black/10`}>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/15">
+                    <MessageSquare size={16} className="opacity-95" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold">{roleConfig.assistantName}</p>
+                    <p className="text-[11px] font-medium uppercase tracking-[0.16em] opacity-80">{roleConfig.roleLabel} Mode</p>
+                  </div>
                 </div>
+                <p className="mt-2 max-w-[18rem] text-xs leading-relaxed text-white/80">
+                  Ask for bookings, payout status, wallet actions, or worker tools.
+                </p>
               </div>
+
               <div className="flex items-center gap-1">
                 <button
                   type="button"
                   onClick={exportChat}
-                  className="rounded-md p-1 text-white/85 transition hover:bg-white/15 hover:text-white"
+                  className="rounded-xl p-2 text-white/85 transition hover:bg-white/15 hover:text-white"
                   aria-label="Export chat"
                   title="Export chat"
                 >
@@ -616,7 +451,7 @@ export default function AICommandWidget() {
                 <button
                   type="button"
                   onClick={() => setOpen(false)}
-                  className={`fixed ${floatingOffsetClass} ${floatingRightClass} z-[70] inline-flex items-center gap-2 rounded-full bg-gradient-to-r ${roleConfig.accentClass} px-4 py-3 text-sm font-semibold text-white shadow-xl transition hover:brightness-110`}
+                  className="rounded-xl p-2 text-white/85 transition hover:bg-white/15 hover:text-white"
                   aria-label="Close AI assistant"
                 >
                   <X size={16} />
@@ -624,16 +459,13 @@ export default function AICommandWidget() {
               </div>
             </div>
 
-                <div
-                  className={`fixed ${floatingOffsetClass} ${floatingRightClass} z-[70] flex h-[620px] w-[420px] max-w-[calc(100vw-6rem)] flex-col overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-2xl dark:border-zinc-700 dark:bg-zinc-900`}
-                  style={floatingPanelStyle}
-                >
+            <div className="mt-3 flex flex-wrap gap-2">
               {roleConfig.quickActions.map((actionItem) => (
                 <button
                   key={actionItem.label}
                   type="button"
                   onClick={() => sendMessage(actionItem.prompt)}
-                  className="rounded-full border border-white/40 bg-white/10 px-2.5 py-1 text-[11px] font-medium transition hover:bg-white/20"
+                  className="rounded-full border border-white/30 bg-white/10 px-3 py-1.5 text-[11px] font-semibold transition hover:bg-white/20"
                 >
                   {actionItem.label}
                 </button>
@@ -641,9 +473,9 @@ export default function AICommandWidget() {
             </div>
           </div>
 
-          <div className="flex items-center justify-between border-b border-zinc-200 bg-zinc-50 px-4 py-2.5 dark:border-zinc-700 dark:bg-zinc-800">
+          <div className="flex items-center justify-between border-b border-white/10 bg-white/5 px-4 py-2 text-white/70">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Conversation</span>
+              <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/55">Conversation</span>
             </div>
 
             {pendingConfirmation && (
@@ -668,28 +500,38 @@ export default function AICommandWidget() {
             )}
           </div>
 
-          <div ref={messagesContainerRef} className="flex-1 space-y-3 overflow-y-auto bg-gradient-to-b from-zinc-50/40 to-white p-3 dark:from-zinc-900 dark:to-zinc-900">
-            {messages.map((message, index) => (
-              <MessageBubble key={`${message.role}-${index}`} role={message.role} text={message.text} />
-            ))}
+          <div ref={messagesContainerRef} className="flex-1 overflow-y-auto bg-[radial-gradient(circle_at_top,rgba(14,165,233,0.10),transparent_40%),linear-gradient(180deg,rgba(9,9,11,0.92)_0%,rgba(17,24,39,0.98)_100%)] p-3">
+            <div className="space-y-3">
+              {messages.map((message, index) => (
+                <MessageBubble key={`${message.role}-${index}`} role={message.role} text={message.text} />
+              ))}
+            </div>
             {loading && (
-              <div className="flex items-center gap-2 text-xs text-zinc-500">
+              <div className="mt-3 flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/70">
                 <Loader2 size={14} className="animate-spin" />
                 Thinking...
+              </div>
+            )}
+            {!loading && messages.length <= 1 && (
+              <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 p-3 text-xs text-white/70">
+                <p className="font-semibold text-white">Ready for worker tasks</p>
+                <p className="mt-1 leading-relaxed text-white/60">
+                  Use a quick action above or type a request to see bookings, payouts, availability, or verification status.
+                </p>
               </div>
             )}
             <div ref={messagesEndRef} aria-hidden="true" />
           </div>
 
-          <div className="border-t border-zinc-200 p-3 dark:border-zinc-700">
-            <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-zinc-500">Suggested Prompts</p>
-            <div className="mb-2 flex flex-wrap gap-2">
+          <div className="border-t border-white/10 bg-black/30 p-3 backdrop-blur-md">
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/50">Suggested Prompts</p>
+            <div className="mb-3 flex flex-wrap gap-2">
               {suggestions.map((suggestion) => (
                 <button
                   key={suggestion}
                   type="button"
                   onClick={() => sendMessage(suggestion)}
-                  className="rounded-full border border-zinc-300 px-2 py-1 text-xs text-zinc-700 transition hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                  className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs text-white/75 transition hover:bg-white/10 hover:text-white"
                 >
                   {suggestion}
                 </button>
@@ -707,50 +549,18 @@ export default function AICommandWidget() {
                   }
                 }}
                 placeholder="Type a command..."
-                className="h-10 w-full rounded-xl border border-zinc-300 px-3 text-sm outline-none ring-sky-300 transition focus:ring dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100"
+                className="h-10 w-full rounded-2xl border border-white/10 bg-white/5 px-3 text-sm text-white outline-none ring-sky-300 placeholder:text-white/35 transition focus:ring"
               />
               <button
                 type="button"
-                onClick={isRecording ? stopVoiceRecording : startVoiceRecording}
-                disabled={loading}
-                className={[
-                  'inline-flex h-10 w-10 items-center justify-center rounded-xl text-white transition disabled:cursor-not-allowed disabled:opacity-60',
-                  isRecording ? 'bg-red-600 hover:bg-red-500' : 'bg-emerald-600 hover:bg-emerald-500',
-                ].join(' ')}
-                aria-label={isRecording ? 'Stop voice recording' : 'Start voice recording'}
-                title={isRecording ? 'Stop recording' : 'Start voice command'}
-              >
-                {isRecording ? <Square size={14} /> : <Mic size={14} />}
-              </button>
-              <button
-                type="button"
                 onClick={() => sendMessage(input)}
-                disabled={!canSend || isRecording}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-sky-600 text-white transition disabled:cursor-not-allowed disabled:opacity-60 hover:bg-sky-500"
+                disabled={!canSend}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-sky-500 text-white transition disabled:cursor-not-allowed disabled:opacity-60 hover:bg-sky-400"
                 aria-label="Send message"
               >
                 <Send size={14} />
               </button>
             </div>
-
-            {(isRecording || isProcessingVoice) && (
-              <div className="mt-2 flex items-center justify-between rounded-lg border border-zinc-200 bg-zinc-50 px-2.5 py-1.5 text-[11px] text-zinc-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">
-                {isRecording ? (
-                  <>
-                    <span className="inline-flex items-center gap-1.5 font-medium text-red-500">
-                      <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
-                      Recording...
-                    </span>
-                    <span className="font-semibold tabular-nums">{formatDuration(recordingSeconds)}</span>
-                  </>
-                ) : (
-                  <span className="inline-flex items-center gap-1.5 font-medium">
-                    <Loader2 size={12} className="animate-spin" />
-                    Processing voice command...
-                  </span>
-                )}
-              </div>
-            )}
           </div>
         </div>
       )}
