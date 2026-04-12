@@ -6,7 +6,7 @@ import axios from 'axios';
 import { API_BASE_URL } from '../config/runtime';
 import { clientEnv } from '../config/env';
 import { isNetworkOnline, isSlowConnection } from '../utils/network';
-import { withExponentialBackoff, isRetryableError } from '../utils/retry';
+import { withExponentialBackoff } from '../utils/retry';
 
 // Base API URL - points to backend server
 const API_URL = API_BASE_URL;
