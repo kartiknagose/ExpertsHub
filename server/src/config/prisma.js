@@ -45,19 +45,15 @@ const getConnectionString = () => {
 
 const connectionString = getConnectionString();
 
-const pooledDbMarkers = [
-  'pooler',
-  'pgbouncer',
-  'supabase.co:6543',
-  'supabase.com:6543',
-];
-
-const shouldEnablePgbouncerMode = (url) => {
+function shouldEnablePgbouncerMode(url) {
   const normalized = String(url || '').toLowerCase();
   if (!normalized) return false;
   if (String(process.env.PRISMA_FORCE_PGBOUNCER || '').toLowerCase() === 'true') return true;
-  return pooledDbMarkers.some((marker) => normalized.includes(marker));
-};
+
+  // Keep markers local to avoid TDZ/startup ordering issues.
+  const markers = ['pooler', 'pgbouncer', 'supabase.co:6543', 'supabase.com:6543'];
+  return markers.some((marker) => normalized.includes(marker));
+}
 
 const ensurePgbouncerFlag = (url) => {
   const value = String(url || '').trim();
@@ -277,3 +273,4 @@ const connectWithRetry = async (maxRetries = 3) => {
 
 module.exports = prisma;
 module.exports.connectWithRetry = connectWithRetry;
+
