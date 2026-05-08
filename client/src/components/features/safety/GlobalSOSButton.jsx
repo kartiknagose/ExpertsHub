@@ -22,6 +22,7 @@ const HOLD_DURATION = 3000;
 
 export function GlobalSOSButton() {
     const { activeBooking } = useSOS();
+    const [aiWidgetOpen, setAiWidgetOpen] = useState(() => Boolean(typeof window !== 'undefined' && window.__EXPERTSHUB_AI_WIDGET_OPEN__));
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [holdProgress, setHoldProgress] = useState(0);
@@ -96,18 +97,39 @@ export function GlobalSOSButton() {
     // Cleanup
     useEffect(() => () => { if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current); }, []);
 
+    useEffect(() => {
+        const syncAiWidgetState = (event) => {
+            if (typeof event?.detail?.open === 'boolean') {
+                setAiWidgetOpen(event.detail.open);
+                return;
+            }
+
+            if (typeof window !== 'undefined') {
+                setAiWidgetOpen(Boolean(window.__EXPERTSHUB_AI_WIDGET_OPEN__));
+            }
+        };
+
+        syncAiWidgetState();
+        window.addEventListener('expertshub:ai-widget-toggle', syncAiWidgetState);
+        return () => window.removeEventListener('expertshub:ai-widget-toggle', syncAiWidgetState);
+    }, []);
+
     // Don't render if no active booking
     if (!activeBooking) return null;
+
+    const floatingOffsetClass = aiWidgetOpen
+        ? 'bottom-6 lg:bottom-6'
+        : 'bottom-24 lg:bottom-8';
 
     return (
         <>
             {/* ── Floating SOS Button ── */}
             <Motion.button
                 onClick={() => setIsModalOpen(true)}
-                className="fixed bottom-24 lg:bottom-8 right-4 lg:right-8 z-50 flex items-center gap-2
+                className={`fixed ${floatingOffsetClass} right-4 lg:right-8 z-50 flex items-center gap-2
                            bg-red-600 hover:bg-red-700 active:bg-red-800 text-white
                            px-4 py-3 rounded-2xl shadow-2xl shadow-red-500/50
-                           transition-colors group"
+                           transition-colors group`}
                 initial={{ scale: 0, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0, opacity: 0 }}

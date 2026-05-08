@@ -309,6 +309,15 @@ export default function AICommandWidget() {
     }
   }, [sessionId, open, messages, suggestions]);
 
+  useEffect(() => {
+    try {
+      window.__EXPERTSHUB_AI_WIDGET_OPEN__ = open;
+      window.dispatchEvent(new CustomEvent('expertshub:ai-widget-toggle', { detail: { open } }));
+    } catch {
+      // Best-effort UI coordination only.
+    }
+  }, [open]);
+
   const appendAssistantMessage = (text) => {
     const clean = String(text || '').trim();
     if (!clean) return;
@@ -413,7 +422,7 @@ export default function AICommandWidget() {
     setPendingConfirmation(null);
   };
 
-  const floatingOffsetClass = activeBooking ? 'bottom-24 lg:bottom-10' : 'bottom-5';
+  const floatingOffsetClass = activeBooking ? 'bottom-40 lg:bottom-24' : 'bottom-5';
   const floatingRightClass = activeBooking ? 'right-5 lg:right-8' : 'right-5';
   const floatingPanelStyle = {
     width: 'min(23rem, calc(100vw - 0.75rem))',
