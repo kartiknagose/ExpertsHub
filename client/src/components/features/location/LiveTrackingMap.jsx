@@ -86,32 +86,32 @@ export function LiveTrackingMap({
 }) {
     const { t } = useTranslation();
     const [workerPos, setWorkerPos] = useState(initialWorkerLocation);
-    const [history, setHistory] = useState(initialWorkerLocation ? [[initialWorkerLocation.lat, initialWorkerLocation.lng]] : []);
     const [lastUpdated, setLastUpdated] = useState(new Date());
     const [recenterCount, setRecenterCount] = useState(0);
     const [tileType, setTileType] = useState('streets');
     const [showTileMenu, setShowTileMenu] = useState(false);
-    const [lastInitial, setLastInitial] = useState(initialWorkerLocation);
     const [eta, setEta] = useState(null);
+    const lastInitialRef = useRef(initialWorkerLocation);
 
-    // Sync prop to state after render so we don't trigger rerender loops.
     useEffect(() => {
         if (!initialWorkerLocation) return;
         if (
-            lastInitial &&
-            initialWorkerLocation.lat === lastInitial.lat &&
-            initialWorkerLocation.lng === lastInitial.lng
+            lastInitialRef.current &&
+            initialWorkerLocation.lat === lastInitialRef.current.lat &&
+            initialWorkerLocation.lng === lastInitialRef.current.lng
         ) {
             return;
         }
 
-        setLastInitial(initialWorkerLocation);
-        setWorkerPos(initialWorkerLocation);
-        setHistory((prev) => {
-            if (prev.length > 0) return prev;
-            return [[initialWorkerLocation.lat, initialWorkerLocation.lng]];
+        lastInitialRef.current = initialWorkerLocation;
+
+        const frameId = window.requestAnimationFrame(() => {
+            setWorkerPos(initialWorkerLocation);
+            setLastUpdated(new Date());
         });
-    }, [initialWorkerLocation, lastInitial]);
+
+        return () => window.cancelAnimationFrame(frameId);
+    }, [initialWorkerLocation]);
 
     useEffect(() => {
         const handleLocationUpdate = (event) => {
@@ -119,10 +119,6 @@ export function LiveTrackingMap({
             if (data.workerProfileId === workerId && typeof data.latitude === 'number' && typeof data.longitude === 'number') {
                 const newPos = { lat: data.latitude, lng: data.longitude };
                 setWorkerPos(newPos);
-                setHistory(prev => {
-                    const next = [...prev, [data.latitude, data.longitude]];
-                    return next.slice(-50);
-                });
                 setLastUpdated(new Date());
             }
         };
